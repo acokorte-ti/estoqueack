@@ -31,3 +31,6 @@ frontend/dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Token de acesso ao GitHub (nunca versionar)
+.github_token

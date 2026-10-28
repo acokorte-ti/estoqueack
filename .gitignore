@@ -34,3 +34,4 @@ Thumbs.db
 
 # Token de acesso ao GitHub (nunca versionar)
 .github_token
+.github_token*

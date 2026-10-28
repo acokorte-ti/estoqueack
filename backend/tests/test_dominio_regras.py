@@ -28,15 +28,17 @@ class TestSaldo(unittest.TestCase):
         self.assertEqual(regras.validar_saldo(100, 0, 0).erros[0].codigo, "PESO_INVALIDO")
 
 
-class TestTolerancia20(unittest.TestCase):
-    def test_exatamente_20_passa(self):
-        self.assertEqual(codigos(regras.validar_peso_real(100, 120)), [])
+class TestTolerancia5(unittest.TestCase):
+    def test_exatamente_5_passa(self):
+        self.assertEqual(codigos(regras.validar_peso_real(100, 105)), [])
 
-    def test_acima_20_exige_ciencia(self):
-        r = regras.validar_peso_real(100, 120.1)
+    def test_acima_5_exige_justificativa(self):
+        r = regras.validar_peso_real(100, 106)
         self.assertEqual(r.ocorrencias[0].nivel, Nivel.CIENCIA)
+        self.assertAlmostEqual(r.ocorrencias[0].dados["excedente_kg"], 6)
         self.assertFalse(r.pode_gravar())
         self.assertFalse(r.pode_gravar({"EXCESSO_TOLERANCIA": "  "}), "justificativa vazia não vale")
+        self.assertFalse(r.pode_gravar({"EXCESSO_TOLERANCIA": "ok"}), "justificativa curta não vale")
         self.assertTrue(r.pode_gravar({"EXCESSO_TOLERANCIA": "Só havia bitola 50x610, OP urgente"}))
 
     def test_abaixo_20_so_alerta(self):
@@ -48,9 +50,11 @@ class TestTolerancia20(unittest.TestCase):
         self.assertEqual(codigos(regras.validar_peso_real(100, 115, tolerancia_excesso_pct=10)),
                          ["EXCESSO_TOLERANCIA"])
 
-    def test_sobremetal(self):
+    def test_sobremetal_so_informa(self):
         self.assertEqual(codigos(regras.validar_sobremetal(119, 100)), [])
-        self.assertEqual(codigos(regras.validar_sobremetal(150, 100)), ["SOBREMETAL_ACIMA_TOLERANCIA"])
+        r = regras.validar_sobremetal(150, 100)
+        self.assertEqual(codigos(r), ["SOBREMETAL_ALTO"])
+        self.assertTrue(r.pode_gravar())
 
 
 class TestBitola(unittest.TestCase):

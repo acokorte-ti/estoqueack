@@ -34,6 +34,6 @@ def calcular_peso(d: CalculoPesoEntrada, db: Session = Depends(get_db), cfg: Con
 @router.post("/validar-peso-real")
 def validar_peso_real(d: ValidarPesoEntrada, cfg: Config = Depends(deps.config),
                       _: Usuario = Depends(deps.usuario_liberado)) -> dict:
-    """Pré-visualiza a regra dos 20 % (mesma regra usada nas movimentações)."""
+    """Pré-visualiza a regra de tolerância (5 % de excedente) (mesma regra usada nas movimentações)."""
     r = regras.validar_peso_real(d.previsto_kg, d.real_kg, cfg.tolerancia_excesso_pct, cfg.tolerancia_falta_pct)
     return r.como_dict()

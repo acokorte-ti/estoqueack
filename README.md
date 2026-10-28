@@ -18,7 +18,7 @@ O sistema substitui as planilhas ESTOQUE 2026, Materia Prima Geral, Controle de 
 
 ```
 backend/    API FastAPI (Python 3.12), regras de negócio, migrações Alembic, testes
-  app/domain/         regras puras: peso, tolerância de 20 %, medidas, árvore de lotes
+  app/domain/         regras puras: peso, tolerância de 5 %, medidas, árvore de lotes
   app/api/routes/     endpoints REST (/api/...)
   app/integrations/   conector Mega (somente leitura)
 frontend/   React + TypeScript (Vite)
@@ -81,7 +81,7 @@ Recomendação: mude a conta OCI para **Pay As You Go**. Os recursos Always Free
 
 | Fase | Entrega | Situação |
 |---|---|---|
-| 0 | Fundação: infraestrutura, login, usuários, ligas e densidades, calculadora, regra dos 20 %, CI | **em andamento** |
+| 0 | Fundação: infraestrutura, login, usuários, ligas e densidades, calculadora, regra de tolerância de 5 %, CI | **em andamento** |
 | 1 | Estoque RJ: lotes, consulta, corte, fila RJ, COP, recebimento, SA e migração do histórico | próxima |
 | 2 | Itu: consumo, sobra, RETO rastreado, destinações e restrições | |
 | 3 | Mega: leitura de saldos, OPs e SAs, e conciliação | |

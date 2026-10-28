@@ -70,11 +70,11 @@ def test_admin_cria_usuario_e_perfil_restringe(client):
     assert client.get("/api/painel/resumo").status_code == 200
 
 
-def test_calculadora_e_regra_20(client):
+def test_calculadora_e_regra_5(client):
     h = preparar_admin(client)
     r = client.post("/api/calculadora/peso", json={"formato": "RETANGULAR", "densidade": 7.85, "espessura": 47,
                                                    "largura": 130, "comprimento": 2110, "quantidade": 62}, headers=h)
     assert r.status_code == 200
     assert abs(r.json()["peso_total_kg"] - 6274.585) < 0.01
-    r = client.post("/api/calculadora/validar-peso-real", json={"previsto_kg": 100, "real_kg": 130}, headers=h)
+    r = client.post("/api/calculadora/validar-peso-real", json={"previsto_kg": 100, "real_kg": 106}, headers=h)
     assert r.json()["ocorrencias"][0]["codigo"] == "EXCESSO_TOLERANCIA"

@@ -20,7 +20,7 @@ class Config(BaseSettings):
     admin_nome: str = "Administrador"
     admin_senha_inicial: str = ""
 
-    tolerancia_excesso_pct: float = 20.0
+    tolerancia_excesso_pct: float = 5.0
     tolerancia_falta_pct: float = 20.0
     espessura_serra_mm: float = 3.0
     densidade_padrao: float = 7.85

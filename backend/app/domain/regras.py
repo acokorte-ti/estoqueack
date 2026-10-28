@@ -1,7 +1,8 @@
 """Regras de validação antecipada das movimentações de matéria-prima.
 
 Cada função recebe valores simples e devolve um `Resultado`. Nenhuma grava nada.
-Os percentuais vêm da configuração (padrão 20 %) — decisão do Eduardo em 28/10/2026.
+Tolerância de excesso: padrão 5 % sobre o peso previsto (que JÁ inclui o sobremetal).
+Revisão do Eduardo em 28/10/2026 (antes: 20 %). Valor configurável em TOLERANCIA_EXCESSO_PCT.
 """
 from __future__ import annotations
 
@@ -39,11 +40,12 @@ def validar_saldo(saldo_kg: float, reservado_outros_kg: float, solicitado_kg: fl
 
 
 def validar_peso_real(previsto_kg: float, real_kg: float,
-                      tolerancia_excesso_pct: float = 20.0,
+                      tolerancia_excesso_pct: float = 5.0,
                       tolerancia_falta_pct: float = 20.0) -> Resultado:
     """Compara peso real (balança) com o previsto.
 
-    > previsto + 20 %  → CIÊNCIA obrigatória (ex.: bitola muito maior, OP urgente).
+    O previsto já é calculado com sobremetal, então o excedente aceito é pequeno.
+    > previsto + 5 %   → CIÊNCIA obrigatória: o operador justifica o uso a mais de MP.
     < previsto − 20 %  → ALERTA (provável erro de digitação/pesagem).
     """
     r = validar_quantidade_kg(real_kg, "peso real")
@@ -53,8 +55,9 @@ def validar_peso_real(previsto_kg: float, real_kg: float,
     if desvio_pct > tolerancia_excesso_pct + EPS:
         r.adicionar("EXCESSO_TOLERANCIA", Nivel.CIENCIA,
                     f"Peso real {real_kg:.1f} kg está {desvio_pct:.1f}% acima do previsto ({previsto_kg:.1f} kg). "
-                    f"Limite: {tolerancia_excesso_pct:.0f}%. Confirme que está ciente e justifique.",
-                    previsto_kg=previsto_kg, real_kg=real_kg, desvio_pct=round(desvio_pct, 2))
+                    f"Limite: {tolerancia_excesso_pct:g}%. Justifique o uso de {real_kg - previsto_kg:.1f} kg a mais de "
+                    "matéria-prima.",
+                    excedente_kg=round(real_kg - previsto_kg, 3), previsto_kg=previsto_kg, real_kg=real_kg, desvio_pct=round(desvio_pct, 2))
     elif -desvio_pct > tolerancia_falta_pct + EPS:
         r.adicionar("ABAIXO_PREVISTO", Nivel.ALERTA,
                     f"Peso real {real_kg:.1f} kg está {-desvio_pct:.1f}% abaixo do previsto ({previsto_kg:.1f} kg). "
@@ -65,15 +68,19 @@ def validar_peso_real(previsto_kg: float, real_kg: float,
 
 def validar_sobremetal(peso_bruto_kg: float, peso_peca_kg: float,
                        tolerancia_pct: float = 20.0) -> Resultado:
-    """Na solicitação: material bruto (bitola × comprimento) versus peso previsto da peça."""
+    """Na solicitação: material bruto (bitola × comprimento) versus peso da peça acabada.
+
+    Apenas INFORMATIVO (ALERTA): o sobremetal já faz parte do peso previsto. O controle
+    obrigatório é o de peso real × previsto (5 %) em `validar_peso_real`.
+    """
     r = Resultado()
     if not peso_peca_kg or peso_peca_kg <= 0 or not peso_bruto_kg or peso_bruto_kg <= 0:
         return r
     excesso_pct = (peso_bruto_kg - peso_peca_kg) / peso_peca_kg * 100
     if excesso_pct > tolerancia_pct + EPS:
-        r.adicionar("SOBREMETAL_ACIMA_TOLERANCIA", Nivel.CIENCIA,
+        r.adicionar("SOBREMETAL_ALTO", Nivel.ALERTA,
                     f"O material bruto ({peso_bruto_kg:.1f} kg) gera sobremetal de {excesso_pct:.1f}% sobre a peça "
-                    f"({peso_peca_kg:.1f} kg). Limite: {tolerancia_pct:.0f}%. Confirme que está ciente e justifique.",
+                    f"({peso_peca_kg:.1f} kg). Verifique se não há bitola mais próxima da medida acabada.",
                     peso_bruto_kg=peso_bruto_kg, peso_peca_kg=peso_peca_kg, excesso_pct=round(excesso_pct, 2))
     return r
 

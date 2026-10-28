@@ -69,7 +69,7 @@ export default function Painel() {
           <p>
             Os saldos aparecem aqui depois da importação das planilhas (ESTOQUE 2026, Estoque Geral e histórico de SA),
             prevista para a Fase 1. Enquanto isso, a <Link to="/calculadora">calculadora de peso</Link> já usa as
-            densidades por liga e a regra dos 20 %.
+            densidades por liga e a regra de tolerância de 5 %.
           </p>
         </section>
       )}

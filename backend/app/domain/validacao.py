@@ -12,6 +12,9 @@ from enum import Enum
 from typing import Any
 
 
+JUSTIFICATIVA_MINIMA = 10  # caracteres; evita justificativas vazias como "ok"
+
+
 class Nivel(str, Enum):
     ERRO = "ERRO"
     CIENCIA = "CIENCIA"
@@ -57,7 +60,7 @@ class Resultado:
         """
         conf = {k: (v or "").strip() for k, v in (confirmacoes or {}).items()}
         pend = list(self.erros)
-        pend += [c for c in self.ciencias if len(conf.get(c.codigo, "")) < 5]
+        pend += [c for c in self.ciencias if len(conf.get(c.codigo, "")) < JUSTIFICATIVA_MINIMA]
         return pend
 
     def pode_gravar(self, confirmacoes: dict[str, str] | None = None) -> bool:

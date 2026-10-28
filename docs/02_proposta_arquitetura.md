@@ -28,7 +28,7 @@ Versão 1 para validação, 28/10/2026. Base: `01_Analise_Processo_Atual.md` e a
 | 17 | Endereço e código | `estoque.acokorte.com.br`. Repositório: `github.com/acokorte-ti/estoqueack`. |
 | 18 | Escrita no Mega | Por enquanto só consulta. A arquitetura já deixa um ponto preparado para atualizar o Mega pelo sistema no futuro. |
 | 19 | Hospedagem | **Opção A: OCI Always Free (Ampere A1)**, tanto para homologação quanto para produção. |
-| 20 | Tolerância | Até **20 % acima do peso previsto**. Acima disso, o sistema avisa e exige "estou ciente" com justificativa (caso de bitola muito maior e OP urgente). |
+| 20 | Tolerância | **Revisada em 28/10:** o peso previsto já inclui o sobremetal, então o excedente aceito é de até **5 %**. Acima disso, o sistema alerta e obriga o operador a justificar o uso a mais de matéria-prima. |
 | 21 | Login | **Usuários e senhas no banco do próprio sistema**, sem Microsoft 365. |
 
 ---
@@ -230,16 +230,16 @@ Renato, Fabiano ou Matheus marcam um lote como reservado, ou como "não usar par
 
 O ajuste exige justificativa obrigatória e é destacado nos relatórios.
 
-### 7.9-A Regra dos 20 % (decisão 20)
+### 7.9-A Regra de tolerância de 5 % (decisão 20, revisada)
 
-O parâmetro `TOLERANCIA_EXCESSO_PCT` vale **20 %** e é configurável. A regra se aplica em dois momentos:
+O peso previsto já é calculado **com sobremetal**. Por isso, o excedente aceito é pequeno: o parâmetro `TOLERANCIA_EXCESSO_PCT` vale **5 %** e é configurável.
 
-1. **Na solicitação:** se o peso bruto previsto do material (bitola × comprimento de corte) passar de 20 % acima do peso previsto da peça, o sistema mostra o aviso "sobremetal acima de 20 %" e exige "estou ciente" + justificativa.
-2. **Na liberação ou baixa:** se o peso real passar de 20 % acima do peso previsto, vale a mesma exigência.
+- **Peso real até 5 % acima do previsto:** grava normalmente.
+- **Peso real mais de 5 % acima do previsto:** o sistema alerta, mostra quantos kg a mais estão sendo usados e **só grava com justificativa** (mínimo de 10 caracteres). Exemplo: previsto 100 kg, real 106 kg, então o operador precisa justificar os 6 kg a mais.
+- **Peso real mais de 20 % abaixo do previsto:** alerta simples, porque provavelmente é erro de pesagem ou digitação.
+- **Na solicitação**, a relação entre bitola e peça acabada aparece só como informação (sobremetal alto), sem bloquear.
 
-Se o peso real ficar **mais de 20 % abaixo** do previsto, o sistema mostra um alerta simples, porque provavelmente é erro de digitação ou de pesagem.
-
-Toda exceção aceita fica registrada (quem, quando e por quê) e aparece no painel "Exceções de tolerância" do administrador.
+Toda justificativa fica registrada (quem, quando, quanto a mais e por quê) e aparece no painel "Exceções de tolerância" do administrador.
 
 ### 7.9 Tolerância de peso por perda de corte
 

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core import seguranca
@@ -129,7 +130,11 @@ def garantir_admin_inicial(db: Session, cfg: Config) -> None:
         raise RuntimeError("Nenhum usuário cadastrado: defina ADMIN_SENHA_INICIAL no .env para criar o administrador.")
     u = Usuario(login=cfg.admin_login.strip().lower(), nome=cfg.admin_nome, perfil="ADMIN", planta="ITU",
                 senha_hash=seguranca.gerar_hash_senha(cfg.admin_senha_inicial), trocar_senha=True)
-    db.add(u)
-    db.flush()
-    auditoria.registrar(db, "ADMIN_INICIAL_CRIADO", usuario_id=u.id, entidade="usuario", entidade_id=u.id)
-    db.commit()
+    try:
+        db.add(u)
+        db.flush()
+        auditoria.registrar(db, "ADMIN_INICIAL_CRIADO", usuario_id=u.id, entidade="usuario", entidade_id=u.id)
+        db.commit()
+    except IntegrityError:
+        # Outro worker da API criou o admin ao mesmo tempo; nada a fazer.
+        db.rollback()

@@ -1,0 +1,21 @@
+[project]
+name = "estoqueack-backend"
+version = "0.1.0"
+description = "EstoqueACK — controle de matéria-prima AçoKorte (API)"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S"]
+ignore = ["S101", "E741"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S"]
+"alembic/*" = ["E501"]

@@ -1,0 +1,33 @@
+# Segredos e ambiente
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Dados reais da empresa NUNCA vão para o repositório
+*.xlsx
+*.xls
+*.csv
+dados/
+backups/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Node
+node_modules/
+frontend/dist/
+
+# IDE / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

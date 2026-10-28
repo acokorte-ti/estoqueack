@@ -39,7 +39,8 @@ def _aware(dt: datetime | None) -> datetime | None:
 MSG_GENERICA = "Login ou senha inválidos."
 
 
-def autenticar(db: Session, cfg: Config, login: str, senha: str, ip: str | None, user_agent: str | None) -> SessaoCriada:
+def autenticar(db: Session, cfg: Config, login: str, senha: str, ip: str | None,
+               user_agent: str | None) -> SessaoCriada:
     login = (login or "").strip().lower()
     usuario = db.scalar(select(Usuario).where(Usuario.login == login))
 

@@ -102,7 +102,8 @@ def validar_perda_corte(peso_antes_kg: float, consumo_kg: float, sobra_kg: float
     perda_real = round(peso_antes_kg - consumo_kg - sobra_kg, 3)
     if perda_real < -EPS:
         r.adicionar("SOMA_MAIOR_QUE_LOTE", Nivel.ERRO,
-                    f"Consumo + sobra ({consumo_kg + sobra_kg:.1f} kg) é maior que o peso do lote ({peso_antes_kg:.1f} kg).",
+                    f"Consumo + sobra ({consumo_kg + sobra_kg:.1f} kg) é maior que o peso do lote "
+                    f"({peso_antes_kg:.1f} kg).",
                     perda_real_kg=perda_real)
         return r
     limite = perda_esperada_kg + peso_antes_kg * margem_pct / 100

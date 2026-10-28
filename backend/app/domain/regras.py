@@ -53,11 +53,13 @@ def validar_peso_real(previsto_kg: float, real_kg: float,
         return r
     desvio_pct = (real_kg - previsto_kg) / previsto_kg * 100
     if desvio_pct > tolerancia_excesso_pct + EPS:
+        excedente = round(real_kg - previsto_kg, 3)
         r.adicionar("EXCESSO_TOLERANCIA", Nivel.CIENCIA,
                     f"Peso real {real_kg:.1f} kg está {desvio_pct:.1f}% acima do previsto ({previsto_kg:.1f} kg). "
-                    f"Limite: {tolerancia_excesso_pct:g}%. Justifique o uso de {real_kg - previsto_kg:.1f} kg a mais de "
+                    f"Limite: {tolerancia_excesso_pct:g}%. Justifique o uso de {excedente:.1f} kg a mais de "
                     "matéria-prima.",
-                    excedente_kg=round(real_kg - previsto_kg, 3), previsto_kg=previsto_kg, real_kg=real_kg, desvio_pct=round(desvio_pct, 2))
+                    excedente_kg=excedente, previsto_kg=previsto_kg, real_kg=real_kg,
+                    desvio_pct=round(desvio_pct, 2))
     elif -desvio_pct > tolerancia_falta_pct + EPS:
         r.adicionar("ABAIXO_PREVISTO", Nivel.ALERTA,
                     f"Peso real {real_kg:.1f} kg está {-desvio_pct:.1f}% abaixo do previsto ({previsto_kg:.1f} kg). "
@@ -93,7 +95,7 @@ def validar_bitola(bitola_esp: float | None, bitola_larg: float | None, bitola_d
     pec = sorted([v for v in (peca_esp, peca_larg) if v]) if not peca_diam else [peca_diam, peca_diam]
     if len(bit) < 2 or len(pec) < 2:
         return r
-    if any(p > b + EPS for p, b in zip(pec, bit)):
+    if any(p > b + EPS for p, b in zip(pec, bit, strict=False)):
         r.adicionar("BITOLA_MENOR_QUE_PECA", Nivel.ERRO,
                     "A bitola do lote é menor que a medida acabada da peça.",
                     bitola=bit, peca=pec)

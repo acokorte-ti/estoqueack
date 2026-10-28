@@ -33,11 +33,11 @@ class Ocorrencia:
 class Resultado:
     ocorrencias: list[Ocorrencia] = field(default_factory=list)
 
-    def adicionar(self, codigo: str, nivel: Nivel, mensagem: str, **dados: Any) -> "Resultado":
+    def adicionar(self, codigo: str, nivel: Nivel, mensagem: str, **dados: Any) -> Resultado:
         self.ocorrencias.append(Ocorrencia(codigo, nivel, mensagem, dados))
         return self
 
-    def juntar(self, outro: "Resultado") -> "Resultado":
+    def juntar(self, outro: Resultado) -> Resultado:
         self.ocorrencias.extend(outro.ocorrencias)
         return self
 

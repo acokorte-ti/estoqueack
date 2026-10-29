@@ -5,6 +5,7 @@ ordem de produção, SA e MOVIMENTOS de estoque, usando valores conhecidos das p
 
 Uso (na máquina do Eduardo, que tem rota até o Oracle):
     py -m pip install oracledb
+    $env:ORACLE_IC="C:\\Users\\<user>\\oracle\\instantclient_23_0"   # Instant Client (exigido pela criptografia)
     py descobrir_mega.py --credenciais ..\\..\\.mega_ro        (arquivo com 3 linhas: dsn, usuario, senha)
 
 Saída: relatorio_mega_AAAAMMDD_HHMM.md (na pasta atual). NÃO contém dados de clientes além dos
@@ -30,8 +31,12 @@ PALAVRAS_TABELA = ["PRODUTO", "PROD", "ITEM", "MATERIAL", "ESTOQUE", "SALDO", "O
 
 
 def conectar(arq: Path):
+    import os
+
     import oracledb
-    dsn, usuario, senha = [l.strip() for l in arq.read_text(encoding="utf-8").splitlines()[:3]]
+    if os.environ.get("ORACLE_IC"):  # banco exige Native Network Encryption → modo thick
+        oracledb.init_oracle_client(lib_dir=os.environ["ORACLE_IC"])
+    dsn, usuario, senha = [l.strip() for l in arq.read_text(encoding="utf-8-sig").splitlines()[:3]]
     con = oracledb.connect(user=usuario, password=senha, dsn=dsn)
     con.call_timeout = 60_000  # ms
     cur = con.cursor()

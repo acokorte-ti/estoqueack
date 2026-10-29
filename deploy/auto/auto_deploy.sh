@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Deploy automático "por puxada" (pull) do EstoqueACK no system-lab.
 # O servidor verifica a branch main no GitHub e só publica commits com o CI 100 % verde.
-# Nada entra no servidor por SSH. Agendado no cron do usuário ubuntu a cada 5 minutos:
-#   */5 * * * * $HOME/apps/estoqueack/deploy/auto/auto_deploy.sh >> $HOME/.local/state/estoqueack-deploy.log 2>&1
+# Nada entra no servidor por SSH. Instalado em ~/.local/bin/estoqueack-auto-deploy.sh (fora do repositório,
+# para não depender da versão em uso) e agendado no cron do usuário ubuntu a cada 5 minutos:
+#   */5 * * * * $HOME/.local/bin/estoqueack-auto-deploy.sh >> $HOME/.local/state/estoqueack-deploy.log 2>&1
+# Ele se reinstala sozinho a partir do repositório após cada publicação bem-sucedida.
 #
 # Regras:
 #  - backend/ ou backend do compose mudou  → backup do banco + rebuild do container api (migrações rodam na subida)
@@ -53,7 +55,10 @@ if [[ " ${SERV[*]} " == *" api "* ]]; then
   deploy/backup/backup.sh || { log "ERRO no backup pré-deploy — publicação cancelada"; exit 1; }
 fi
 git merge -q --ff-only "$NOVO" || { log "ERRO: árvore local divergente, nada publicado"; exit 1; }
-[ ${#SERV[@]} -eq 0 ] && { log "ok (sem serviço para reconstruir)"; exit 0; }
+if [ ${#SERV[@]} -eq 0 ]; then
+  install -D -m 755 deploy/auto/auto_deploy.sh "$HOME/.local/bin/estoqueack-auto-deploy.sh"
+  log "OK ${NOVO:0:7} (sem serviço para reconstruir)"; exit 0
+fi
 
 testar() {
   for _ in $(seq 1 30); do
@@ -66,6 +71,7 @@ testar() {
 if docker compose up -d --build "${SERV[@]}" >"$ESTADO/estoqueack-deploy-build.log" 2>&1 && testar; then
   log "OK ${NOVO:0:7} no ar"
   echo "$NOVO" > "$ESTADO/estoqueack-deploy.ultimo_ok"
+  install -D -m 755 deploy/auto/auto_deploy.sh "$HOME/.local/bin/estoqueack-auto-deploy.sh"
 else
   log "FALHOU ${NOVO:0:7} — voltando para ${ATUAL:0:7} (ver estoqueack-deploy-build.log)"
   echo "$NOVO" > "$ESTADO/estoqueack-deploy.recusado"

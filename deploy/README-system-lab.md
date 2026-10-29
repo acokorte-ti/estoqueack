@@ -25,9 +25,9 @@ Crie um registro **A** de `estoque.acokorte.com.br` apontando para **204.216.137
 ## 3. nginx e certificado (como root, uma vez)
 
 ```bash
+# O site padrão da porta 80 (http-porta80) já atende /.well-known/acme-challenge em /var/www/certbot
+sudo certbot certonly --webroot -w /var/www/certbot -d estoque.acokorte.com.br --non-interactive --agree-tos
 sudo cp ~/apps/estoqueack/deploy/nginx-host/estoque.acokorte.com.br.conf /etc/nginx/sites-available/estoqueack
-# 1º, só o bloco da porta 80, para emitir o certificado:
-sudo certbot certonly --webroot -w /var/www/html -d estoque.acokorte.com.br
 sudo ln -s /etc/nginx/sites-available/estoqueack /etc/nginx/sites-enabled/estoqueack
 sudo nginx -t && sudo systemctl reload nginx
 ```

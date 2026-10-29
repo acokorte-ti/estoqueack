@@ -34,10 +34,17 @@ sudo nginx -t && sudo systemctl reload nginx   # nunca recarregar se o teste fal
 
 A renovação do certificado é automática, pelo timer do certbot que os outros sites já usam.
 
-## 4. Atualizar a versão
+## 4. Atualizações: deploy automático
 
-```bash
-cd ~/apps/estoqueack && git pull && docker compose up -d --build
-```
+O cron do usuário `ubuntu` roda `deploy/auto/auto_deploy.sh` a cada 5 minutos. Ele verifica a branch `main` e **só publica commits com o CI todo verde**:
 
-Isso fica temporário até o runner do GitHub Actions automatizar o deploy.
+- Mudanças no backend: faz backup e reconstrói o container `api`.
+- Mudanças no frontend: reconstrói só o container `web`.
+- Se o teste depois da publicação falhar, volta sozinho para a versão anterior.
+- Mudanças em `deploy/nginx-host/` **não** são aplicadas automaticamente, porque precisam de sudo.
+
+O log fica em `~/.local/state/estoqueack-deploy.log`.
+
+Optou-se por esse modelo "de puxada" em vez de um *runner* do GitHub no servidor porque o repositório é público, e o GitHub desaconselha runners próprios em repositórios públicos.
+
+Quando for preciso publicar só o frontend na mão: `ssh system-lab 'bash -s' < scripts/deploy_web.sh`.

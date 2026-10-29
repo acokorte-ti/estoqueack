@@ -55,13 +55,12 @@ jobs:
       - run: npm run build
 
   docker:
-    runs-on: ubuntu-latest
+    # Build nativo em ARM64 (mesma arquitetura do system-lab), sem emulação QEMU
+    runs-on: ubuntu-24.04-arm
     needs: [backend, frontend]
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - name: Build ARM64 (OCI Ampere)
+      - name: Build ARM64 (system-lab / OCI Ampere)
         run: |
-          docker buildx build --platform linux/arm64 -t estoqueack-api ./backend
-          docker buildx build --platform linux/arm64 -f deploy/Dockerfile.web -t estoqueack-web .
+          docker build -t estoqueack-api ./backend
+          docker build -f deploy/Dockerfile.web -t estoqueack-web .

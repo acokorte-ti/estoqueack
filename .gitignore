@@ -39,3 +39,9 @@ Thumbs.db
 # Credenciais do Mega e relatórios de mapeamento (nunca versionar)
 .mega_ro*
 relatorio_mega_*.md
+
+# Senhas e anotações locais (incidente 2026-10-29: pass_bkp/pass.txt foi publicado por engano)
+pass_bkp/
+*senha*
+*pass*.txt
+*.secret

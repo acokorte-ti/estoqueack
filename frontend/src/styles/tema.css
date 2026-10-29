@@ -1,0 +1,57 @@
+/* =====================================================================
+   EstoqueACK — TEMA PADRÃO (identidade AçoKorte)
+   Fonte das cores: www.acokorte.com.br (vermelho do logo, vermelho dos
+   títulos, grafite dos botões, cinzas claros, hero de aço escovado).
+   Regras de uso: estoqueack/docs/ux/02_tema_visual.md
+   Nenhuma tela define cor, fonte ou tamanho fora destes tokens.
+   ===================================================================== */
+:root {
+  /* ---- Marca ---- */
+  --ack-vermelho: #ea1d26;          /* vermelho do logo: só marca e detalhes, nunca texto pequeno */
+  --ack-vermelho-escuro: #be0a0f;   /* vermelho dos títulos do site: botão principal (contraste 6,4:1 com branco) */
+  --ack-vermelho-hover: #9b0a0e;
+  --ack-vermelho-claro: #fbe9e9;
+
+  /* ---- Aço (neutros) ---- */
+  --aco-preto: #222222;             /* títulos */
+  --aco-grafite: #3b3b3b;           /* texto e botão secundário (cor dos botões do site) */
+  --aco-chumbo: #2c2e31;            /* menu lateral */
+  --aco-medio: #6b7075;             /* texto de apoio (5,0:1 no branco) */
+  --aco-borda: #8a9096;             /* borda de campo (3,2:1, visível) */
+  --aco-linha: #e1e1e1;             /* divisórias */
+  --aco-claro: #f7f7f7;             /* fundo da aplicação */
+  --branco: #ffffff;
+
+  /* ---- Significado fixo (não mudar sem registrar em DECISOES.md) ---- */
+  --estoque-mega: #2f5d8a;          /* azul: Estoque Mega (fiscal e físico Itu) */
+  --estoque-rj-rio: #6b4e7a;        /* púrpura: RJ no Rio */
+  --estoque-rj-itu: #8c5a2b;        /* bronze: RJ em Itu */
+  --ciencia: #9a7208;  --ciencia-fundo: #fbf3dc;   /* amarelo: exige "estou ciente" */
+  --bloqueio: #b3261e; --bloqueio-fundo: #fceeee;  /* vermelho: bloqueia (sempre com ícone e texto) */
+  --aviso: #5b6168;    --aviso-fundo: #eef0f2;     /* cinza: só aviso */
+  --sucesso: #2e7151;  --sucesso-fundo: #e5f2ea;   /* verde: gravado / dentro da tolerância */
+  --foco: #1f6fd1;                                 /* anel de foco do teclado: azul, distinto da marca */
+
+  /* ---- Tipografia (mesmas famílias do site) ---- */
+  --f-titulo: "Raleway", "Open Sans", system-ui, sans-serif;
+  --f-texto: "Open Sans", system-ui, sans-serif;
+  --t-pequeno: 0.875rem;   /* 14 px: ajuda, rodapé */
+  --t-base: 1rem;          /* 16 px: texto, campos, botões */
+  --t-medio: 1.25rem;      /* 20 px: h2 */
+  --t-grande: 1.75rem;     /* 28 px: h1 */
+  --t-numero: 2.75rem;     /* 44 px: peso em destaque */
+
+  /* ---- Medidas ---- */
+  --toque: 3rem;           /* 48 px: altura mínima de botão, campo e item de menu */
+  --toque-grande: 3.5rem;  /* 56 px: botão principal no tablet/celular */
+  --raio: 4px;             /* campos e botões (site usa 5 px) */
+  --raio-painel: 6px;
+  --esp-1: 0.25rem; --esp-2: 0.5rem; --esp-3: 0.75rem; --esp-4: 1rem;
+  --esp-5: 1.5rem;  --esp-6: 2rem;   --esp-7: 3rem;
+
+  /* ---- Aço escovado (o elemento marcante do tema; usar só em login e no topo do menu) ---- */
+  --aco-escovado:
+    repeating-linear-gradient(115deg, rgba(255,255,255,0.06) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(115deg, rgba(0,0,0,0.10) 0 2px, transparent 2px 7px),
+    linear-gradient(115deg, #1f2124 0%, #4a4e53 38%, #8e949a 52%, #3f4347 66%, #1c1e21 100%);
+}

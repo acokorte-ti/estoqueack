@@ -27,6 +27,7 @@ export default function TrocarSenha() {
   return (
     <div className="entrada">
       <form className="entrada-form" onSubmit={enviar}>
+        <img className="entrada-logo" src="/logo-acokorte.png" alt="AçoKorte" width={216} height={44} />
         <h1>Nova senha</h1>
         <p className="entrada-sub">
           {usuario?.trocar_senha

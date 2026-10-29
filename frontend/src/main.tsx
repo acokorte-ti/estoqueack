@@ -1,10 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import "@fontsource/barlow/400.css";
-import "@fontsource/barlow/500.css";
-import "@fontsource/barlow/600.css";
-import "@fontsource/barlow-semi-condensed/600.css";
+// Mesmas famílias do site www.acokorte.com.br: Raleway nos títulos, Open Sans no texto
+import "@fontsource/open-sans/400.css";
+import "@fontsource/open-sans/600.css";
+import "@fontsource/open-sans/700.css";
+import "@fontsource/raleway/700.css";
 import "./styles/app.css";
 import App from "./App";
 import { SessaoProvider } from "./api/sessao";

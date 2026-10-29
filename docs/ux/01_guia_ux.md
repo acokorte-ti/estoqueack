@@ -57,7 +57,7 @@ Operador de chão de fábrica (Marcelo no RJ, Fabiano e Matheus em Itu), muitas 
 | `TabelaOuCartoes` | tabela no computador, cartões no celular |
 | `CampoMega` | campo [MEGA] com estado "não confirmado no Mega" quando o Mega estiver fora (§7) |
 
-Cores com significado fixo (já no `app.css`): azul = Estoque Mega, púrpura = RJ no Rio, bronze = RJ em Itu, palha = exige "estou ciente", vermelho = bloqueia.
+Cores, fontes e botões: ver o tema padrão em `02_tema_visual.md` (identidade AçoKorte; tokens em `frontend/src/styles/tema.css`). Cores com significado fixo: azul = Estoque Mega, púrpura = RJ no Rio, bronze = RJ em Itu, amarelo = exige "estou ciente", caixa vermelha com ✕ = bloqueia.
 
 ## 6. Ordem proposta de construção
 

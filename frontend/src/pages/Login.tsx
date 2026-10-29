@@ -31,6 +31,7 @@ export default function Login() {
   return (
     <div className="entrada">
       <form className="entrada-form" onSubmit={enviar}>
+        <img className="entrada-logo" src="/logo-acokorte.png" alt="AçoKorte" width={216} height={44} />
         <h1>EstoqueACK</h1>
         <p className="entrada-sub">Controle de matéria-prima de Itu e Barra Mansa</p>
         <label>

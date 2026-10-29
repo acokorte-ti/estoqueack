@@ -35,3 +35,7 @@ Thumbs.db
 # Token de acesso ao GitHub (nunca versionar)
 .github_token
 .github_token*
+
+# Credenciais do Mega e relatórios de mapeamento (nunca versionar)
+.mega_ro*
+relatorio_mega_*.md

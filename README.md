@@ -9,6 +9,7 @@ O sistema substitui as planilhas ESTOQUE 2026, Materia Prima Geral, Controle de 
 
 | Documento | Conteúdo |
 |---|---|
+| [docs/tecnico/00_RETOMAR_PROJETO.md](docs/tecnico/00_RETOMAR_PROJETO.md) | **Comece aqui para retomar a parte técnica:** onde está cada coisa, segredos, operação e lições |
 | [docs/01_analise_processo_atual.md](docs/01_analise_processo_atual.md) | Levantamento do processo e das planilhas |
 | [docs/02_proposta_arquitetura.md](docs/02_proposta_arquitetura.md) | Arquitetura, fluxos, validações, telas e banco |
 | [docs/03_especificacao_funcional.md](docs/03_especificacao_funcional.md) | Especificação funcional: fluxo completo, telas, botões, origem de cada dado, carga inicial |

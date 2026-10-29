@@ -32,6 +32,9 @@ if [ -n "${BACKUP_COPIA_EXTERNA:-}" ]; then
   $BACKUP_COPIA_EXTERNA "$ARQ" && echo "$(date -Is) cópia externa enviada"
 fi
 
-find "$DESTINO" -name 'estoqueack_*.sql.gz.gpg' -mtime +"$RETENCAO_DIAS" -delete
-# Retém também 1 backup por mês dos últimos 12 meses (o do dia 1º)
-find "$DESTINO" -name 'estoqueack_*01_*.sql.gz.gpg' -mtime -366 -exec touch -c {} + 2>/dev/null || true
+# Retenção: diários por $RETENCAO_DIAS dias; no dia 1º, uma cópia vai para mensal/ (guardada 12 meses)
+if [ "$(date +%d)" = "01" ]; then
+  mkdir -p "$DESTINO/mensal" && cp -p "$ARQ" "$DESTINO/mensal/"
+fi
+find "$DESTINO" -maxdepth 1 -name 'estoqueack_*.sql.gz.gpg' -mtime +"$RETENCAO_DIAS" -delete
+find "$DESTINO/mensal" -name 'estoqueack_*.sql.gz.gpg' -mtime +366 -delete 2>/dev/null || true

@@ -29,7 +29,7 @@ Crie um registro **A** de `estoque.acokorte.com.br` apontando para **204.216.137
 sudo certbot certonly --webroot -w /var/www/certbot -d estoque.acokorte.com.br --non-interactive --agree-tos
 sudo cp ~/apps/estoqueack/deploy/nginx-host/estoque.acokorte.com.br.conf /etc/nginx/sites-available/estoqueack
 sudo ln -s /etc/nginx/sites-available/estoqueack /etc/nginx/sites-enabled/estoqueack
-sudo nginx -t && sudo systemctl reload nginx
+sudo nginx -t && sudo systemctl reload nginx   # nunca recarregar se o teste falhar
 ```
 
 A renovação do certificado é automática, pelo timer do certbot que os outros sites já usam.

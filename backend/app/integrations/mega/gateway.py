@@ -68,7 +68,8 @@ class OracleMegaGateway:
             oracledb.init_oracle_client(lib_dir=cfg.mega_instant_client)
         self._cfg = cfg
         self._pool = oracledb.create_pool(user=cfg.mega_usuario, password=cfg.mega_senha, dsn=cfg.mega_dsn,
-                                          min=1, max=4, increment=1)
+                                          min=1, max=2, increment=1)
+        # 2 workers × 2 conexões = 4, igual ao SESSIONS_PER_USER do perfil estoqueack_ro_perfil no Oracle
 
     def _consultar(self, sql: str, **params) -> list[tuple]:
         with self._pool.acquire() as con:

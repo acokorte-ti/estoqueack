@@ -56,20 +56,9 @@ pytest                                                   # tudo (precisa de requ
 python -m unittest discover -s tests -p "test_dominio*"  # só regras de negócio, sem dependências
 ```
 
-## Implantação na OCI (Always Free, Ampere A1)
+## Implantação
 
-1. Crie a VM com Ubuntu 22.04 ou 24.04 (ARM). Na Security List, libere as portas 22, 80 e 443.
-2. No DNS, crie um registro `A` de `estoque.acokorte.com.br` apontando para o IP público da VM.
-3. Na VM:
-   ```bash
-   git clone https://github.com/acokorte-ti/estoqueack /opt/estoqueack && cd /opt/estoqueack
-   bash deploy/oci/preparar-vm.sh          # depois, saia e entre de novo no SSH
-   cp .env.example .env && nano .env       # defina senhas, chave secreta e APP_ENV=prod
-   docker compose up -d --build
-   ```
-4. Agende o backup diário (veja o cabeçalho de `deploy/backup/backup.sh`) e faça um teste de restauração.
-
-Recomendação: mude a conta OCI para **Pay As You Go**. Os recursos Always Free continuam gratuitos, e a Oracle deixa de recuperar instâncias ociosas.
+A homologação roda no **system-lab** (servidor Linux ARM64 da empresa na OCI), atrás do nginx do servidor, no mesmo padrão dos outros sistemas internos. O passo a passo está em [deploy/README-system-lab.md](deploy/README-system-lab.md). O backup diário está em `deploy/backup/`.
 
 ## Segurança
 

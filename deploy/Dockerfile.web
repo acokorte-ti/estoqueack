@@ -6,7 +6,8 @@ RUN npm ci || npm install
 COPY frontend/ .
 RUN npm run build
 
-# Etapa 2: Caddy servindo estáticos + proxy para a API, HTTPS automático
-FROM caddy:2-alpine
-COPY deploy/Caddyfile /etc/caddy/Caddyfile
-COPY --from=build /app/dist /srv
+# Etapa 2: nginx servindo os estáticos e encaminhando /api para a API.
+# O HTTPS fica no nginx do servidor (host), que encaminha para 127.0.0.1:${WEB_PORTA}.
+FROM nginx:1.27-alpine
+COPY deploy/nginx-container.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html

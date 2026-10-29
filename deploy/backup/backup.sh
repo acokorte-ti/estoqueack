@@ -1,27 +1,37 @@
 #!/usr/bin/env bash
-# Backup diário do PostgreSQL (dump compactado + criptografado).
-# Agendar no cron da VM:  15 2 * * *  /opt/estoqueack/deploy/backup/backup.sh >> /var/log/estoqueack-backup.log 2>&1
-# Requisitos: arquivo .env na raiz do projeto; BACKUP_GPG_SENHA definido em /etc/estoqueack-backup.env
-#             (opcional) OCI CLI configurado para envio ao Object Storage (bucket BACKUP_BUCKET).
+# Backup diário do PostgreSQL do EstoqueACK: dump → gzip → GPG (AES256).
+# Agendado no cron do usuário ubuntu (system-lab):
+#   15 2 * * *  $HOME/apps/estoqueack/deploy/backup/backup.sh >> $HOME/.local/state/estoqueack-backup.log 2>&1
+# Configuração (fora do repositório, permissão 600): ~/.config/estoqueack/backup.env
+#   BACKUP_GPG_SENHA=...        (OBRIGATÓRIA; guarde uma cópia no cofre de senhas — sem ela o backup não abre)
+#   BACKUP_DIR=/var/backups/estoqueack
+#   BACKUP_RETENCAO_DIAS=30
+#   BACKUP_COPIA_EXTERNA=...    (opcional: comando que recebe o arquivo como $1, ex. envio ao Object Storage)
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-source .env
-[ -f /etc/estoqueack-backup.env ] && source /etc/estoqueack-backup.env
+set -a; source .env; set +a
+CONF=${ESTOQUEACK_BACKUP_CONF:-$HOME/.config/estoqueack/backup.env}
+[ -f "$CONF" ] && source "$CONF"
 
 DESTINO=${BACKUP_DIR:-/var/backups/estoqueack}
 RETENCAO_DIAS=${BACKUP_RETENCAO_DIAS:-30}
 mkdir -p "$DESTINO"
 ARQ="$DESTINO/estoqueack_$(date +%Y%m%d_%H%M%S).sql.gz.gpg"
+TMP="$ARQ.parcial"
+trap 'rm -f "$TMP"' EXIT
 
-docker compose exec -T db pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=plain --no-owner \
+docker compose exec -T db pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=plain --no-owner --no-privileges \
   | gzip -9 \
-  | gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase "${BACKUP_GPG_SENHA:?defina BACKUP_GPG_SENHA}" -o "$ARQ"
-
+  | gpg --batch --yes --quiet --symmetric --cipher-algo AES256 \
+        --passphrase-fd 3 -o "$TMP" 3<<<"${BACKUP_GPG_SENHA:?defina BACKUP_GPG_SENHA em $CONF}"
+mv "$TMP" "$ARQ"
+chmod 600 "$ARQ"
 echo "$(date -Is) backup gerado: $ARQ ($(du -h "$ARQ" | cut -f1))"
 
-if [ -n "${BACKUP_BUCKET:-}" ] && command -v oci >/dev/null; then
-  oci os object put --bucket-name "$BACKUP_BUCKET" --file "$ARQ" --name "$(basename "$ARQ")" --force
-  echo "$(date -Is) enviado ao Object Storage: $BACKUP_BUCKET"
+if [ -n "${BACKUP_COPIA_EXTERNA:-}" ]; then
+  $BACKUP_COPIA_EXTERNA "$ARQ" && echo "$(date -Is) cópia externa enviada"
 fi
 
 find "$DESTINO" -name 'estoqueack_*.sql.gz.gpg' -mtime +"$RETENCAO_DIAS" -delete
+# Retém também 1 backup por mês dos últimos 12 meses (o do dia 1º)
+find "$DESTINO" -name 'estoqueack_*01_*.sql.gz.gpg' -mtime -366 -exec touch -c {} + 2>/dev/null || true

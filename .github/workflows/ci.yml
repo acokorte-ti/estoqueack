@@ -6,6 +6,14 @@ on:
   pull_request:
 
 jobs:
+  segredos:
+    # Bloqueia senhas/tokens nos arquivos do commit (incidente 2026-10-29). Sem segredo encontrado = verde.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: gitleaks (arquivos atuais)
+        run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2 dir /repo --config /repo/.gitleaks.toml --redact --no-banner
+
   backend:
     runs-on: ubuntu-latest
     services:
@@ -57,7 +65,7 @@ jobs:
   docker:
     # Build nativo em ARM64 (mesma arquitetura do system-lab), sem emulação QEMU
     runs-on: ubuntu-24.04-arm
-    needs: [backend, frontend]
+    needs: [segredos, backend, frontend]
     steps:
       - uses: actions/checkout@v4
       - name: Build ARM64 (system-lab / OCI Ampere)

@@ -1,0 +1,18 @@
+# Regras do gitleaks para o EstoqueACK (CI, job "segredos").
+[extend]
+useDefault = true
+
+[[rules]]
+id = "estoqueack-variavel-segredo"
+description = "Variável de senha/token/chave com valor real (ex.: BACKUP_GPG_SENHA=..., MEGA_SENHA=...)"
+regex = '''(?i)\b[A-Z0-9_]*(SENHA|PASSWORD|PASSWD|SECRET|TOKEN|SECRET_KEY)[A-Z0-9_]*\s*[=:]\s*["']?([A-Za-z0-9_\-+/=.@!#$%^&*]{12,})'''
+secretGroup = 2
+# Só em arquivos de configuração/anotação (no código Python/TS a palavra "senha" aparece sem valor real)
+path = '''(?i)(\.txt|\.env[^/]*|\.ini|\.cfg|\.conf|\.ya?ml|\.toml|\.properties|\.json)$'''
+entropy = 3.0
+  [rules.allowlist]
+  # valores de exemplo/placeholder usados no .env.example e na documentação
+  regexes = ['''(?i)(troque|exemplo|changeme|seu_|sua_|<[^>]+>|\$\{|xxxx)''']
+
+[allowlist]
+paths = ['''(^|/)\.env\.example$''', '''(^|/)package-lock\.json$''', '''(^|/)\.gitleaks\.toml$''']

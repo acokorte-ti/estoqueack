@@ -237,7 +237,7 @@ O peso previsto já é calculado **com sobremetal**. Por isso, o excedente aceit
 - **Peso real até 5 % acima do previsto:** grava normalmente.
 - **Peso real mais de 5 % acima do previsto:** o sistema alerta, mostra quantos kg a mais estão sendo usados e **só grava com justificativa** (mínimo de 10 caracteres). Exemplo: previsto 100 kg, real 106 kg, então o operador precisa justificar os 6 kg a mais.
 - **Peso real mais de 20 % abaixo do previsto:** alerta simples, porque provavelmente é erro de pesagem ou digitação.
-- **Na solicitação**, a relação entre bitola e peça acabada aparece só como informação (sobremetal alto), sem bloquear.
+- **Na solicitação (decisão de 29/10):** o sistema compara o peso bruto que será cortado da bitola com o peso da peça acabada. Se o sobremetal passar de **20 %** (`TOLERANCIA_SOBREMETAL_PCT`, configurável), a solicitação só é aceita com justificativa. Exemplo: "OP urgente, só havia bitola 50×610".
 
 Toda justificativa fica registrada (quem, quando, quanto a mais e por quê) e aparece no painel "Exceções de tolerância" do administrador.
 

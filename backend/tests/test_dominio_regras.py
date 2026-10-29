@@ -50,11 +50,16 @@ class TestTolerancia5(unittest.TestCase):
         self.assertEqual(codigos(regras.validar_peso_real(100, 115, tolerancia_excesso_pct=10)),
                          ["EXCESSO_TOLERANCIA"])
 
-    def test_sobremetal_so_informa(self):
-        self.assertEqual(codigos(regras.validar_sobremetal(119, 100)), [])
-        r = regras.validar_sobremetal(150, 100)
-        self.assertEqual(codigos(r), ["SOBREMETAL_ALTO"])
-        self.assertTrue(r.pode_gravar())
+    def test_sobremetal_exige_justificativa(self):
+        self.assertEqual(codigos(regras.validar_sobremetal(120, 100)), [])
+        r = regras.validar_sobremetal(200, 100)
+        self.assertEqual(codigos(r), ["SOBREMETAL_ACIMA_TOLERANCIA"])
+        self.assertFalse(r.pode_gravar())
+        self.assertTrue(r.pode_gravar({"SOBREMETAL_ACIMA_TOLERANCIA": "OP urgente, só havia 50x610"}))
+
+    def test_sobremetal_configuravel(self):
+        self.assertEqual(codigos(regras.validar_sobremetal(115, 100, tolerancia_pct=10)),
+                         ["SOBREMETAL_ACIMA_TOLERANCIA"])
 
 
 class TestBitola(unittest.TestCase):

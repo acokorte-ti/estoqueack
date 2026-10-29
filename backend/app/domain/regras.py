@@ -72,17 +72,19 @@ def validar_sobremetal(peso_bruto_kg: float, peso_peca_kg: float,
                        tolerancia_pct: float = 20.0) -> Resultado:
     """Na solicitação: material bruto (bitola × comprimento) versus peso da peça acabada.
 
-    Apenas INFORMATIVO (ALERTA): o sobremetal já faz parte do peso previsto. O controle
-    obrigatório é o de peso real × previsto (5 %) em `validar_peso_real`.
+    Acima de `tolerancia_pct` (padrão 20 %, TOLERANCIA_SOBREMETAL_PCT) → CIÊNCIA: o operador
+    só solicita se justificar (ex.: "OP urgente, só havia bitola 50×610"). Decisão de 29/10/2026.
+    Depois, na pesagem, vale a regra de 5 % sobre o previsto (`validar_peso_real`).
     """
     r = Resultado()
     if not peso_peca_kg or peso_peca_kg <= 0 or not peso_bruto_kg or peso_bruto_kg <= 0:
         return r
     excesso_pct = (peso_bruto_kg - peso_peca_kg) / peso_peca_kg * 100
     if excesso_pct > tolerancia_pct + EPS:
-        r.adicionar("SOBREMETAL_ALTO", Nivel.ALERTA,
+        r.adicionar("SOBREMETAL_ACIMA_TOLERANCIA", Nivel.CIENCIA,
                     f"O material bruto ({peso_bruto_kg:.1f} kg) gera sobremetal de {excesso_pct:.1f}% sobre a peça "
-                    f"({peso_peca_kg:.1f} kg). Verifique se não há bitola mais próxima da medida acabada.",
+                    f"({peso_peca_kg:.1f} kg). Limite: {tolerancia_pct:g}%. Verifique se há bitola mais "
+                    "próxima da medida acabada ou justifique o uso desta.",
                     peso_bruto_kg=peso_bruto_kg, peso_peca_kg=peso_peca_kg, excesso_pct=round(excesso_pct, 2))
     return r
 

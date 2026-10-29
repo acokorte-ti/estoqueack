@@ -9,7 +9,9 @@
 #   BACKUP_COPIA_EXTERNA=...    (opcional: comando que recebe o arquivo como $1, ex. envio ao Object Storage)
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-set -a; source .env; set +a
+# Lê só as variáveis necessárias do .env (o arquivo segue o formato do Docker, não é script bash)
+ler_env() { grep -E "^$1=" .env | tail -1 | cut -d= -f2-; }
+POSTGRES_USER=$(ler_env POSTGRES_USER); POSTGRES_DB=$(ler_env POSTGRES_DB)
 CONF=${ESTOQUEACK_BACKUP_CONF:-$HOME/.config/estoqueack/backup.env}
 [ -f "$CONF" ] && source "$CONF"
 

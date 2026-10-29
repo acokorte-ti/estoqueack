@@ -68,6 +68,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--credenciais", required=True, type=Path)
     ap.add_argument("--esquema", help="esquema do Mega, se já souber")
+    ap.add_argument("--buscar-valores", action="store_true",
+                    help="também procura valores conhecidos (faz varreduras; rodar fora do horário de pico)")
     a = ap.parse_args()
     con, cur = conectar(a.credenciais)
     r = [f"# Mapeamento do Mega — {dt.datetime.now():%Y-%m-%d %H:%M}\n"]
@@ -103,6 +105,19 @@ def main() -> int:
                 achados.append((tab, col, n[0][0]))
         r.extend([f"## {rotulo}\n", tabela_md(["TABELA", "COLUNA", "OCORRENCIAS"], achados, 80)])
 
+    # 2b. Colunas das maiores tabelas candidatas (só dicionário, leve)
+    for tab, _n, _c in [x for x in l if cols[0] != "ERRO"][:25]:
+        c2, l2 = q(cur, """SELECT column_name, data_type, data_length, comments FROM all_col_comments
+                           RIGHT JOIN all_tab_columns USING (owner, table_name, column_name)
+                           WHERE owner=:e AND table_name=:t ORDER BY column_id""", e=esquema, t=tab)
+        r += [f"### Colunas de {tab}\n", tabela_md(c2, l2, 80)]
+
+    if not a.buscar_valores:
+        cols, l = q(cur, f"""SELECT view_name FROM all_views WHERE owner=:e
+                             AND ({filtro.replace('table_name', 'view_name')}) ORDER BY 1""", e=esquema)
+        r += ["## 7. Visões candidatas\n", tabela_md(cols, l, 120)]
+        return _salvar(con, r)
+
     procurar(CODIGOS_MP, "3. Onde aparecem os códigos de MP (1698, 87780, 62622, 78290)", ["PRO", "ITE", "MAT", "COD"])
     procurar(OPS, "4. Onde aparecem as OPs (100508, 100092, 100553)", ["ORD", "OP", "NUM", "DOC"])
     procurar(SA_CODIGOS, "5. Onde aparecem os SAs (78988, 68946, 91773)", ["PRO", "ITE", "COD"])
@@ -124,6 +139,10 @@ def main() -> int:
                          ORDER BY 1""", e=esquema)
     r += ["## 7. Visões candidatas\n", tabela_md(cols, l, 120)]
 
+    return _salvar(con, r)
+
+
+def _salvar(con, r) -> int:
     con.rollback()
     con.close()
     saida = Path(f"relatorio_mega_{dt.datetime.now():%Y%m%d_%H%M}.md")

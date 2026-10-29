@@ -20,3 +20,5 @@ ignore = ["S101", "E741", "B008", "S105", "S106", "UP017"]  # UP017: manter time
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S"]
 "alembic/*" = ["E501", "S608"]
+# Só constantes (esquema/filial) entram no f-string; valores do usuário vão sempre por bind variable
+"app/integrations/mega/consultas.py" = ["S608"]

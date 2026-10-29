@@ -4,8 +4,8 @@ Fase atual: SOMENTE LEITURA. A escrita está prevista na interface, mas desabili
 (`MEGA_ESCRITA_HABILITADA=false`). Gravar direto nas tabelas do ERP ignora regras fiscais
 e gatilhos do Mega; quando for implementada, deve usar o mecanismo oficial de integração.
 
-As consultas SQL ficam em `consultas.py` e precisam ser ajustadas ao dicionário de dados
-real do Mega (nomes de tabelas/colunas) — ver docs/integracao_mega.md.
+As consultas SQL ficam em `consultas.py` (mapeadas e validadas em 2026-10-29, ver
+docs/integracao_mega.md). O banco EXIGE Native Network Encryption → modo thick (Instant Client).
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ class SaldoMega:
     descricao: str
     um: str
     saldo_fisico: float
-    preco_medio: float | None
+    peso_especifico: float | None   # PRO_RE_PESOESPECIFICO (densidade cadastrada no Mega)
 
 
 @dataclass(frozen=True)
@@ -33,8 +33,10 @@ class OrdemProducao:
     item_codigo: int | None
     item_descricao: str | None
     cliente: str | None
-    situacao: str | None
+    situacao: str | None            # 'AB' = aberta (demais códigos a confirmar)
     data_emissao: date | None
+    quantidade: float | None = None
+    data_recebimento: date | None = None
 
 
 @dataclass(frozen=True)
@@ -62,6 +64,8 @@ class OracleMegaGateway:
             raise RuntimeError("Integração Mega desabilitada (MEGA_HABILITADO=false).")
         import oracledb  # import tardio: só carrega quando a integração está ligada
 
+        if cfg.mega_instant_client and oracledb.is_thin_mode():
+            oracledb.init_oracle_client(lib_dir=cfg.mega_instant_client)
         self._cfg = cfg
         self._pool = oracledb.create_pool(user=cfg.mega_usuario, password=cfg.mega_senha, dsn=cfg.mega_dsn,
                                           min=1, max=4, increment=1)
@@ -75,16 +79,21 @@ class OracleMegaGateway:
             con.rollback()
             return linhas
 
-    def saldos_mp(self) -> list[SaldoMega]:
-        return [SaldoMega(int(c), d, um, float(s or 0), float(p) if p is not None else None)
-                for c, d, um, s, p in self._consultar(consultas.SALDOS_MP, filial=consultas.FILIAL_ITU)]
+    def saldos_mp(self, data_corte: date | None = None) -> list[SaldoMega]:
+        """Saldo por código de MP na filial de Itu. `data_corte` exclusiva (padrão: amanhã = saldo atual)."""
+        import datetime as _dt
+        corte = data_corte or (_dt.date.today() + _dt.timedelta(days=1))
+        return [SaldoMega(int(c), d, um, float(s or 0), float(pe) if pe is not None else None)
+                for c, d, um, s, pe in self._consultar(consultas.SALDOS_MP, filial=consultas.FILIAL_ITU,
+                                                        data_corte=corte)]
 
     def ordem_producao(self, numero: int) -> OrdemProducao | None:
-        linhas = self._consultar(consultas.ORDEM_PRODUCAO, numero=numero)
+        linhas = self._consultar(consultas.ORDEM_PRODUCAO, numero=numero, filial=consultas.FILIAL_ITU)
         if not linhas:
             return None
-        n, ic, idesc, cli, sit, dt = linhas[0]
-        return OrdemProducao(int(n), int(ic) if ic else None, idesc, cli, sit, dt.date() if dt else None)
+        n, ic, idesc, cli, sit, dt, qtd, receb = linhas[0]
+        return OrdemProducao(int(n), int(ic) if ic else None, idesc, cli, sit, dt.date() if dt else None,
+                             float(qtd) if qtd is not None else None, receb.date() if receb else None)
 
     def buscar_sa(self, texto: str) -> list[SemiAcabado]:
         return [SemiAcabado(int(c), d, dt.date() if dt else None)

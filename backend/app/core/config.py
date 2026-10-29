@@ -36,6 +36,8 @@ class Config(BaseSettings):
     mega_usuario: str = ""
     mega_senha: str = ""
     mega_escrita_habilitada: bool = False
+    # Pasta do Oracle Instant Client 19 (o banco exige Native Network Encryption → modo thick)
+    mega_instant_client: str = ""
 
     @property
     def producao(self) -> bool:

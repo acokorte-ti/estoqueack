@@ -1,0 +1,14 @@
+# Imagem descartável para mapear o Mega a partir de um servidor Linux ARM64/x86_64.
+# O banco exige Native Network Encryption → python-oracledb em modo thick + Instant Client 19.
+FROM python:3.12-slim-bookworm
+RUN apt-get update && apt-get install -y --no-install-recommends libaio1 unzip curl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+ARG IC_ARM=https://download.oracle.com/otn_software/linux/instantclient/1927000/instantclient-basiclite-linux.arm64-19.27.0.0.0dbru.zip
+ARG IC_X64=https://download.oracle.com/otn_software/linux/instantclient/1927000/instantclient-basiclite-linux.x64-19.27.0.0.0dbru.zip
+RUN set -e; url=$IC_X64; [ "$(uname -m)" = "aarch64" ] && url=$IC_ARM; \
+    curl -fsSL "$url" -o /tmp/ic.zip && unzip -q /tmp/ic.zip -d /opt && rm /tmp/ic.zip && \
+    mv /opt/instantclient_* /opt/instantclient && echo /opt/instantclient > /etc/ld.so.conf.d/oic.conf && ldconfig
+RUN pip install --no-cache-dir oracledb==2.5.1
+ENV ORACLE_IC=/opt/instantclient
+WORKDIR /work
+COPY testar_conexao.py descobrir_mega.py diagnostico_conexao.py ./

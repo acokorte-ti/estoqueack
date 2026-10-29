@@ -11,6 +11,7 @@ O sistema substitui as planilhas ESTOQUE 2026, Materia Prima Geral, Controle de 
 |---|---|
 | [docs/01_analise_processo_atual.md](docs/01_analise_processo_atual.md) | Levantamento do processo e das planilhas |
 | [docs/02_proposta_arquitetura.md](docs/02_proposta_arquitetura.md) | Arquitetura, fluxos, validações, telas e banco |
+| [docs/03_especificacao_funcional.md](docs/03_especificacao_funcional.md) | Especificação funcional: fluxo completo, telas, botões, origem de cada dado, carga inicial |
 | [docs/integracao_mega.md](docs/integracao_mega.md) | Acesso de leitura ao Oracle 19c do Mega |
 | [docs/adr/](docs/adr/) | Decisões técnicas registradas |
 

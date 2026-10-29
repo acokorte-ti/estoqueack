@@ -42,6 +42,7 @@ relatorio_mega_*.md
 
 # Senhas e anotações locais (incidente 2026-10-29: pass_bkp/pass.txt foi publicado por engano)
 pass_bkp/
-*senha*
+*senha*.txt
+*senhas*
 *pass*.txt
 *.secret

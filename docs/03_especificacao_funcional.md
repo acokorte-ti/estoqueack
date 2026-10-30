@@ -426,7 +426,7 @@ Botões:
 | Nº do COP | [SUGERIDO] próximo número da sequência (último importado foi 600), editável |
 | Itens | [DIGITADO] marcando os cortes com **SA pronto** que ainda não estão em COP. Cortes sem SA aparecem cinza, com "SA pendente" |
 | Peso total | [CALC] |
-| NF de transferência | [DIGITADO] **por item** (ou para vários itens de uma vez), com o emitente (Fio Certo / Médio Vale). Um COP pode ter várias NFs, e uma NF pode atender dois COPs: nas planilhas, 23 de 44 COPs tiveram mais de uma NF. Equivale à coluna "NF FIOCERTO/MEDIO VALE" da planilha de SA |
+| NF de transferência | [DIGITADO] **uma vez no COP**, com o emitente (Fio Certo / Médio Vale), e copiada para todos os itens. Esse é o caso comum: 27 de 38 COPs de 2026 tiveram uma única NF. Exceção: botão "NF diferente para itens selecionados"; uma mesma NF também pode ser usada em dois COPs seguidos (3 casos em 2026). Fica gravada em cada linha de SA. Equivale à coluna "NF FIOCERTO/MEDIO VALE" da planilha de SA |
 | Data de envio | [SISTEMA] ao fechar |
 
 Botões:
@@ -819,7 +819,7 @@ Todo registro importado guarda **arquivo, aba e linha** de origem. Assim, qualqu
 | # | Pergunta | Proposta padrão, se você concordar |
 |---|---|---|
 | **P01** | Para o material Mega, o sistema pode ler a **tabela de movimentos** do Mega (entradas por NF, baixas em OP, transferências)? Ou lemos só o saldo? | Ler os movimentos, porque deixa a conciliação muito mais precisa. Você confirma ao explorar o banco |
-| **P02** | ~~Uma NF por COP?~~ **Respondida pela conferência das planilhas:** não. 23 de 44 COPs tiveram mais de uma NF, e algumas NFs atendem dois COPs. A NF fica por item (linha de SA) | — |
+| **P02** | ~~Uma NF por COP?~~ **Respondida pela conferência das planilhas (recontagem de jan a out/2026):** na maioria, sim. 27 de 38 COPs tiveram uma única NF, 11 tiveram mais de uma, e 3 NFs atenderam dois COPs seguidos. A NF é digitada no COP e pode variar por item | — |
 | **P03** | No corte feito no RJ, o peso do SA é o **peso real** do pedaço cortado (PESO2) ou o peso previsto da peça? Na planilha, o SA de 100553 tem 307 kg; o PESO2 ainda estava vazio | Corte no RJ: peso real. Peça inteira: peso previsto da peça, como no exemplo 837 kg |
 | **P04** | A sincronização diária às 6h é suficiente para o saldo Mega? | Sim, mais o botão "Sincronizar agora" |
 | **P05** | Quer **notificação por e-mail**, além do aviso dentro do sistema? Se sim, qual conta envia (SMTP do Microsoft 365)? | Só dentro do sistema na primeira versão; e-mail depois |

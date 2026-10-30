@@ -63,16 +63,28 @@ Itu: marca "RECEBIDO ACK?"
 
 **Ainda precisa de confirmação (P13):** o SA é feito em Itu pelo Fabiano, e o RJ (Fio Certo / Médio Vale) só emite a NF depois que recebe o código?
 
-### 2.2 NF × COP: não é uma NF por COP ⚠️ (responde a P02)
+### 2.2 NF × COP: na maioria é uma NF por COP, mas nem sempre ⚠️ (responde a P02)
 
-| Evidência | Número |
+**Correção da v1 deste documento (2026-10-30):** a primeira contagem ligou o SA ao COP só pela OP. Quando a mesma OP tinha outro SA em outra data (SA complementar de peça inteira consumida depois em Itu, ou entrega anterior), ele era contado no mesmo COP, e isso inflou o número de COPs com várias NFs. A recontagem liga cada SA ao envio da mesma OP **pela data**: o SA tem que estar entre 20 dias antes e 3 dias depois da liberação. A coluna COP só existe no Controle de Corte a partir de **jan/2026** (COP 550), então a análise cobre jan a out/2026.
+
+| Evidência (recontagem) | Número |
 |---|---|
-| COPs com mais de uma NF | 23 de 44 (ex.: COP 550 com as NFs 636, 637 e 640) |
-| NFs que atendem mais de um COP | 10 de 66 (ex.: NF 647 nos COPs 554 e 565) |
-| NFs só de SAs sem corte RJ (corte em Itu, transferência só fiscal) | 151 |
-| Séries de NF | < 1000 até meados de 2025 e ≥ 1000 a partir do 2º semestre de 2025. A hipótese é que sejam emitentes diferentes (Médio Vale × Fio Certo), mas falta confirmar |
+| COPs com **uma única NF** | **27 de 38 (71 %)**; na série de NF ≥ 1000, 19 de 25 (76 %) |
+| COPs com mais de uma NF | 11 de 38 (ex.: COP 552 com as NFs 641, 642 e 643; COP 578 com 3114 e 3119) |
+| NFs que atendem dois COPs seguidos | 3 de 49 (3114: COPs 577 e 578; 3135: 582 e 583; 3160: 588 e 589) |
+| Últimos 8 COPs (593 a 600, set–out/2026) | 7 com uma NF |
+| NFs só de SAs sem corte RJ (corte em Itu, transferência só fiscal) | 151 (2025–2026) |
+| Séries de NF | < 1000 até o início de 2026 e ≥ 1000 depois. A hipótese é que sejam emitentes diferentes (Médio Vale × Fio Certo), mas falta confirmar |
 
-**O que muda na especificação:** a NF fica **em cada linha de SA**, como já é na planilha. O COP mostra as NFs dos seus itens. A P02 está respondida.
+**Achado extra:** algumas OPs de peça inteira têm um **segundo SA** semanas depois do envio, com outra NF (ex.: OP 99125: 195 kg em 22/07 e 117 kg em 14/09; OP 99834: 112 kg e 113 kg; OP 96897: 214 kg e 22 kg). Isso é consumo complementar da barra em Itu (Caminho B2) para a mesma OP.
+
+**O que muda na especificação:**
+
+- **No COP:** a NF é digitada **uma vez no COP** e vale para todos os itens. É o caso comum.
+- **Exceção:** o Marcelo pode informar uma NF diferente para alguns itens, ou usar a mesma NF em dois COPs.
+- **Onde a NF fica gravada:** em cada linha de SA, como na planilha.
+
+A P02 está respondida.
 
 ### 2.3 Peso previsto: sobremetal em todas as dimensões, não só no comprimento ⚠️
 

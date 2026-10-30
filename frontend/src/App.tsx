@@ -8,6 +8,8 @@ import Calculadora from "./pages/Calculadora";
 import Usuarios from "./pages/Usuarios";
 import Ligas from "./pages/Ligas";
 import EmBreve from "./pages/EmBreve";
+import EsqueciSenha from "./pages/EsqueciSenha";
+import RedefinirSenha from "./pages/RedefinirSenha";
 
 function Protegido({ children, admin = false }: { children: JSX.Element; admin?: boolean }) {
   const { usuario, carregando } = useSessao();
@@ -23,6 +25,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/entrar" element={<Login />} />
+      <Route path="/esqueci-senha" element={<EsqueciSenha />} />
+      <Route path="/redefinir-senha" element={<RedefinirSenha />} />
       <Route path="/trocar-senha" element={<Protegido><TrocarSenha /></Protegido>} />
       <Route element={<Protegido><Layout /></Protegido>}>
         <Route index element={<Painel />} />

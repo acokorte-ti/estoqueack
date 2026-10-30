@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/cliente";
 import { useSessao } from "../api/sessao";
+import CampoSenha from "../components/CampoSenha";
 
 export default function TrocarSenha() {
   const { usuario, recarregar } = useSessao();
@@ -34,18 +35,9 @@ export default function TrocarSenha() {
             ? "Sua senha é temporária. Crie uma senha pessoal para continuar."
             : "Troque sua senha de acesso."}
         </p>
-        <label>
-          Senha atual
-          <input type="password" autoComplete="current-password" value={atual} onChange={(e) => setAtual(e.target.value)} required />
-        </label>
-        <label>
-          Nova senha
-          <input type="password" autoComplete="new-password" value={nova} onChange={(e) => setNova(e.target.value)} required />
-        </label>
-        <label>
-          Repita a nova senha
-          <input type="password" autoComplete="new-password" value={repetir} onChange={(e) => setRepetir(e.target.value)} required />
-        </label>
+        <CampoSenha rotulo="Senha atual" autoComplete="current-password" valor={atual} aoMudar={setAtual} autoFocus />
+        <CampoSenha rotulo="Nova senha" autoComplete="new-password" valor={nova} aoMudar={setNova} />
+        <CampoSenha rotulo="Repita a nova senha" autoComplete="new-password" valor={repetir} aoMudar={setRepetir} />
         <p className="dica">Mínimo de 10 caracteres, com letras e números, sem conter o seu login.</p>
         {erro && <p className="erro" role="alert">{erro}</p>}
         <button className="primario">Salvar nova senha</button>

@@ -4,7 +4,7 @@ import { api, ErroApi, type Sessao, type Usuario } from "./cliente";
 interface Ctx {
   usuario: Usuario | null;
   carregando: boolean;
-  entrar: (login: string, senha: string) => Promise<Usuario>;
+  entrar: (login: string, senha: string, lembrar?: boolean) => Promise<Usuario>;
   sair: () => Promise<void>;
   recarregar: () => Promise<void>;
 }
@@ -31,8 +31,8 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
     void recarregar();
   }, [recarregar]);
 
-  const entrar = async (login: string, senha: string) => {
-    const s = await api.post<Sessao>("/auth/login", { login, senha });
+  const entrar = async (login: string, senha: string, lembrar = false) => {
+    const s = await api.post<Sessao>("/auth/login", { login, senha, lembrar });
     setUsuario(s.usuario);
     return s.usuario;
   };

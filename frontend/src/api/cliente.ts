@@ -34,12 +34,31 @@ async function requisitar<T>(metodo: string, caminho: string, corpo?: unknown): 
       typeof detalhe === "string"
         ? detalhe
         : Array.isArray(detalhe)
-          ? "Confira os campos preenchidos."
+          ? mensagemCampos(detalhe as ErroCampo[])
           : `Não foi possível concluir (erro ${r.status}).`;
     throw new ErroApi(r.status, msg, dados);
   }
   return dados as T;
 }
+
+// 422 do FastAPI/Pydantic: transforma a lista técnica em frase para o usuário.
+interface ErroCampo { loc?: (string | number)[]; type?: string }
+const NOME_CAMPO: Record<string, string> = {
+  login: "Login", nome: "Nome completo", email: "E-mail", senha: "Senha", nova_senha: "Nova senha",
+  identificador: "Login ou e-mail", perfil: "Perfil", planta: "Planta",
+};
+const MSG_CAMPO: Record<string, string> = {
+  login: "Login: use nome.sobrenome, em minúsculas e sem acento (ex.: fabiano.camargo).",
+  email: "E-mail inválido. Confira o endereço (ex.: nome@acokorte.com.br).",
+};
+function mensagemCampos(erros: ErroCampo[]): string {
+  const campos = [...new Set(erros.map((e) => String(e.loc?.[e.loc.length - 1] ?? "")).filter(Boolean))];
+  if (!campos.length) return "Confira os campos preenchidos.";
+  return campos.map((c) => MSG_CAMPO[c] ?? `Confira o campo ${NOME_CAMPO[c] ?? c}.`).join(" ");
+}
+
+/** Mesmo padrão do backend (schemas.LOGIN_PADRAO): nome.sobrenome */
+export const LOGIN_PADRAO = "[a-z]+(\\.[a-z]+)+";
 
 export const api = {
   get: <T,>(c: string) => requisitar<T>("GET", c),

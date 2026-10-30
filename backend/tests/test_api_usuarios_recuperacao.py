@@ -45,11 +45,30 @@ def test_admin_define_senha_e_nao_obriga_troca(client):
 
 def test_admin_obriga_troca_e_senha_fraca(client):
     h = preparar_admin(client)
-    assert _criar(client, h, senha="curta").status_code == 400
-    assert _criar(client, h, senha="fabiano.camargo123").status_code == 400  # contém o login
+    assert _criar(client, h, senha="12345").status_code == 400               # menos de 6
+    r = _criar(client, h, login="so.numeros", email="n@acokorte.com.br", senha="123456", trocar_senha=False)
+    assert r.status_code == 201                                               # só números, 6 caracteres: ok
     r = _criar(client, h, senha=None, trocar_senha=True)
     assert r.json()["senha_temporaria"] and r.json()["usuario"]["trocar_senha"] is True
     assert _criar(client, h, login="outro.usuario").status_code == 409       # e-mail repetido
+
+
+def test_senha_temporaria_sempre_obriga_troca(client):
+    h = preparar_admin(client)
+    r = _criar(client, h, senha=None, trocar_senha=False)                    # o admin tentou desmarcar
+    assert r.json()["senha_temporaria"] and r.json()["usuario"]["trocar_senha"] is True
+    uid = r.json()["usuario"]["id"]
+    r = client.post(f"/api/usuarios/{uid}/redefinir-senha", json={"trocar_senha": False}, headers=h)
+    assert r.json()["senha_temporaria"] and r.json()["usuario"]["trocar_senha"] is True
+    temp = r.json()["senha_temporaria"]
+    client.post("/api/auth/logout", headers=h)
+    r = login(client, "fabiano.camargo", temp)
+    assert r.status_code == 200 and r.json()["usuario"]["trocar_senha"] is True
+    assert client.get("/api/painel/resumo").status_code == 403               # só entra depois de trocar
+    csrf = {"X-CSRF-Token": client.cookies.get("ack_csrf")}
+    assert client.post("/api/auth/trocar-senha", json={"senha_atual": temp, "nova_senha": "654321"},
+                       headers=csrf).status_code == 204
+    assert client.get("/api/painel/resumo").status_code == 200
 
 
 def test_redefinir_e_alterar_flag(client):

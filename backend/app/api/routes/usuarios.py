@@ -44,8 +44,9 @@ def criar(dados: UsuarioCriar, request: Request, db: Session = Depends(get_db),
     if dados.email and db.scalar(select(Usuario.id).where(Usuario.email == dados.email)):
         raise HTTPException(status.HTTP_409_CONFLICT, "Já existe um usuário com este e-mail.")
     senha, temporaria = _senha_escolhida(cfg, login, dados.senha)
+    # Senha gerada pelo sistema: troca no 1º acesso é obrigatória. Senha definida pelo admin: ele escolhe.
     u = Usuario(login=login, nome=dados.nome.strip(), email=dados.email, perfil=dados.perfil, planta=dados.planta,
-                senha_hash=seguranca.gerar_hash_senha(senha), trocar_senha=dados.trocar_senha)
+                senha_hash=seguranca.gerar_hash_senha(senha), trocar_senha=bool(temporaria) or dados.trocar_senha)
     db.add(u)
     db.flush()
     auditoria.registrar(db, "USUARIO_CRIADO", usuario_id=admin.id, entidade="usuario", entidade_id=u.id,
@@ -85,7 +86,7 @@ def redefinir_senha(usuario_id: int, request: Request, dados: RedefinirPorAdmin 
     dados = dados or RedefinirPorAdmin()
     senha, temporaria = _senha_escolhida(cfg, u.login, dados.senha)
     u.senha_hash = seguranca.gerar_hash_senha(senha)
-    u.trocar_senha = dados.trocar_senha
+    u.trocar_senha = bool(temporaria) or dados.trocar_senha
     u.tentativas_falhas = 0
     u.bloqueado_ate = None
     auth.revogar_todas(db, u.id)

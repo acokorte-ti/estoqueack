@@ -33,10 +33,8 @@ def problemas_senha(senha: str, login: str, tamanho_minimo: int) -> list[str]:
     erros = []
     if len(senha) < tamanho_minimo:
         erros.append(f"A senha deve ter pelo menos {tamanho_minimo} caracteres.")
-    if not re.search(r"[A-Za-z]", senha) or not re.search(r"\d", senha):
-        erros.append("A senha deve conter letras e números.")
-    if login and login.lower() in senha.lower():
-        erros.append("A senha não pode conter o login.")
+    # Decisão do Eduardo (2026-10-30): só o tamanho mínimo; pode ser só números. A proteção contra força bruta
+    # fica no bloqueio por tentativas e na restrição de IP.
     return erros
 
 

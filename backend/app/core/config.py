@@ -47,7 +47,7 @@ class Config(BaseSettings):
     smtp_senha: str = ""
     smtp_remetente: str = ""               # ex.: "EstoqueACK <estoque.smtp@acokorte.com.br>"
     smtp_starttls: bool = True
-    senha_tamanho_minimo: int = Field(default=10, ge=8)
+    senha_tamanho_minimo: int = Field(default=6, ge=6)
 
     mega_habilitado: bool = False
     mega_dsn: str = ""

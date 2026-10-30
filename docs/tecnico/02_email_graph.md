@@ -54,7 +54,10 @@ Primeiro pegue o **Object ID** do app em **Enterprise applications** (não em Ap
 Num PowerShell do Windows (como administrador, uma vez só):
 
 ```powershell
-Install-Module ExchangeOnlineManagement -Scope CurrentUser
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+Install-Module ExchangeOnlineManagement -Scope CurrentUser -Force -AllowClobber   # -AllowClobber: PowerShellGet 1.0 antigo do Windows
+Import-Module ExchangeOnlineManagement
 Connect-ExchangeOnline
 
 $AppId    = "<Application (client) ID>"
@@ -103,8 +106,16 @@ Deve mostrar `modo: graph` e `e-mail 'EstoqueACK: teste de envio' enviado`. Depo
 |---|---|
 | `token do Entra recusado (HTTP 401, invalid_client)` | segredo errado ou expirado (passo 3) |
 | `token do Entra recusado (HTTP 400, invalid_request)` / `unauthorized_client` | tenant ID ou client ID trocados |
+| `Graph recusou o envio (HTTP 401, erro)` (token saiu, envio recusado sem detalhe) | app ainda sem `Application Mail.Send` em nenhuma caixa: passo 4 |
 | `Graph recusou o envio (HTTP 403, ErrorAccessDenied)` | passo 4 não feito, ainda propagando, ou `GRAPH_REMETENTE` diferente da caixa liberada |
 | `Graph recusou o envio (HTTP 404, ErrorInvalidUser)` / `MailboxNotEnabledForRESTAPI` | caixa estoque.smtp@ não existe ou ainda está sendo criada |
+
+## Armadilhas que já aconteceram (2026-10-30)
+
+- A caixa foi criada primeiro como **usuário sem licença** (aparece em "Usuários ativos" como *Unlicensed*). Usuário sem licença não tem caixa: `Get-Mailbox` não acha e o `Test-ServicePrincipalAuthorization` dá InScope False. Tem que ser **caixa compartilhada** (`New-Mailbox -Shared ...`, `RecipientTypeDetails : SharedMailbox`).
+- O app não aparece em **Enterprise applications** por causa do filtro padrão "Aplicativos Empresariais": tirar o filtro ou abrir pelo link "Aplicativo gerenciado no diretório local" no registro do app.
+- O **ID do segredo** (formato GUID) não serve: o que vai no `.env` é o **Valor** (~40 caracteres, com `~`).
+- O `Connect-ExchangeOnline` pede a conta de **admin** do M365, não a caixa compartilhada (que não tem login).
 
 ## Manutenção
 

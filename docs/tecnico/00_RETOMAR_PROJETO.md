@@ -98,7 +98,7 @@ curl -s http://127.0.0.1:8090/api/saude               # saúde da API
 6. **E-mail (SMTP):** a recuperação de senha está pronta na API, mas sem SMTP o e-mail não sai (só um aviso no log). O Eduardo precisa indicar uma caixa do M365 com SMTP AUTH. Configurar `SMTP_*` no `.env` do servidor e testar um envio.
 7. **Pedidos abertos na coordenação:** R014 (FUNCIONAL: registrar usuários e recuperação na especificação) e R015 (FRONTEND: telas de login, recuperação e usuários). O caminho crítico continua sendo P02 a P12 e R003 a R009 (FUNCIONAL).
 
-## 7.1 Situação em 2026-10-30 (fim do chat "ESP. TECNICAS"; continua no chat "BACKEND 2")
+## 7.1 Situação em 2026-10-30 (fim do chat "BACKEND"; continua no chat "BACKEND 2")
 
 - **No ar:** https://estoque.acokorte.com.br (só IPs liberados), com a API até o commit `fc13e54`: login, usuários (`nome.sobrenome`, senha definida pelo admin, opção de obrigar a troca), "Manter conectado", recuperação de senha por e-mail, calculadora, T04/T05 (lotes) e consulta de OP no Mega. São 60 testes.
 - **Banco:** migrações 0001 e 0002 aplicadas; só existe o usuário `eduardo.macedo`. Os usuários matheus.almeida, renato.pinto, fabiano.camargo e marcello.teixeira serão criados pelo Eduardo, depois das telas do FRONTEND.

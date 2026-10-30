@@ -93,8 +93,18 @@ curl -s http://127.0.0.1:8090/api/saude               # saúde da API
 1. **Segurança:** pedir ao suporte do GitHub a remoção do cache dos commits antigos (§8). Rotacionar a senha GPG do backup (adiado pelo Eduardo). Avaliar tornar o repositório privado e trocar o `.github_token` por um com permissão mínima.
 2. **Backup fora do servidor:** destino a definir com o Eduardo.
 3. **Mega:** mapear o cliente da OP, os códigos de situação da OP e a carga de saldo do SA. Depois, trocar o `SELECT ANY TABLE` do `estoqueack_ro` por GRANTs por tabela.
-4. **Fase 1** (depois da aprovação da especificação funcional): migração 0002 com solicitação, liberação, COP e recebimento; endpoints de T07 a T12; leitor das planilhas (T25).
+4. **Fase 1** (depois da aprovação da especificação funcional): migração **0003** (a 0002 já é a `token_senha`) com solicitação, liberação, COP e recebimento; endpoints de T07 a T12; leitor das planilhas (T25).
 5. **Monitoramento:** alerta de site fora do ar, de falha de backup e de falha de deploy.
+6. **E-mail (SMTP):** a recuperação de senha está pronta na API, mas sem SMTP o e-mail não sai (só um aviso no log). O Eduardo precisa indicar uma caixa do M365 com SMTP AUTH. Configurar `SMTP_*` no `.env` do servidor e testar um envio.
+7. **Pedidos abertos na coordenação:** R014 (FUNCIONAL: registrar usuários e recuperação na especificação) e R015 (FRONTEND: telas de login, recuperação e usuários). O caminho crítico continua sendo P02 a P12 e R003 a R009 (FUNCIONAL).
+
+## 7.1 Situação em 2026-10-30 (fim do chat "ESP. TECNICAS"; continua no chat "BACKEND 2")
+
+- **No ar:** https://estoque.acokorte.com.br (só IPs liberados), com a API até o commit `fc13e54`: login, usuários (`nome.sobrenome`, senha definida pelo admin, opção de obrigar a troca), "Manter conectado", recuperação de senha por e-mail, calculadora, T04/T05 (lotes) e consulta de OP no Mega. São 60 testes.
+- **Banco:** migrações 0001 e 0002 aplicadas; só existe o usuário `eduardo.macedo`. Os usuários matheus.almeida, renato.pinto, fabiano.camargo e marcello.teixeira serão criados pelo Eduardo, depois das telas do FRONTEND.
+- **Mega ligado** na homologação (o `estoqueack_ro` ainda tem acesso amplo).
+- **Como trabalhar no system-lab a partir do chat:** Desktop Commander com `start_process("ssh -tt -o ServerAliveInterval=30 system-lab", shell="cmd.exe")` e depois `interact_with_process`. **Uma sessão só.** Se ela parar de responder, conferir pelo site (`curl --resolve estoque.acokorte.com.br:443:204.216.137.171 …`, que funciona porque o sandbox sai com o IP do Eduardo) antes de abrir outra. O `sudo` está liberado no Desktop Commander.
+- **Commit e push a partir do sandbox:** `git -c http.extraHeader="Authorization: Basic $(printf 'x-access-token:%s' "$(tr -d ' \r\n' < .github_token)" | base64 -w0)" push`. Adicionar só arquivos explícitos. Testes: venv em `/tmp/venv` (recriar com `pip install -r backend/requirements-dev.txt`). gitleaks em `/tmp/gitleaks` (baixar da release v8.21.2).
 
 ## 8. Registro de incidentes
 

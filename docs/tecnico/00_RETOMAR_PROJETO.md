@@ -1,6 +1,6 @@
 # Como retomar o projeto: parte técnica
 
-Este é o documento de passagem do chat TÉCNICO. Se a conversa se perder, comece por aqui. Última atualização: 2026-10-29.
+Este é o documento de passagem do chat TÉCNICO. Se a conversa se perder, comece por aqui. Última atualização: 2026-10-30.
 
 ## 1. Ordem de leitura
 
@@ -90,7 +90,7 @@ curl -s http://127.0.0.1:8090/api/saude               # saúde da API
 
 ## 7. Pendências técnicas (ver também `ESTADO_TECNICO.md`)
 
-1. **Segurança:** rotacionar a senha GPG do backup e limpar o histórico do Git (§8). Avaliar tornar o repositório privado e trocar o `.github_token` por um com permissão mínima.
+1. **Segurança:** pedir ao suporte do GitHub a remoção do cache dos commits antigos (§8). Rotacionar a senha GPG do backup (adiado pelo Eduardo). Avaliar tornar o repositório privado e trocar o `.github_token` por um com permissão mínima.
 2. **Backup fora do servidor:** destino a definir com o Eduardo.
 3. **Mega:** mapear o cliente da OP, os códigos de situação da OP e a carga de saldo do SA. Depois, trocar o `SELECT ANY TABLE` do `estoqueack_ro` por GRANTs por tabela.
 4. **Fase 1** (depois da aprovação da especificação funcional): migração 0002 com solicitação, liberação, COP e recebimento; endpoints de T07 a T12; leitor das planilhas (T25).
@@ -98,8 +98,10 @@ curl -s http://127.0.0.1:8090/api/saude               # saúde da API
 
 ## 8. Registro de incidentes
 
-**2026-10-29, senha do backup publicada no GitHub.** O commit `3422e54` (13h04), feito pelo chat TÉCNICO com `git add -A`, incluiu `pass_bkp/pass.txt`, uma anotação local do Eduardo com a senha GPG dos backups, num repositório **público**.
+**2026-10-29, senha do backup publicada no GitHub.** O commit `ea2b71b (antigo 3422e54)` (13h04), feito pelo chat TÉCNICO com `git add -A`, incluiu `pass_bkp/pass.txt`, uma anotação local do Eduardo com a senha GPG dos backups, num repositório **público**.
 
 - **Impacto:** a senha só abre os arquivos de backup, que ficam apenas no system-lab (pasta 700), sem cópia externa. Nenhum backup vazou, mas a senha deve ser considerada comprometida.
-- **Contenção, feita em 2026-10-29 às 14h:** arquivo removido do repositório (`f88e9d1`); `.gitignore` bloqueando `pass_bkp/`, `*senha*.txt` e `*pass*.txt`; job **gitleaks** no CI com regra própria (`.gitleaks.toml`), testada e capaz de detectar esse arquivo.
-- **Pendente, com aprovação do Eduardo:** (a) rotacionar a senha GPG e recriptografar os backups existentes; (b) apagar o arquivo do histórico do Git (reescrita com force-push, que exige ajustar o clone do servidor e avisar os outros chats).
+- **Contenção, feita em 2026-10-29 às 14h:** arquivo removido do repositório (`d7393ab (antigo f88e9d1)`); `.gitignore` bloqueando `pass_bkp/`, `*senha*.txt` e `*pass*.txt`; job **gitleaks** no CI com regra própria (`.gitleaks.toml`), testada e capaz de detectar esse arquivo.
+- **2026-10-30, histórico limpo (aprovado pelo Eduardo):** `git filter-repo --invert-paths --path pass_bkp/` numa cópia em /tmp. Antes do envio, foi conferido que (1) a árvore final é idêntica, (2) nenhum commit contém a senha (busca pelo valor) e (3) o gitleaks no histórico não acha nada. O envio foi feito com `--force-with-lease`. Os 13 commits a partir do antigo `3422e54` ganharam códigos novos (as referências na coordenação foram atualizadas como "novo (antigo xxx)"). A pasta local foi realinhada com `reset --mixed`, sem tocar em arquivos, e o clone do system-lab com `reset --hard` (árvore idêntica, sem rebuild). Os objetos antigos foram removidos (`reflog expire` + `gc --prune=now`) nos dois lugares.
+- **Ainda acessível:** o GitHub mantém os commits órfãos em cache. O link direto do commit antigo responde 200 até o **suporte do GitHub** limpar (ação do Eduardo, dono da conta: https://support.github.com → "Remove cached views of sensitive data", informando o repositório e os commits `3422e54` e `f88e9d1`).
+- **Decisão do Eduardo (2026-10-30):** por enquanto, **não** rotacionar a senha do backup e manter o repositório público. A rotação é a correção definitiva e continua recomendada.

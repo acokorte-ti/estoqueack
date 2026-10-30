@@ -7,7 +7,7 @@ Criado em 2026-10-30 pelo TÉCNICO. Uso atual: link do "Esqueci minha senha". Us
 A Microsoft está retirando o login por usuário e senha (Basic Auth) no SMTP AUTH do Exchange Online. Com o Graph:
 
 - nenhuma senha de caixa fica no servidor; o sistema usa um **app** do Entra ID (client credentials);
-- o app só consegue enviar **como `estoque@acokorte.com.br`**, por causa da restrição do Exchange (RBAC for Applications). Ele não lê e-mail e não envia como outras pessoas;
+- o app só consegue enviar **como `estoque.smtp@acokorte.com.br`**, por causa da restrição do Exchange (RBAC for Applications). Ele não lê e-mail e não envia como outras pessoas;
 - se o segredo vazar, basta apagá-lo no portal; a caixa não é afetada.
 
 A API usa o Graph quando as 4 variáveis `GRAPH_*` estão preenchidas. Senão, usa o SMTP (`SMTP_*`). Se nenhum dos dois estiver configurado, só registra um aviso no log. Código: `backend/app/services/email.py`.
@@ -19,7 +19,7 @@ A API usa o Graph quando as 4 variáveis `GRAPH_*` estão preenchidas. Senão, u
 Exchange admin center (https://admin.exchange.microsoft.com) → **Recipients → Mailboxes → Add a shared mailbox**:
 
 - Display name: `EstoqueACK`
-- Email: `estoque@acokorte.com.br`
+- Email: `estoque.smtp@acokorte.com.br`
 
 A caixa compartilhada não consome licença e não tem senha. Para ver os e-mails enviados, dê a você mesmo permissão de "Read and manage" nela.
 
@@ -47,7 +47,7 @@ No app → **Certificates & secrets → Client secrets → New client secret**:
 
 Copie o **Value** na hora (ele só aparece uma vez) → `GRAPH_CLIENT_SECRET`. **Não cole o segredo no chat nem em arquivo dentro da pasta do projeto.** Ele vai direto para o servidor no passo 5.
 
-### 4. Liberar o envio só pela caixa estoque@ (Exchange Online PowerShell)
+### 4. Liberar o envio só pela caixa estoque.smtp@ (Exchange Online PowerShell)
 
 Primeiro pegue o **Object ID** do app em **Enterprise applications** (não em App registrations): Entra → Identity → Applications → **Enterprise applications** → `EstoqueACK - envio de e-mail` → Object ID.
 
@@ -63,13 +63,13 @@ $ObjectId = "<Object ID da Enterprise application>"
 New-ServicePrincipal -AppId $AppId -ObjectId $ObjectId -DisplayName "EstoqueACK - envio de e-mail"
 
 New-ManagementScope -Name "EstoqueACK - so caixa estoque" `
-  -RecipientRestrictionFilter "PrimarySmtpAddress -eq 'estoque@acokorte.com.br'"
+  -RecipientRestrictionFilter "PrimarySmtpAddress -eq 'estoque.smtp@acokorte.com.br'"
 
 New-ManagementRoleAssignment -App $AppId -Role "Application Mail.Send" `
   -CustomResourceScope "EstoqueACK - so caixa estoque"
 
-# Conferência: deve dar InScope = True para a estoque@ e False para outra caixa
-Test-ServicePrincipalAuthorization -Identity $AppId -Resource estoque@acokorte.com.br
+# Conferência: deve dar InScope = True para a estoque.smtp@ e False para outra caixa
+Test-ServicePrincipalAuthorization -Identity $AppId -Resource estoque.smtp@acokorte.com.br
 Test-ServicePrincipalAuthorization -Identity $AppId -Resource eduardo.macedo@acokorte.com.br
 ```
 
@@ -84,7 +84,7 @@ cd ~/apps/estoqueack
 read -rp "Tenant ID: " T; read -rp "Client ID: " C; read -rsp "Client secret: " S; echo
 cp -p .env ".env.bak.$(date +%F-%H%M)"
 sed -i '/^GRAPH_/d' .env
-printf 'GRAPH_TENANT_ID=%s\nGRAPH_CLIENT_ID=%s\nGRAPH_CLIENT_SECRET=%s\nGRAPH_REMETENTE=estoque@acokorte.com.br\n' "$T" "$C" "$S" >> .env
+printf 'GRAPH_TENANT_ID=%s\nGRAPH_CLIENT_ID=%s\nGRAPH_CLIENT_SECRET=%s\nGRAPH_REMETENTE=estoque.smtp@acokorte.com.br\n' "$T" "$C" "$S" >> .env
 unset S T C
 chmod 600 .env
 docker compose up -d --force-recreate api
@@ -104,7 +104,7 @@ Deve mostrar `modo: graph` e `e-mail 'EstoqueACK: teste de envio' enviado`. Depo
 | `token do Entra recusado (HTTP 401, invalid_client)` | segredo errado ou expirado (passo 3) |
 | `token do Entra recusado (HTTP 400, invalid_request)` / `unauthorized_client` | tenant ID ou client ID trocados |
 | `Graph recusou o envio (HTTP 403, ErrorAccessDenied)` | passo 4 não feito, ainda propagando, ou `GRAPH_REMETENTE` diferente da caixa liberada |
-| `Graph recusou o envio (HTTP 404, ErrorInvalidUser)` / `MailboxNotEnabledForRESTAPI` | caixa estoque@ não existe ou ainda está sendo criada |
+| `Graph recusou o envio (HTTP 404, ErrorInvalidUser)` / `MailboxNotEnabledForRESTAPI` | caixa estoque.smtp@ não existe ou ainda está sendo criada |
 
 ## Manutenção
 

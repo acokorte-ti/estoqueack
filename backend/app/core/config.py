@@ -38,14 +38,14 @@ class Config(BaseSettings):
     graph_tenant_id: str = ""
     graph_client_id: str = ""
     graph_client_secret: str = ""
-    graph_remetente: str = ""              # ex.: "estoque@acokorte.com.br"
+    graph_remetente: str = ""              # ex.: "estoque.smtp@acokorte.com.br"
 
     # E-mail via SMTP (alternativa, só se o Graph não estiver configurado).
     smtp_host: str = ""
     smtp_porta: int = 587
     smtp_usuario: str = ""
     smtp_senha: str = ""
-    smtp_remetente: str = ""               # ex.: "EstoqueACK <estoque@acokorte.com.br>"
+    smtp_remetente: str = ""               # ex.: "EstoqueACK <estoque.smtp@acokorte.com.br>"
     smtp_starttls: bool = True
     senha_tamanho_minimo: int = Field(default=10, ge=8)
 

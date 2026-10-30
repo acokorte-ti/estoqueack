@@ -14,7 +14,7 @@ def _cfg(**kw) -> Config:
 
 
 GRAPH = {"graph_tenant_id": "tenant-x", "graph_client_id": "cliente-x", "graph_client_secret": "segredo-x",
-         "graph_remetente": "estoque@acokorte.com.br"}
+         "graph_remetente": "estoque.smtp@acokorte.com.br"}
 
 
 @pytest.fixture()
@@ -54,7 +54,7 @@ def test_graph_envia(http):
     token, envio = chamadas
     assert token["url"] == "https://login.microsoftonline.com/tenant-x/oauth2/v2.0/token"
     assert b"grant_type=client_credentials" in token["dados"] and b"graph.microsoft.com%2F.default" in token["dados"]
-    assert envio["url"] == "https://graph.microsoft.com/v1.0/users/estoque@acokorte.com.br/sendMail"
+    assert envio["url"] == "https://graph.microsoft.com/v1.0/users/estoque.smtp@acokorte.com.br/sendMail"
     assert envio["cab"]["Authorization"] == "Bearer tok-1"
     corpo = json.loads(envio["dados"])["message"]
     assert corpo["subject"] == "Recuperar senha"

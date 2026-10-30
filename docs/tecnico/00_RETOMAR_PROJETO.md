@@ -95,7 +95,7 @@ curl -s http://127.0.0.1:8090/api/saude               # saúde da API
 3. **Mega:** mapear o cliente da OP, os códigos de situação da OP e a carga de saldo do SA. Depois, trocar o `SELECT ANY TABLE` do `estoqueack_ro` por GRANTs por tabela.
 4. **Fase 1** (depois da aprovação da especificação funcional): migração **0003** (a 0002 já é a `token_senha`) com solicitação, liberação, COP e recebimento; endpoints de T07 a T12; leitor das planilhas (T25).
 5. **Monitoramento:** alerta de site fora do ar, de falha de backup e de falha de deploy.
-6. **E-mail:** decidido em 2026-10-30 enviar pelo **Microsoft Graph** (app do Entra restrito à caixa compartilhada `estoque@acokorte.com.br`), não por SMTP AUTH (que está sendo retirado pela Microsoft). Código pronto (`app/services/email.py`, SMTP fica como alternativa). Falta o Eduardo fazer os passos 1 a 4 de `docs/tecnico/02_email_graph.md` e gravar `GRAPH_*` no `.env` do servidor (passo 5); depois testar (passo 6).
+6. **E-mail:** decidido em 2026-10-30 enviar pelo **Microsoft Graph** (app do Entra restrito à caixa compartilhada `estoque.smtp@acokorte.com.br`), não por SMTP AUTH (que está sendo retirado pela Microsoft). Código pronto (`app/services/email.py`, SMTP fica como alternativa). Falta o Eduardo fazer os passos 1 a 4 de `docs/tecnico/02_email_graph.md` e gravar `GRAPH_*` no `.env` do servidor (passo 5); depois testar (passo 6).
 7. **Pedidos abertos na coordenação:** R014 (FUNCIONAL: registrar usuários e recuperação na especificação) e R015 (FRONTEND: telas de login, recuperação e usuários). O caminho crítico continua sendo P02 a P12 e R003 a R009 (FUNCIONAL).
 
 ## 7.1 Situação em 2026-10-30 (fim do chat "BACKEND"; continua no chat "BACKEND 2")

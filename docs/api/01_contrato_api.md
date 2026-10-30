@@ -109,6 +109,22 @@ Toda justificativa aceita é gravada no movimento (`confirmacoes`) e na auditori
 
 ---
 
+## 2.1 Usuários, login e recuperação de senha (2026-10-30, pedido do Eduardo)
+
+**Login no padrão `nome.sobrenome`**, minúsculo e sem acento (ex.: `fabiano.camargo`). O backend converte para minúsculo e recusa outros formatos com `422`.
+
+| Método e caminho | O que faz |
+|---|---|
+| `POST /api/auth/login` ✅ | Corpo `{ login, senha, lembrar }`. `lembrar: true` ("Manter conectado") faz a sessão durar 30 dias; sem ele, dura 10 h. **O sistema não guarda a senha:** para lembrar a senha, use o gerenciador do navegador (os campos já têm `autocomplete="username"` e `"current-password"`) |
+| `POST /api/usuarios` ✅ (ADMIN) | Corpo `{ login, nome, email, perfil, planta, senha, trocar_senha }`. `senha` vazia faz o sistema gerar uma temporária, que volta em `senha_temporaria` (é a única vez que ela aparece). `senha` preenchida precisa seguir a política (10+ caracteres, letras e números, sem o login), senão volta `400`. `trocar_senha` (padrão `true`) obriga a troca no próximo acesso. Login ou e-mail repetido devolve `409` |
+| `PATCH /api/usuarios/{id}` ✅ (ADMIN) | Também aceita `trocar_senha` e `email` |
+| `POST /api/usuarios/{id}/redefinir-senha` ✅ (ADMIN) | Corpo **opcional** `{ senha, trocar_senha }`, com as mesmas regras. Encerra as sessões abertas do usuário |
+| `POST /api/auth/recuperar` ✅ | Corpo `{ identificador }` (login ou e-mail). Responde **sempre** `202` com a mesma `mensagem`, exista o usuário ou não. Se existir, estiver ativo e tiver e-mail, envia o link `https://estoque.acokorte.com.br/redefinir-senha?token=…`, que vale **30 min** e é de **uso único**. Limites: 3 por usuário por hora e 10 por IP por hora |
+| `POST /api/auth/recuperar/verificar` ✅ | `{ token }` → `{ valido: true, login }` ou `{ valido: false, mensagem }`. A tela de redefinição chama isso ao abrir |
+| `POST /api/auth/recuperar/redefinir` ✅ | `{ token, nova_senha }` → `204`, ou `400` com a mensagem (política de senha, link inválido ou expirado). Encerra todas as sessões do usuário. Depois, o usuário entra pela tela de login normal |
+
+As rotas de recuperação **não exigem sessão nem CSRF**, porque o usuário não está logado. Todas as ações ficam na auditoria.
+
 ## 3. T04: Consulta de estoque
 
 ### `GET /api/lotes` ✅

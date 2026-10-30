@@ -13,6 +13,7 @@ class Config(BaseSettings):
     app_env: str = "dev"
     app_domain: str = "localhost"
     app_secret_key: str = "dev-inseguro"
+    app_url: str = "https://estoque.acokorte.com.br"   # base dos links enviados por e-mail
 
     database_url: str = "sqlite:///./estoqueack_dev.db"
 
@@ -29,6 +30,17 @@ class Config(BaseSettings):
     login_max_tentativas: int = 5
     login_bloqueio_minutos: int = 15
     sessao_horas: int = 10
+    sessao_lembrar_dias: int = 30          # "Manter conectado"
+    recuperacao_minutos: int = 30          # validade do link de recuperação de senha
+    recuperacao_max_por_hora: int = 3      # pedidos de recuperação por usuário por hora
+
+    # E-mail (SMTP). Microsoft 365: smtp.office365.com:587 com STARTTLS e uma caixa com SMTP AUTH habilitado.
+    smtp_host: str = ""
+    smtp_porta: int = 587
+    smtp_usuario: str = ""
+    smtp_senha: str = ""
+    smtp_remetente: str = ""               # ex.: "EstoqueACK <estoque@acokorte.com.br>"
+    smtp_starttls: bool = True
     senha_tamanho_minimo: int = Field(default=10, ge=8)
 
     mega_habilitado: bool = False

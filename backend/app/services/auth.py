@@ -41,7 +41,7 @@ MSG_GENERICA = "Login ou senha inválidos."
 
 
 def autenticar(db: Session, cfg: Config, login: str, senha: str, ip: str | None,
-               user_agent: str | None) -> SessaoCriada:
+               user_agent: str | None, lembrar: bool = False) -> SessaoCriada:
     login = (login or "").strip().lower()
     usuario = db.scalar(select(Usuario).where(Usuario.login == login))
 
@@ -76,10 +76,11 @@ def autenticar(db: Session, cfg: Config, login: str, senha: str, ip: str | None,
     usuario.ultimo_login = _agora()
 
     token, csrf = seguranca.gerar_token(), seguranca.gerar_token()
-    expira = _agora() + timedelta(hours=cfg.sessao_horas)
+    duracao = timedelta(days=cfg.sessao_lembrar_dias) if lembrar else timedelta(hours=cfg.sessao_horas)
+    expira = _agora() + duracao
     db.add(Sessao(token_hash=seguranca.hash_token(token), csrf=csrf, usuario_id=usuario.id,
                   expira_em=expira, ip=ip, user_agent=(user_agent or "")[:300]))
-    auditoria.registrar(db, "LOGIN_OK", usuario_id=usuario.id, ip=ip)
+    auditoria.registrar(db, "LOGIN_OK", usuario_id=usuario.id, ip=ip, depois={"manter_conectado": lembrar})
     db.commit()
     return SessaoCriada(token, csrf, usuario, expira)
 

@@ -53,3 +53,16 @@ class Sessao(Base):
     user_agent: Mapped[str | None] = mapped_column(String(300))
 
     usuario: Mapped[Usuario] = relationship(back_populates="sessoes")
+
+
+class TokenSenha(Base):
+    """Link de recuperação de senha. Guardamos só o hash; uso único; expira em poucos minutos."""
+    __tablename__ = "token_senha"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuario.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    criado_em: Mapped[datetime] = mapped_column(DataHora, default=agora)
+    expira_em: Mapped[datetime] = mapped_column(DataHora)
+    usado_em: Mapped[datetime | None] = mapped_column(DataHora)
+    ip: Mapped[str | None] = mapped_column(String(64))

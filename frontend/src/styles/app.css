@@ -136,6 +136,8 @@ input[type="radio"], input[type="checkbox"] { min-height: 0; width: 1.25rem; hei
 }
 .marcar > span { display: flex; flex-direction: column; gap: 2px; }
 .marcar input[type="checkbox"] { width: 1.5rem; height: 1.5rem; flex: none; }
+.marcar.travada { cursor: default; }
+.marcar.travada input[type="checkbox"] { opacity: 0.75; cursor: not-allowed; }
 
 /* Senha com botão Mostrar/Ocultar */
 .campo-senha { display: flex; flex-direction: column; gap: var(--esp-1); }

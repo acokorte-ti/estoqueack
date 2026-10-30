@@ -38,7 +38,7 @@ export default function TrocarSenha() {
         <CampoSenha rotulo="Senha atual" autoComplete="current-password" valor={atual} aoMudar={setAtual} autoFocus />
         <CampoSenha rotulo="Nova senha" autoComplete="new-password" valor={nova} aoMudar={setNova} />
         <CampoSenha rotulo="Repita a nova senha" autoComplete="new-password" valor={repetir} aoMudar={setRepetir} />
-        <p className="dica">Mínimo de 10 caracteres, com letras e números, sem conter o seu login.</p>
+        <p className="dica">Mínimo de 6 caracteres.</p>
         {erro && <p className="erro" role="alert">{erro}</p>}
         <button className="primario">Salvar nova senha</button>
       </form>

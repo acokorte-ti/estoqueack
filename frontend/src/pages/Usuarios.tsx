@@ -14,7 +14,21 @@ const PERFIS: { valor: Perfil; ajuda: string }[] = [
 ];
 
 const VAZIO = { login: "", nome: "", email: "", perfil: "ESTOQUE" as Perfil, planta: "ITU" as "ITU" | "RJ", senha: "", trocar_senha: true };
-const AJUDA_SENHA = "Em branco: o sistema gera uma senha temporária. Preenchida: mínimo de 10 caracteres, com letras e números, sem o login.";
+const AJUDA_SENHA = "Em branco: o sistema gera uma senha temporária. Preenchida: mínimo de 6 caracteres.";
+
+/** Senha em branco = temporária: a troca no 1º acesso é obrigatória (decisão de 2026-10-30), a caixa fica travada. */
+function CaixaTrocar({ senha, marcada, aoMudar, texto }: { senha: string; marcada: boolean; aoMudar: (v: boolean) => void; texto: string }) {
+  const temporaria = senha === "";
+  return (
+    <label className={temporaria ? "marcar travada" : "marcar"}>
+      <input type="checkbox" checked={temporaria || marcada} disabled={temporaria} onChange={(e) => aoMudar(e.target.checked)} />
+      <span>
+        {texto}
+        {temporaria && <small className="dica">Obrigatória com senha temporária. Digite uma senha para poder escolher.</small>}
+      </span>
+    </label>
+  );
+}
 
 export default function Usuarios() {
   const { usuario: eu } = useSessao();
@@ -72,6 +86,7 @@ export default function Usuarios() {
         login: form.login.trim().toLowerCase(),
         email: form.email.trim() || null,
         senha: form.senha || null,
+        trocar_senha: form.senha === "" || form.trocar_senha,
       });
       setAviso({ nome: r.usuario.nome, senha: r.senha_temporaria, acao: "criado" });
       setForm({ ...VAZIO, perfil: form.perfil, planta: form.planta });
@@ -97,7 +112,7 @@ export default function Usuarios() {
     try {
       const r = await api.post<Criado>(`/usuarios/${alvo.id}/redefinir-senha`, {
         senha: red.senha || null,
-        trocar_senha: red.trocar_senha,
+        trocar_senha: red.senha === "" || red.trocar_senha,
       });
       janela.current?.close();
       setAviso({ nome: alvo.nome, senha: r.senha_temporaria, acao: "redefinida" });
@@ -187,10 +202,7 @@ export default function Usuarios() {
           </label>
           <CampoSenha rotulo="Senha" autoComplete="new-password" valor={form.senha} aoMudar={(v) => setForm({ ...form, senha: v })} obrigatorio={false} ajuda={AJUDA_SENHA} />
         </div>
-        <label className="marcar">
-          <input type="checkbox" checked={form.trocar_senha} onChange={(e) => setForm({ ...form, trocar_senha: e.target.checked })} />
-          <span>Obrigar troca de senha no primeiro acesso</span>
-        </label>
+        <CaixaTrocar senha={form.senha} marcada={form.trocar_senha} aoMudar={(v) => setForm({ ...form, trocar_senha: v })} texto="Obrigar troca de senha no primeiro acesso" />
         <div className="botoes">
           <button className="primario" disabled={enviando}>{enviando ? "Criando…" : "Criar usuário"}</button>
         </div>
@@ -265,10 +277,7 @@ export default function Usuarios() {
           <h2 id="titulo-redefinir">Redefinir senha de {alvo?.nome}</h2>
           <p className="desc">As sessões abertas de {alvo?.login} serão encerradas.</p>
           <CampoSenha rotulo="Nova senha" autoComplete="new-password" valor={red.senha} aoMudar={(v) => setRed({ ...red, senha: v })} obrigatorio={false} ajuda={AJUDA_SENHA} autoFocus />
-          <label className="marcar">
-            <input type="checkbox" checked={red.trocar_senha} onChange={(e) => setRed({ ...red, trocar_senha: e.target.checked })} />
-            <span>Obrigar troca de senha no próximo acesso</span>
-          </label>
+          <CaixaTrocar senha={red.senha} marcada={red.trocar_senha} aoMudar={(v) => setRed({ ...red, trocar_senha: v })} texto="Obrigar troca de senha no próximo acesso" />
           {erroRed && <p className="erro" role="alert">{erroRed}</p>}
           <div className="botoes">
             <button className="primario">Redefinir senha</button>

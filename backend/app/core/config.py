@@ -34,7 +34,13 @@ class Config(BaseSettings):
     recuperacao_minutos: int = 30          # validade do link de recuperação de senha
     recuperacao_max_por_hora: int = 3      # pedidos de recuperação por usuário por hora
 
-    # E-mail (SMTP). Microsoft 365: smtp.office365.com:587 com STARTTLS e uma caixa com SMTP AUTH habilitado.
+    # E-mail via Microsoft Graph (preferido): app do Entra ID com Mail.Send (aplicativo) restrito à caixa remetente.
+    graph_tenant_id: str = ""
+    graph_client_id: str = ""
+    graph_client_secret: str = ""
+    graph_remetente: str = ""              # ex.: "estoque@acokorte.com.br"
+
+    # E-mail via SMTP (alternativa, só se o Graph não estiver configurado).
     smtp_host: str = ""
     smtp_porta: int = 587
     smtp_usuario: str = ""

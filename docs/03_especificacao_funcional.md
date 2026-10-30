@@ -84,17 +84,18 @@ Exemplo real: OP 100592, H13 33×105, CH33K.
 2. **Marcelo** vê a solicitação na *Fila RJ* (T09), corta e abre *Registrar corte* (T10). Ali informa peças cortadas e **peso real de balança**. O sistema valida a regra dos 5 % e **baixa o peso real do lote** (movimento `SAIDA_CORTE_RJ`). A solicitação fica **Cortada**.
 3. **Marcelo** abre *COP* (T11), inclui as solicitações cortadas, informa a NF de transferência e fecha o COP nº 600. Todas as solicitações do COP ficam **Em trânsito**.
 4. **Fabiano** abre *Receber COP* (T12), confere item a item e confirma. As solicitações ficam **Recebidas em Itu**.
-5. **Fabiano** abre *SA* (T14). O sistema já montou o pedido de SA de cada OP recebida, com material, dimensão, origem, quantidade e peso. Se o item já teve SA, o código antigo é sugerido. Fabiano faz o cadastro ou a carga de saldo no Mega, como hoje, e informa o código do SA. O sistema confirma lendo o Mega. A solicitação fica **Concluída**.
+5. **Fabiano** abre *SA* (T14). O sistema já montou o pedido de SA de cada OP recebida, com material, dimensão, origem, quantidade e peso. Se a peça acabada (item da OP) já teve SA, o sistema usa o mesmo código, seja qual for a bitola ou a MP. Só uma peça acabada que nunca teve SA exige cadastro novo (ver T14). Fabiano faz o cadastro ou a carga de saldo no Mega, como hoje, e informa o código do SA. O sistema confirma lendo o Mega. A solicitação fica **Concluída**.
 
 ### 2.2 Caminho B: material RJ, peça inteira trazida para Itu
 
 Exemplo real: OP 100092, H13 70×610, CH25K. A peça prevista pesa 837 kg, e a barra inteira, 1.288 kg.
 
-1. **Fabiano** cria a solicitação com o modo **Trazer peça inteira**. O sistema calcula o **peso previsto da peça** (837 kg), que vai para a NF e para o SA.
-2. **Marcelo**, em T10, informa o **peso real da barra inteira** separada (1.288 kg). O sistema baixa 1.288 kg do lote RJ/RJ e deixa esse peso **em trânsito**. Aqui a regra dos 5 % não se aplica, porque a barra é naturalmente maior que a peça. Vale apenas a verificação do sobremetal feita na solicitação.
+1. **Fabiano** cria a solicitação com o modo **Trazer peça inteira**, escolhe a bitola (lote) e preenche o **sobremetal**. O sistema calcula o **peso previsto da peça** pela **bitola escolhida + sobremetal preenchido** (seção da bitola × (comprimento acabado + sobremetal) × densidade), e não pela medida acabada. No exemplo, 837 kg. Esse peso vai para a NF e para o SA. *(Regra confirmada pelo Matheus em 2026-10-30.)*
+2. **Marcelo**, em T10, informa o **peso real da barra inteira** separada (1.288 kg). O sistema baixa 1.288 kg do lote RJ/RJ e deixa esse peso **em trânsito**. Aqui a regra dos 5 % não se aplica, porque a barra é naturalmente maior que a peça. A regra dos 5 % é aplicada no passo 5, quando a peça é pesada.
 3. **Marcelo** inclui a barra no COP (T11) e fecha.
 4. **Fabiano** recebe o COP (T12). O sistema cria automaticamente um **lote RJ em Itu** de 1.288 kg, filho do lote original (mesmo contêiner, liga e bitola).
 5. **Fabiano** corta em Itu e lança em *Corte em Itu* (T13): consumo da OP, sobra pesada e se a sobra **ainda está na bitola** 70×610. Exemplo: consumo 837 kg e sobra 446 kg, com perda de corte de 5 kg dentro da tolerância.
+   - **Peso real da peça × previsto:** se o consumo pesado passar **mais de 5 %** do peso previsto calculado no passo 1, o sistema aponta (EXCESSO_TOLERANCIA) e **pede justificativa**. Exemplo de justificativa: "Peso maior por desvio de serra, aumentou o sobremetal no comprimento".
    - **Se a sobra ainda está na bitola**, ela fica no lote RJ em Itu.
    - **Se não está**, o sistema cria um **lote RETO** (RJ em Itu), filho do lote 70×610 / CH25K.
 6. Segue para o SA (T14), como no caminho A, com o peso da peça.
@@ -331,11 +332,12 @@ Quem usa: Fabiano e Matheus. É um assistente em quatro passos.
 |---|---|---|
 | Modo | [DIGITADO]: Cortar no RJ / Trazer peça inteira / Cortar em Itu (lote em Itu) | O modo depende do local físico do lote |
 | Quantidade de peças | [SUGERIDO] da quantidade da OP | — |
-| Comprimento de corte por peça (mm) | [SUGERIDO] medida acabada + 5 mm, editável | — |
+| Sobremetal no comprimento (mm) | [SUGERIDO] 5 mm, editável | Preenchido pelo usuário em todos os modos |
+| Comprimento de corte por peça (mm) | [CALC] medida acabada + sobremetal | — |
 | Instrução para o RJ | [SUGERIDO] "12 PEÇAS COM 255MM COMPRIMENTO" ou "TRAZER 01 PEÇA H13 70X610" | Mesmo texto usado hoje |
-| Peso previsto da peça | [CALC] medida acabada × densidade da liga | Vai para a NF e o SA |
-| Peso bruto previsto do corte | [CALC] bitola × comprimento de corte × quantidade × densidade | Base da regra de 5 % na pesagem |
-| Sobremetal % | [CALC] (bruto − peça) / peça | Acima de 20 %: amarelo, justificativa obrigatória |
+| Peso da peça acabada | [CALC] medida acabada × densidade da liga | Só referência para o sobremetal % |
+| Peso previsto | [CALC] **seção da bitola escolhida** × comprimento de corte (acabado + sobremetal) × quantidade × densidade | Base da regra dos 5 % na pesagem (T10 no corte RJ; T13 na peça inteira e no corte em Itu). Na **peça inteira**, é o peso que vai para a NF e o SA |
+| Sobremetal % | [CALC] (previsto − peça acabada) / peça acabada | Acima de 20 %: amarelo, justificativa obrigatória |
 | Prazo | [SUGERIDO] da data de entrega da OP [MEGA], editável | — |
 | Observação | [DIGITADO] | — |
 
@@ -439,7 +441,7 @@ Quem usa: Fabiano e Matheus. Vale para lotes **RJ em Itu** (peças inteiras e so
 | Lote | [DIGITADO] ou [SUGERIDO] (peça inteira recebida para a OP) | — |
 | Peso do lote antes | [CALC] saldo atual | — |
 | Peças produzidas | [DIGITADO] | — |
-| Consumo da OP (kg) | [DIGITADO], balança | Regra dos 5 % sobre o previsto |
+| Consumo da OP (kg) | [DIGITADO], balança | Regra dos 5 % sobre o peso previsto da solicitação (bitola + sobremetal). Acima → justificativa (ex.: desvio de serra) |
 | Sobra (kg) | [DIGITADO], balança | 0 se não houver |
 | A sobra mantém a bitola original? | [DIGITADO] Sim / Não | Não → cria lote RETO |
 | Perda de corte | [CALC] antes − consumo − sobra | Amarelo se passar da perda esperada (§9) |
@@ -470,11 +472,18 @@ Para lote Mega, depois de confirmar, aparece um quadro **"Fazer no Mega"** com a
 | Dimensão | [LOTE] bitola, ou "RETO" se o lote for RETO |
 | Origem (contêiner) | [LOTE] |
 | Quantidade | [SISTEMA] peças cortadas/produzidas |
-| Peso | [CALC] peso previsto da peça para peça inteira, ou peso real do corte para corte no RJ [P03] |
+| Peso | [CALC] peso previsto (bitola + sobremetal) para peça inteira, ou peso real do corte para corte no RJ [P03] |
 | Valor precificador | [CALC] R$/kg × peso ÷ quantidade, opcional enquanto não houver R$/kg |
-| Código Mega do SA | [SUGERIDO] último SA usado para o mesmo item (historicamente, 1.645 de 1.684 itens têm um único código de SA). Item novo: [DIGITADO] depois do cadastro no Mega |
+| Código Mega do SA | [SISTEMA] o código de SA já usado para o **item da peça acabada** (o item da OP). Ver regra abaixo |
 | Descrição | [SUGERIDO] "SA <descrição do item [MEGA]> - CÓD.<item>" ou a do SA anterior |
 | NCM, ICMS, IPI | [SUGERIDO] do SA anterior do mesmo item, ou [MEGA] do cadastro do item |
+
+**Regra do código de SA** *(confirmada pelo Matheus em 2026-10-30)*: o código de SA pertence ao **item da peça acabada**, que é o item que vem na OP. A bitola, a liga e a matéria-prima **não importam**.
+
+- **A peça acabada já teve SA:** o código é o mesmo, preenchido pelo sistema, mesmo que a bitola ou a MP agora sejam outras. Não há cadastro novo.
+- **A peça acabada nunca teve SA:** só nesse caso é preciso **criar um SA novo** no Mega. A linha aparece como "SA novo – cadastrar no Mega", e o código é [DIGITADO] depois do cadastro.
+- **O item tem mais de um código no histórico** (39 dos 1.684 itens): o sistema usa o mais recente e mostra os outros. Trocar o código exige justificativa.
+- **Fonte do vínculo item → SA:** a carga da planilha de SA e, depois, os SAs confirmados no sistema.
 | Pedido | [MEGA] pedido de venda da OP, se disponível; senão [DIGITADO] |
 | NF de transferência | [SISTEMA] do COP |
 
@@ -644,11 +653,12 @@ Se o Mega estiver fora do ar, o sistema continua funcionando. Os campos [MEGA] p
 | OP_ENCERRADA | T07, T13 | Bloqueia | OP encerrada ou cancelada |
 | OP_DUPLICADA | T07 | Justificativa | Já existe solicitação ou SA para a OP |
 | BITOLA_MENOR_QUE_PECA | T07 | Bloqueia | A bitola não comporta a medida acabada |
-| SOBREMETAL_ACIMA_TOLERANCIA | T07 | Justificativa | Bruto mais de 20 % acima do peso da peça |
+| SOBREMETAL_ACIMA_TOLERANCIA | T07 | Justificativa | Peso previsto (bitola + sobremetal) mais de 20 % acima do peso da peça acabada |
 | SALDO_INSUFICIENTE | T07, T10, T13 | Bloqueia | Pedido maior que o saldo do lote |
 | USA_SALDO_RESERVADO | T07, T13 | Justificativa | Invade kg reservados para outro destino |
 | DESTINACAO_n | T07, T13 | "Estou ciente" | O lote tem reserva ou restrição vigente |
-| EXCESSO_TOLERANCIA | T10, T13 | Justificativa | Peso real mais de 5 % acima do previsto (o previsto já inclui sobremetal) |
+| EXCESSO_TOLERANCIA | T10, T13 | Justificativa | Peso real mais de 5 % acima do previsto, que é calculado pela bitola escolhida + sobremetal preenchido. Vale também para a peça inteira, quando ela é pesada em T13. Ex.: desvio de serra |
+| SA_CODIGO_TROCADO | T14 | Justificativa | Código de SA diferente do já usado para o item da peça acabada |
 | ABAIXO_PREVISTO | T10, T13 | Aviso | Peso real mais de 20 % abaixo do previsto |
 | SOMA_MAIOR_QUE_LOTE | T13 | Bloqueia | Consumo + sobra maior que o peso do lote |
 | PERDA_CORTE_ALTA | T13 | Justificativa | Perda maior que a perda esperada de serra (3 mm × seção × densidade) mais a margem |

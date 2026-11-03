@@ -99,6 +99,7 @@ def test_caminho_a_corte_rj(amb):
     h = entrar(client, u["itu"])
     sa2 = [s for s in client.get("/api/sas").json()["itens"] if s["solicitacao_id"] == sid2][0]
     assert sa2["sa_codigo"] == 50001 and sa2["sa_novo"] is False
+    _confirmar_no_mega(fab, 50002)   # código existe no Mega: só a troca precisa de justificativa
     v = client.post(f"/api/sas/{sa2['id']}/codigo/validar", json={"sa_codigo": 50002}, headers=h).json()
     assert [o["codigo"] for o in v["ocorrencias"]] == ["SA_CODIGO_TROCADO"]
 
@@ -148,3 +149,46 @@ def test_reabrir_cop_e_nf_por_item(amb):
     assert r.json()["situacao"] == "ABERTO" and r.json()["itens"][0]["sa"] is None
     h = entrar(client, u["analise"])
     assert client.post(f"/api/cops/{cop['id']}/fechar", headers=h).status_code == 403
+
+
+def _sa_pendente(client, u, ids):
+    _cortada(client, u, ids, corpo_solicitacao(ids["l33"]), 85, 12)
+    h = entrar(client, u["rj"])
+    lib = client.get("/api/cops/cortes-prontos").json()[0]["liberacao_id"]
+    cop = client.post("/api/cops", json={"numero": 700}, headers=h).json()
+    client.post(f"/api/cops/{cop['id']}/itens", json={"liberacao_ids": [lib]}, headers=h)
+    client.post(f"/api/cops/{cop['id']}/fechar", headers=h)
+    h = entrar(client, u["itu"])
+    return h, client.get("/api/sas").json()["itens"][0]
+
+
+def test_sa_inativo_pede_justificativa_e_nao_confirma(amb):
+    from app.integrations.mega.gateway import SituacaoSa
+    client, u, ids, fab = amb
+    h, sa = _sa_pendente(client, u, ids)
+    fab.obter().situacoes_sa[36389] = SituacaoSa(36389, True, "SA FACA 20X90X140MM - CÓD.11852 - INATIVO", False,
+                                                 date(2016, 5, 17), 12)
+    v = client.post(f"/api/sas/{sa['id']}/codigo/validar", json={"sa_codigo": 36389}, headers=h).json()
+    assert "SA_INATIVO_MEGA" in [o["codigo"] for o in v["ocorrencias"]]
+    assert client.post(f"/api/sas/{sa['id']}/codigo", json={"sa_codigo": 36389}, headers=h).status_code == 409
+    r = client.post(f"/api/sas/{sa['id']}/codigo", headers=h,
+                    json={"sa_codigo": 36389, "confirmacoes": {"SA_INATIVO_MEGA": "Reativar no Mega depois"}})
+    assert r.status_code == 200 and r.json()["situacao"] == "AGUARDANDO_MEGA"   # inativo nunca confirma
+
+
+def test_sa_codigo_inexistente_avisa(amb):
+    client, u, ids, _ = amb
+    h, sa = _sa_pendente(client, u, ids)
+    v = client.post(f"/api/sas/{sa['id']}/codigo/validar", json={"sa_codigo": 99999}, headers=h).json()
+    assert [o["nivel"] for o in v["ocorrencias"] if o["codigo"] == "SA_NAO_ENCONTRADO_MEGA"] == ["ALERTA"]
+
+
+def test_confirmacao_preenche_ncm_ipi_e_nf_do_mega(amb):
+    from app.integrations.mega.gateway import SituacaoSa
+    client, u, ids, fab = amb
+    h, sa = _sa_pendente(client, u, ids)
+    fab.obter().situacoes_sa[37983] = SituacaoSa(37983, True, "SA FACA TESOURA T1 - 32X99,5X155MM - CÓD.19918",
+                                                 True, date(2016, 9, 8), 10, "3215", "82081000", 5.2)
+    client.post(f"/api/sas/{sa['id']}/codigo", json={"sa_codigo": 37983}, headers=h)
+    j = client.get(f"/api/sas/{sa['id']}").json()
+    assert j["situacao"] == "CONFIRMADO" and j["ncm"] == "82081000" and j["ipi"] == "0.052"

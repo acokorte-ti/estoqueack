@@ -100,14 +100,35 @@ SELECT m.MVT_DT_MOVIMENTO, m.PRO_IN_CODIGO, m.PRO_ST_DESCRICAO, m.MVT_RE_QUANTID
  WHERE m.FIL_IN_CODIGO = :filial AND m.TPM_IN_CODIGO = {TPM_REQUISICAO_OP} AND m.MVT_ST_NUMDOC = :op
 """
 
-# SA: cadastro + entradas (ED) na filial 3 desde a data = carga de saldo. A VALIDAR com SAs reais (F1-F).
+# SA (semiacabado, UM = PC). Validado em 2026-11-03 com os SAs da planilha de 28/10 (37983 OP 100592, 91773 OP
+# 100553, 48512, 93972, 90762, 94811, 71526). A "carga do SA" é, no mesmo dia:
+#   filial 13: ED TPM 1 "Entrada por Compras" (documento = NF Fio Certo/Médio Vale, ex.: 3215)
+#   filial 13 → 3: SD TPM 77 / ED TPM 76 "Transferência entre Filiais" (documento = NF de transferência, ex.: 3166)
+#   depois, filial 3: SD TPM 13 na OP.
+# Até maio/2026 a compra (TPM 1) entrava direto na filial 3. Quantidade em PEÇAS.
+# Inativo: só pela descrição ("... INATIVO"; 3 de 2.997 SAs). NCM no produto; IPI em TRF_NCM (por NCM).
+# ICMS não fica no produto (depende da operação): continua vindo do histórico do item.
+FILIAL_RJ_SA = 13
 SITUACAO_SA = f"""
 SELECT p.PRO_IN_CODIGO, p.PRO_ST_DESCRICAO, p.PRO_DT_INCLUSAO,
-       (SELECT NVL(SUM(m.MVT_RE_QUANTIDADE), 0)
-          FROM {ESQUEMA}.EST_VW_MOVIMENTOESTOQUE m
-         WHERE m.PRO_IN_CODIGO = p.PRO_IN_CODIGO AND m.FIL_IN_CODIGO = :filial
-           AND m.MVT_ST_ENTRSAIDA = 'ED' AND m.MVT_DT_MOVIMENTO >= :desde) AS kg_entrada
+       CASE WHEN UPPER(p.PRO_ST_DESCRICAO) LIKE '%INATIVO%' THEN 'N' ELSE 'S' END AS ativo,
+       p.NCM_IN_CODIGO, n.NCM_RE_ALIQIPI,
+       e.qtd_itu, e.qtd_rj, e.nf_entrada
   FROM {ESQUEMA}.EST_PRODUTOS p
+  LEFT JOIN {ESQUEMA}.TRF_NCM n
+    ON n.NCM_TAB_IN_CODIGO = p.NCM_TAB_IN_CODIGO AND n.NCM_PAD_IN_CODIGO = p.NCM_PAD_IN_CODIGO
+   AND n.NCM_IN_CODIGO = p.NCM_IN_CODIGO
+  LEFT JOIN (SELECT m.PRO_IN_CODIGO,
+                    SUM(CASE WHEN m.FIL_IN_CODIGO = {FILIAL_ITU} THEN m.MVT_RE_QUANTIDADE ELSE 0 END) AS qtd_itu,
+                    SUM(CASE WHEN m.FIL_IN_CODIGO = {FILIAL_RJ_SA} AND m.TPM_IN_CODIGO = 1
+                             THEN m.MVT_RE_QUANTIDADE ELSE 0 END) AS qtd_rj,
+                    MAX(CASE WHEN m.TPM_IN_CODIGO = 1 THEN m.MVT_ST_NUMDOC END) AS nf_entrada
+               FROM {ESQUEMA}.EST_VW_MOVIMENTOESTOQUE m
+              WHERE m.PRO_IN_CODIGO = :codigo
+                AND m.MVT_ST_ENTRSAIDA = 'ED' AND m.MVT_BO_ESTORNO = 'N'
+                AND m.TPM_IN_CODIGO IN (1, 76) AND m.FIL_IN_CODIGO IN ({FILIAL_ITU}, {FILIAL_RJ_SA})
+                AND m.MVT_DT_MOVIMENTO >= :desde
+              GROUP BY m.PRO_IN_CODIGO) e ON e.PRO_IN_CODIGO = p.PRO_IN_CODIGO
  WHERE p.PRO_IN_CODIGO = :codigo
 """
 

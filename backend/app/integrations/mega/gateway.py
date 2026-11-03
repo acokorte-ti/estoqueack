@@ -49,7 +49,10 @@ class SituacaoSa:
     descricao: str | None = None
     ativo: bool | None = None
     data_cadastro: date | None = None
-    kg_entrada: float = 0.0          # entradas (ED) na filial 3 desde a data pedida = carga de saldo do SA
+    qtd_entrada: float = 0.0         # PEÇAS (UM do SA = PC) que entraram desde a data pedida = carga do SA
+    nf_entrada: str | None = None    # nº da NF da entrada por compra (TPM 1) = NF Fio Certo / Médio Vale
+    ncm: str | None = None
+    ipi_pct: float | None = None     # alíquota de IPI do NCM no Mega (TRF_NCM), em %
 
 
 @dataclass(frozen=True)
@@ -117,11 +120,13 @@ class OracleMegaGateway:
                 for c, d, dt in self._consultar(consultas.BUSCAR_SA, texto=f"%{texto.upper()}%")]
 
     def situacao_sa(self, codigo: int, desde: date) -> SituacaoSa:
-        linhas = self._consultar(consultas.SITUACAO_SA, codigo=codigo, filial=consultas.FILIAL_ITU, desde=desde)
+        linhas = self._consultar(consultas.SITUACAO_SA, codigo=codigo, desde=desde)
         if not linhas:
             return SituacaoSa(codigo, False)
-        _c, desc, dt, kg = linhas[0]
-        return SituacaoSa(codigo, True, desc, None, dt.date() if dt else None, float(kg or 0))
+        _c, desc, dt, ativo, ncm, ipi, qtd_itu, qtd_rj, nf = linhas[0]
+        return SituacaoSa(codigo, True, desc, ativo == "S", dt.date() if dt else None,
+                          float(max(qtd_itu or 0, qtd_rj or 0)), nf, str(ncm) if ncm is not None else None,
+                          float(ipi) if ipi is not None else None)
 
     # ---- Reservado para o futuro (atualizações no Mega pelo sistema) ----
     def solicitar_cadastro_sa(self, *_args, **_kwargs):

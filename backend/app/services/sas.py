@@ -130,8 +130,24 @@ def validar_codigo(db: Session, sa: CadastroSa, codigo: int) -> Previa:
         p.resultado.adicionar("SA_CODIGO_TROCADO", Nivel.CIENCIA,
                               f"O item {sa.item_codigo} já usou o SA {sa.sa_codigo_sugerido}. Justifique a troca "
                               f"para {codigo}.", sugerido=sa.sa_codigo_sugerido, informado=codigo)
+    st = _ler_sa_mega(codigo, sa)
+    if st is not None and not st.existe:
+        p.resultado.adicionar("SA_NAO_ENCONTRADO_MEGA", Nivel.ALERTA,
+                              f"O código {codigo} não existe no Mega. Confira a digitação.", sa_codigo=codigo)
+    elif st is not None and st.ativo is False:
+        p.resultado.adicionar("SA_INATIVO_MEGA", Nivel.CIENCIA,
+                              f"O SA {codigo} está INATIVO no Mega ({st.descricao}). Justifique o uso.",
+                              sa_codigo=codigo)
     p.frase = f"SA {codigo} para a OP {sa.op} ({kg_br(sa.peso_kg or 0)}). O sistema confirma lendo o Mega."
     return p
+
+
+def _ler_sa_mega(codigo: int, sa: CadastroSa):
+    """Leitura do SA no Mega para a prévia. Mega fora do ar não bloqueia (devolve None)."""
+    try:
+        return fabrica.obter().situacao_sa(codigo, sa.data - timedelta(days=7))
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def informar_codigo(db: Session, sa_id: int, codigo: int, confirmacoes: dict[str, str], *, usuario: Usuario,
@@ -151,7 +167,8 @@ def informar_codigo(db: Session, sa_id: int, codigo: int, confirmacoes: dict[str
 
 
 def verificar(db: Session, sas: list[CadastroSa]) -> dict[str, Any]:
-    """'Verificar no Mega agora': o código existe e recebeu saldo (entrada) a partir da data do SA − 7 dias."""
+    """'Verificar no Mega agora': o código existe, está ativo e recebeu a carga (entrada por compra na filial 13 ou
+    entrada na filial 3, em peças) a partir da data do SA − 7 dias. Ver consultas.SITUACAO_SA."""
     try:
         g = fabrica.obter()
     except fabrica.MegaIndisponivel as e:
@@ -165,10 +182,16 @@ def verificar(db: Session, sas: list[CadastroSa]) -> dict[str, Any]:
         except Exception as e:  # noqa: BLE001
             return {"verificados": 0, "confirmados": confirmados, "erro": f"Erro no Mega ({type(e).__name__})"}
         sa.verificado_mega_em = agora()
-        if st is not None and st.existe and st.kg_entrada > 0:
+        if st is not None and st.existe and st.ativo is not False and st.qtd_entrada > 0:
             sa.situacao, sa.confirmado_em = "CONFIRMADO", agora()
             if st.descricao and not sa.sa_descricao:
                 sa.sa_descricao = st.descricao
+            if st.ncm and not sa.ncm:
+                sa.ncm = st.ncm
+            if st.ipi_pct is not None and not sa.ipi:
+                sa.ipi = f"{st.ipi_pct / 100:.4g}"
+            sa.dados_extra = {**(sa.dados_extra or {}),
+                              "mega": {"qtd_entrada": st.qtd_entrada, "nf_entrada": st.nf_entrada}}
             confirmados += 1
             _ao_confirmar(db, sa)
     db.flush()

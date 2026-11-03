@@ -10,7 +10,7 @@ docs/integracao_mega.md). O banco EXIGE Native Network Encryption → modo thick
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Protocol
 
 from app.core.config import Config
@@ -74,6 +74,23 @@ class ComponenteOp:
 
 
 @dataclass(frozen=True)
+class MovimentoMega:
+    lancamento: int
+    data: date
+    entrada_saida: str              # ED | SD
+    tpm: int
+    tpm_descricao: str | None
+    documento: str | None
+    codigo: int
+    kg: float                       # sempre positivo; o sinal vem de entrada_saida
+    codigo_destino: int | None = None
+    estorno: bool = False
+    incluido_em: date | None = None
+    alterado_em: datetime | None = None
+    usuario: int | None = None
+
+
+@dataclass(frozen=True)
 class SemiAcabado:
     codigo: int
     descricao: str
@@ -81,7 +98,9 @@ class SemiAcabado:
 
 
 class MegaGateway(Protocol):
-    def saldos_mp(self) -> list[SaldoMega]: ...
+    def saldos_mp(self, data_corte: date | None = None) -> list[SaldoMega]: ...
+    def precos_medios_mp(self, data_corte: date | None = None) -> dict[int, tuple[float, date]]: ...
+    def movimentos_janela(self, desde: date, alterado_desde: date, ultimo_lancamento: int) -> list[MovimentoMega]: ...
     def ordem_producao(self, numero: int) -> OrdemProducao | None: ...
     def estrutura_op(self, numero: int) -> list[ComponenteOp]: ...
     def buscar_sa(self, texto: str) -> list[SemiAcabado]: ...
@@ -124,6 +143,23 @@ class OracleMegaGateway:
                 for c, d, um, s, pe in self._consultar(consultas.SALDOS_MP, filial=consultas.FILIAL_ITU,
                                                         data_corte=corte)]
 
+    def precos_medios_mp(self, data_corte: date | None = None) -> dict[int, tuple[float, date]]:
+        """Custo médio (R$/kg) mais recente por código de MP na filial 3: {codigo: (valor, data)}."""
+        import datetime as _dt
+        corte = data_corte or (_dt.date.today() + _dt.timedelta(days=1))
+        return {int(c): (float(v), d.date()) for c, v, d in
+                self._consultar(consultas.PRECOS_MEDIOS_MP, filial=consultas.FILIAL_ITU, data_corte=corte)
+                if v is not None}
+
+    def movimentos_janela(self, desde: date, alterado_desde: date, ultimo_lancamento: int) -> list[MovimentoMega]:
+        def _d(v):
+            return v.date() if isinstance(v, datetime) else v
+        return [MovimentoMega(int(lc), _d(dt), es, int(tpm), tdesc, doc, int(cod), float(q or 0),
+                              int(dest) if dest else None, est == "S", _d(inc), alt, int(usu) if usu else None)
+                for lc, dt, es, tpm, tdesc, doc, cod, q, dest, est, inc, alt, usu in
+                self._consultar(consultas.MOVIMENTOS_JANELA, filial=consultas.FILIAL_ITU, desde=desde,
+                                alterado_desde=alterado_desde, ultimo_lancamento=ultimo_lancamento)]
+
     def ordem_producao(self, numero: int) -> OrdemProducao | None:
         linhas = self._consultar(consultas.ORDEM_PRODUCAO, numero=numero, filial=consultas.FILIAL_ITU)
         if not linhas:
@@ -163,15 +199,28 @@ class OracleMegaGateway:
 class MegaFalso:
     """Implementação em memória para testes e desenvolvimento sem acesso ao ERP."""
 
-    def __init__(self, saldos=None, ops=None, sas=None, situacoes_sa=None, estruturas=None):
-        self._saldos = saldos or []
+    def __init__(self, saldos=None, ops=None, sas=None, situacoes_sa=None, estruturas=None, precos=None,
+                 movimentos=None):
+        self.saldos = list(saldos or [])
         self._ops = {o.numero: o for o in (ops or [])}
         self._sas = sas or []
         self.situacoes_sa: dict[int, SituacaoSa] = dict(situacoes_sa or {})
         self.estruturas: dict[int, list[ComponenteOp]] = dict(estruturas or {})
+        self.precos: dict[int, tuple[float, date]] = dict(precos or {})
+        self.movimentos: list[MovimentoMega] = list(movimentos or [])
+        self.falhar = False                     # simula Mega fora do ar na sincronização
 
-    def saldos_mp(self):
-        return list(self._saldos)
+    def saldos_mp(self, data_corte=None):
+        if self.falhar:
+            raise RuntimeError("Mega fora do ar (simulado)")
+        return list(self.saldos)
+
+    def precos_medios_mp(self, data_corte=None):
+        return dict(self.precos)
+
+    def movimentos_janela(self, desde, alterado_desde, ultimo_lancamento):
+        return [m for m in self.movimentos if m.data >= desde or m.lancamento > ultimo_lancamento
+                or (m.alterado_em is not None and m.alterado_em.date() >= alterado_desde)]
 
     def ordem_producao(self, numero):
         return self._ops.get(numero)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, Date, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Date, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -39,6 +39,7 @@ class Notificacao(Base):
 
 class SyncMega(Base):
     __tablename__ = "sync_mega"
+    __table_args__ = (Index("ix_sync_mega_tipo_situacao", "tipo", "situacao", "iniciado_em"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tipo: Mapped[str] = mapped_column(String(15))            # ESTOQUE | SA
@@ -58,13 +59,18 @@ class MegaSaldo(Base):
     codigo: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
     descricao: Mapped[str | None] = mapped_column(String(200))
     saldo_kg: Mapped[float] = mapped_column(Kg)
-    preco_medio: Mapped[float | None] = mapped_column(Kg)
+    preco_medio: Mapped[float | None] = mapped_column(Kg)          # R$/kg, custo médio diário (EST_SALDOFIN tipo 1)
+    preco_medio_data: Mapped[date | None] = mapped_column(Date)     # 0004
+    um: Mapped[str | None] = mapped_column(String(8))               # 0004
+    peso_especifico: Mapped[float | None] = mapped_column(Kg)       # 0004 (PRO_RE_PESOESPECIFICO)
     atualizado_em: Mapped[datetime] = mapped_column(DataHora, default=agora)
 
 
 class MegaMovimento(Base):
-    """Cópia incremental de EST_VW_MOVIMENTOESTOQUE (filial 3, itens MP), por MVT_IN_LANCAM."""
+    """Cópia de EST_VW_MOVIMENTOESTOQUE (filial 3, itens MP). A sincronização relê uma janela e substitui (ver
+    services/sync_mega.py)."""
     __tablename__ = "mega_movimento"
+    __table_args__ = (Index("ix_mega_movimento_codigo_data", "codigo", "data"),)
 
     lancamento: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
     codigo: Mapped[int] = mapped_column(Integer, index=True)
@@ -76,6 +82,9 @@ class MegaMovimento(Base):
     kg: Mapped[float] = mapped_column(Kg)
     codigo_destino: Mapped[int | None] = mapped_column(Integer)
     estorno: Mapped[bool] = mapped_column(Boolean, default=False)
+    incluido_em: Mapped[date | None] = mapped_column(Date)          # 0004 (MVT_DT_INCLUSAO)
+    alterado_em: Mapped[datetime | None] = mapped_column(DataHora)  # 0004 (MVT_DT_ALTERA)
+    usuario_mega: Mapped[int | None] = mapped_column(Integer)       # 0004 (USU_IN_INCLUSAO)
 
 
 class PendenciaMega(Base):

@@ -37,6 +37,41 @@ SELECT m.PRO_IN_CODIGO,
  GROUP BY m.PRO_IN_CODIGO
 """
 
+# Preço médio (custo médio diário, R$/kg) por código na filial 3: último EST_SALDOFIN tipo 1 até a data.
+# Validado em 2026-11-03: bate EXATO com a coluna de custo do relatório "Inventário do Tipo C.M.D." de 20/10/2026
+# nos 6 códigos de referência (1698 = 7,9395; 5838 = 10,7352; 78290 = 13,3053; 87780 = 35,7682; 62622; 60064).
+# Em EST_SALDOFIN o ORG_IN_CODIGO é a filial (3 = Itu, 13 = RJ). Tipo 1 = custo do dia com movimento, tipo 2 =
+# fechamento do mês. Há datas inválidas (ano 8014): o filtro "< :data_corte" as descarta.
+PRECOS_MEDIOS_MP = f"""
+SELECT s.PRO_IN_CODIGO,
+       MAX(s.SFN_RE_VLCUSTO) KEEP (DENSE_RANK LAST ORDER BY s.SFN_DT_SALDODIA) AS custo_medio,
+       MAX(s.SFN_DT_SALDODIA) AS data_custo
+  FROM {ESQUEMA}.EST_SALDOFIN s
+  JOIN {ESQUEMA}.EST_PRODUTOS p ON p.PRO_IN_CODIGO = s.PRO_IN_CODIGO
+ WHERE s.ORG_TAB_IN_CODIGO = 53 AND s.ORG_PAD_IN_CODIGO = 1 AND s.ORG_IN_CODIGO = :filial AND s.ORG_TAU_ST_CODIGO = 'G'
+   AND s.SFN_IN_TIPOCUSTO = 1 AND s.CRI_IN_CODIGO = 1
+   AND p.PRO_ST_DEFITEM = 'MP'
+   AND s.SFN_DT_SALDODIA < :data_corte
+ GROUP BY s.PRO_IN_CODIGO
+"""
+
+# Movimentos para a sincronização (2026-11-03). MVT_IN_LANCAM cresce com a inclusão, mas lançamentos podem ter
+# data de movimento retroativa e ~3 % são alterados depois (ex.: entradas de NF com a data corrigida dias depois;
+# MVT_DT_ALTERA). Não há linha de estorno com MVT_BO_ESTORNO='S' em 2026 (o estorno some da visão). Por isso a
+# sincronização relê uma JANELA (data do movimento recente, ou alterado recentemente, ou lançamento novo) e
+# substitui a cópia local dessa janela; assim pega inclusão, alteração e exclusão.
+MOVIMENTOS_JANELA = f"""
+SELECT m.MVT_IN_LANCAM, m.MVT_DT_MOVIMENTO, m.MVT_ST_ENTRSAIDA, m.TPM_IN_CODIGO, m.TPM_ST_DESCRICAO,
+       m.MVT_ST_NUMDOC, m.PRO_IN_CODIGO, m.MVT_RE_QUANTIDADE, m.PRO_IN_CODIGODEST, m.MVT_BO_ESTORNO,
+       m.MVT_DT_INCLUSAO, m.MVT_DT_ALTERA, m.USU_IN_INCLUSAO
+  FROM {ESQUEMA}.EST_VW_MOVIMENTOESTOQUE m
+  JOIN {ESQUEMA}.EST_PRODUTOS p ON p.PRO_IN_CODIGO = m.PRO_IN_CODIGO
+ WHERE m.FIL_IN_CODIGO = :filial
+   AND p.PRO_ST_DEFITEM = 'MP'
+   AND (m.MVT_DT_MOVIMENTO >= :desde OR m.MVT_DT_ALTERA >= :alterado_desde OR m.MVT_IN_LANCAM > :ultimo_lancamento)
+ ORDER BY m.MVT_IN_LANCAM
+"""
+
 # Movimentos novos desde o último lançamento lido (sincronização incremental).
 MOVIMENTOS_DESDE = f"""
 SELECT m.MVT_IN_LANCAM, m.MVT_DT_MOVIMENTO, m.MVT_ST_ENTRSAIDA, m.TPM_IN_CODIGO, m.TPM_ST_DESCRICAO,

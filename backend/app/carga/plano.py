@@ -430,6 +430,11 @@ def _estoque_mega(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
         pl.pend("SEM_SALDO_MEGA", "BLOQUEIA", "Sem saldo do Mega (sincronização não rodou): os lotes do Estoque "
                 "Mega não podem ser criados.", None, "Rodar \"Sincronizar agora\" antes da carga")
         return
+    # Universo do Estoque Mega: códigos do Estoque Geral + códigos do Mega cuja descrição traz uma liga de aço
+    # conhecida. O resto (bronze, rolamento, fita, inox…) também é "MP" no Mega, mas não é matéria-prima de aço
+    # deste controle: fica de fora, listado nas pendências.
+    conhecidas = set(ctx.ligas) | {it.liga for it in pl.itens.values() if it.codigo_mega}
+    fora: list[tuple[int, str, float]] = []
     for cod, s in sorted(ctx.mega_saldo.items()):
         kg = round(float(s["saldo_kg"] or 0), 3)
         if kg <= 0.0005:
@@ -440,6 +445,9 @@ def _estoque_mega(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
         ch = ("CM", cod)
         if ch not in pl.itens:
             m = medida(s.get("descricao") or "")
+            if m.liga not in conhecidas:
+                fora.append((cod, s.get("descricao") or "", kg))
+                continue
             liga = _liga(pl, ctx, m.liga, None, s.get("peso_especifico"))
             pl.itens[ch] = ItemP(ch, (s.get("descricao") or f"Código {cod}")[:200], liga, _formato_valido(m),
                                  m.espessura, m.largura, m.diametro, cod)
@@ -451,6 +459,12 @@ def _estoque_mega(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
                      origem={"arquivo": "Mega (mega_saldo)", "aba": ctx.data_mega, "linha": cod})
         lote.movimentos.append(MovP("SALDO_INICIAL", kg, documento=f"Carga saldo Mega {ctx.data_mega or ''}".strip()))
         pl.lotes.append(lote)
+    pl.contagens["mega_codigos_fora"] = len(fora)
+    pl.contagens["mega_kg_fora"] = round(sum(k for _, _, k in fora), 3)
+    for cod, desc, kg in fora:
+        pl.pend("CM_FORA_DO_CATALOGO", "REVISAR", f"Código {cod} \"{desc}\": {kg:.1f} kg no Mega, não está no "
+                "Estoque Geral e a descrição não traz liga de aço conhecida. Não vira lote.", None,
+                "Confirmar que não é matéria-prima de aço; se for, incluir no Estoque Geral")
 
 
 def _restricoes_e_avisos(pl: Plano, geral: list[P.LinhaGeral]) -> None:
@@ -653,9 +667,11 @@ def _conferencias(pl: Plano, estoque, geral, corte, sas) -> None:
     add("(c) Total RJ em Itu × Materia Prima Geral (coluna RJ em Itu)", round(sum(g.rj_em_itu for g in geral), 3),
         round(sum(l.saldo for l in itu), 3))
     mega = [l for l in pl.lotes if l.estoque == "ESTOQUE_MEGA"]
-    add("(a) Total Estoque Mega × saldo do Mega (MP, filial 3)", None if not mega else
+    add("(a) Total Estoque Mega × saldo do Mega (MP de aço, filial 3)", None if not mega else
         round(sum(l.conferencia_kg or 0 for l in mega), 3), round(sum(l.saldo for l in mega), 3),
-        obs=f"Saldo do Mega de {pl.data_mega}" if pl.data_mega else "Sem saldo do Mega")
+        obs=(f"Saldo do Mega de {pl.data_mega}. Fora do catálogo (não é aço): "
+             f"{pl.contagens.get('mega_codigos_fora', 0)} códigos, {pl.contagens.get('mega_kg_fora', 0):.1f} kg")
+        if pl.data_mega else "Sem saldo do Mega")
     add("(a) Estoque Geral (ESTOQUE MEGA de 20/10) × saldo do Mega hoje",
         round(sum(g.estoque_mega or 0 for g in geral), 3),
         round(sum(l.saldo for l in mega), 3), tol=10 ** 9, obs="Só informativo: a planilha é de 20/10")

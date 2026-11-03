@@ -219,7 +219,9 @@ def conferencia_banco(db: Session) -> list[dict[str, Any]]:
                                                                                        ItemMP.id)
                               .where(Lote.planta_fiscal == "ITU", Lote.local_fisico == "ITU",
                                      ItemMP.codigo_mega.is_not(None)).group_by(ItemMP.codigo_mega)).all())
-    mega = {c: float(s) for c, s in db.execute(select(MegaSaldo.codigo, MegaSaldo.saldo_kg))}
+    # só os códigos do catálogo (item_mp); os de fora (não aço) estão nas pendências CM_FORA_DO_CATALOGO
+    catalogo = set(db.scalars(select(ItemMP.codigo_mega).where(ItemMP.codigo_mega.is_not(None))))
+    mega = {c: float(s) for c, s in db.execute(select(MegaSaldo.codigo, MegaSaldo.saldo_kg)) if c in catalogo}
     difs = [(c, mega.get(c, 0.0), float(por_cod.get(c) or 0)) for c in set(mega) | set(por_cod)
             if abs(float(por_cod.get(c) or 0) - max(mega.get(c, 0.0), 0.0)) > 5.0]
     add("(a) Códigos Mega com soma dos lotes ≠ saldo Mega (> 5 kg)", 0, len(difs), 0,

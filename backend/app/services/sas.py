@@ -32,25 +32,47 @@ class Sugestao:
     outros: list[int]
 
 
-def sugerir(db: Session, item_codigo: int | None, *, exceto_id: int | None = None) -> Sugestao:
-    """Código de SA mais recente já usado para o item da peça acabada (regra do Matheus, 2026-10-30).
-    A checagem de 'ativo no Mega' entra quando o mapeamento do cadastro de SA estiver validado."""
-    if not item_codigo:
+def sa_da_estrutura(op: int | None) -> tuple[int, str | None] | None:
+    """SA que o Mega já colocou na estrutura da OP (PRO_DEMANDA_DEP), quando a OP é de material RJ.
+    Mega fora do ar → None (fica só o histórico)."""
+    if not op:
+        return None
+    try:
+        comps = fabrica.obter().estrutura_op(op)
+    except Exception:  # noqa: BLE001
+        return None
+    sa = next((c for c in comps if c.tipo == "SA"), None)
+    return (sa.codigo, sa.descricao) if sa else None
+
+
+def sugerir(db: Session, item_codigo: int | None, *, exceto_id: int | None = None, op: int | None = None) -> Sugestao:
+    """Código de SA sugerido: 1º o SA da estrutura da OP no Mega (mapeado em 2026-11-03); senão, o mais recente já
+    usado para o item da peça acabada (regra do Matheus, 2026-10-30)."""
+    est = sa_da_estrutura(op)
+    if not item_codigo and not est:
         return Sugestao(None, None, None, None, None, [])
+    if not item_codigo:
+        return Sugestao(est[0], est[1], None, None, None, [])
     q = (select(CadastroSa).where(CadastroSa.item_codigo == item_codigo, CadastroSa.sa_codigo.is_not(None),
                                   CadastroSa.situacao == "CONFIRMADO")
          .order_by(CadastroSa.data.desc(), CadastroSa.id.desc()))
     if exceto_id:
         q = q.where(CadastroSa.id != exceto_id)
     hist = list(db.scalars(q.limit(200)))
-    if not hist:
+    if not hist and not est:
         return Sugestao(None, None, None, None, None, [])
-    h = hist[0]
+    if est:
+        # fiscais (ICMS/IPI/NCM) do último SA com o mesmo código; se não houver, do último do item
+        h = next((x for x in hist if x.sa_codigo == est[0]), hist[0] if hist else None)
+        codigo, descricao = est[0], est[1] or (h.sa_descricao if h else None)
+    else:
+        h = hist[0]
+        codigo, descricao = h.sa_codigo, h.sa_descricao
     outros = []
-    for x in hist[1:]:
-        if x.sa_codigo != h.sa_codigo and x.sa_codigo not in outros:
+    for x in hist:
+        if x.sa_codigo != codigo and x.sa_codigo not in outros:
             outros.append(x.sa_codigo)
-    return Sugestao(h.sa_codigo, h.sa_descricao, h.ncm, h.icms, h.ipi, outros)
+    return Sugestao(codigo, descricao, h.ncm if h else None, h.icms if h else None, h.ipi if h else None, outros)
 
 
 def _dimensao(lote: Lote) -> str:
@@ -61,7 +83,7 @@ def criar_linha(db: Session, *, origem: str, lote: Lote, op: int, item_codigo: i
                 cliente: str | None, pedido: str | None, quantidade: int | None, peso_kg: float,
                 solicitacao_id: int | None = None, cop_item_id: int | None = None,
                 corte_itu_id: int | None = None) -> CadastroSa:
-    sug = sugerir(db, item_codigo)
+    sug = sugerir(db, item_codigo, op=op)
     raiz_ct = lote.conteiner.codigo if lote.conteiner else None
     sa = CadastroSa(origem=origem, cop_item_id=cop_item_id, corte_itu_id=corte_itu_id, solicitacao_id=solicitacao_id,
                     lote_id=lote.id, data=agora().date(), op=op, item_codigo=item_codigo,

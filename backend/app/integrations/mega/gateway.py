@@ -56,6 +56,24 @@ class SituacaoSa:
 
 
 @dataclass(frozen=True)
+class ComponenteOp:
+    """Linha da estrutura da OP (PRO_DEMANDA_DEP): o SA (material RJ) ou a MP em kg (material Itu)."""
+    codigo: int
+    descricao: str | None
+    definicao: str | None           # PRO_ST_DEFITEM ('MP', 'CO', 'PA'…)
+    um: str | None
+    qtd_necessaria: float
+    qtd_unitaria: float | None = None
+    qtd_requisitada: float | None = None
+
+    @property
+    def tipo(self) -> str:
+        if (self.descricao or "").upper().startswith("SA "):
+            return "SA"
+        return "MP" if self.definicao == "MP" else "OUTRO"
+
+
+@dataclass(frozen=True)
 class SemiAcabado:
     codigo: int
     descricao: str
@@ -65,6 +83,7 @@ class SemiAcabado:
 class MegaGateway(Protocol):
     def saldos_mp(self) -> list[SaldoMega]: ...
     def ordem_producao(self, numero: int) -> OrdemProducao | None: ...
+    def estrutura_op(self, numero: int) -> list[ComponenteOp]: ...
     def buscar_sa(self, texto: str) -> list[SemiAcabado]: ...
     def situacao_sa(self, codigo: int, desde: date) -> SituacaoSa | None: ...
 
@@ -115,6 +134,12 @@ class OracleMegaGateway:
                              pedido=str(int(ped)) if ped is not None else None,
                              cliente_codigo=int(cli_cod) if cli_cod is not None else None, tipo=tipo)
 
+    def estrutura_op(self, numero: int) -> list[ComponenteOp]:
+        f = lambda v: float(v) if v is not None else None  # noqa: E731
+        return [ComponenteOp(int(c), d, dfi, um, float(nec or 0), f(uni), f(req))
+                for c, d, dfi, um, nec, uni, req in self._consultar(consultas.ESTRUTURA_OP, numero=numero,
+                                                                     filial=consultas.FILIAL_ITU)]
+
     def buscar_sa(self, texto: str) -> list[SemiAcabado]:
         return [SemiAcabado(int(c), d, dt.date() if dt else None)
                 for c, d, dt in self._consultar(consultas.BUSCAR_SA, texto=f"%{texto.upper()}%")]
@@ -138,17 +163,21 @@ class OracleMegaGateway:
 class MegaFalso:
     """Implementação em memória para testes e desenvolvimento sem acesso ao ERP."""
 
-    def __init__(self, saldos=None, ops=None, sas=None, situacoes_sa=None):
+    def __init__(self, saldos=None, ops=None, sas=None, situacoes_sa=None, estruturas=None):
         self._saldos = saldos or []
         self._ops = {o.numero: o for o in (ops or [])}
         self._sas = sas or []
         self.situacoes_sa: dict[int, SituacaoSa] = dict(situacoes_sa or {})
+        self.estruturas: dict[int, list[ComponenteOp]] = dict(estruturas or {})
 
     def saldos_mp(self):
         return list(self._saldos)
 
     def ordem_producao(self, numero):
         return self._ops.get(numero)
+
+    def estrutura_op(self, numero):
+        return list(self.estruturas.get(numero, []))
 
     def buscar_sa(self, texto):
         return [s for s in self._sas if texto.upper() in s.descricao.upper()]

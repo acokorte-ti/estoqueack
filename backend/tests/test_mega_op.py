@@ -57,3 +57,33 @@ def test_rota_op_devolve_pedido_e_cliente(amb):
     j = client.get("/api/mega/op/200003").json()
     assert j["pedido"] == "82403" and j["cliente_codigo"] == 1785 and j["tipo"] == "OP001"
     assert j["situacao_descricao"] == "Firme planejada" and j["aberta"] is None
+
+
+def _estrutura(fab):
+    from app.integrations.mega.gateway import ComponenteOp
+    fab.obter().estruturas[200003] = [ComponenteOp(37983, "SA FACA TESOURA T1 - 32X99,5X155MM - CÓD.19918", "CO", "PC",
+                                                   10, 1, 10)]
+    fab.obter().estruturas[200001] = [ComponenteOp(5838, "IMP-A8 RETO", "MP", "KG", 80, 20, 80)]
+
+
+def test_rota_op_traz_estrutura_sa_e_mp(amb):
+    from app.integrations.mega import fabrica
+    client, u, _ = amb
+    _estrutura(fabrica)
+    entrar(client, u["itu"])
+    est = client.get("/api/mega/op/200003").json()["estrutura"]
+    assert est[0]["codigo"] == 37983 and est[0]["tipo"] == "SA"
+    est = client.get("/api/mega/op/200001").json()["estrutura"]
+    assert est[0]["tipo"] == "MP" and est[0]["qtd_necessaria"] == 80
+
+
+def test_sugestao_de_sa_vem_da_estrutura_da_op(amb):
+    from app.core.db import SessionLocal
+    from app.integrations.mega import fabrica
+    from app.services import sas
+    _estrutura(fabrica)
+    with SessionLocal() as db:
+        s = sas.sugerir(db, 19918, op=200003)
+        assert s.codigo == 37983 and s.descricao.startswith("SA FACA")
+        assert sas.sugerir(db, 19918, op=200001).codigo is None     # OP de MP Itu: sem SA na estrutura
+        assert sas.sugerir(db, 19918).codigo is None                # sem OP e sem histórico

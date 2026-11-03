@@ -33,7 +33,14 @@ def ordem_producao(numero: int, _: Usuario = Depends(deps.usuario_liberado)):
         if m.formato in ("RETANGULAR", "REDONDO"):
             medida = {"formato": m.formato, "espessura": m.espessura, "largura": m.largura,
                       "diametro": m.diametro, "comprimento": m.comprimento}
+    try:
+        estrutura = [{"codigo": c.codigo, "descricao": c.descricao, "tipo": c.tipo, "um": c.um,
+                      "qtd_necessaria": c.qtd_necessaria, "qtd_unitaria": c.qtd_unitaria,
+                      "qtd_requisitada": c.qtd_requisitada} for c in fabrica.obter().estrutura_op(numero)]
+    except Exception:  # noqa: BLE001 — estrutura é informativa (T07); falha não derruba a consulta da OP
+        estrutura = None
     return {"numero": op.numero, "item_codigo": op.item_codigo, "item_descricao": op.item_descricao,
+            "estrutura": estrutura,
             "cliente": op.cliente, "cliente_codigo": op.cliente_codigo, "pedido": op.pedido, "tipo": op.tipo,
             "situacao": op.situacao, "situacao_descricao": desc, "aberta": aberta,
             "quantidade": op.quantidade,

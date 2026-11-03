@@ -112,20 +112,74 @@ Validado contra o relatório "Inventário do Tipo C.M.D." de 20/10/2026 (aba "es
 | `FIL_IN_CODIGO` | Filial | 3 |
 | `PRO_IN_CODIGO` | Item a produzir | 68092 (confere com a planilha de corte) |
 | `ORD_RE_QTDE_ORDEM` | Quantidade | 128 (confere) |
-| `ORD_ST_SITUACAO` | Situação | `AB` (aberta). Códigos de encerrada e cancelada **a confirmar** |
+| `ORD_ST_SITUACAO` | Situação | `AB` (aberta). Domínio completo abaixo |
 | `TPO_ST_CODIGO_TIPO` | Tipo da OP | OP001 |
 | `ORD_DT_RECEBIMENTO` | Data prevista de recebimento | 2026-12-09 (= PRAZO da planilha) |
 | `ORD_DT_ABERTURA_REAL` | Abertura | 2026-10-16 |
-| `ORD_ST_ALTERNATIVO` | Código alternativo | 82355 (provável vínculo com pedido/demanda, **a confirmar**) |
+| `ORD_ST_ALTERNATIVO` | Código alternativo | 82355 = nº do pedido de venda (confirmado; usado quando falta a origem) |
 
 Relacionadas: `PRO_PROG_ORDEM` (programação por operação e máquina), `PRO_MOVTOMANUF`, `PRO_ESTMOVTOMANUF` e `PRO_DEMANDA_DEP`.
 
+### Situação da OP (`ORD_ST_SITUACAO`), mapeada em 2026-11-03 (chat BANCO E TESTES)
+
+O domínio está no comentário da coluna no próprio Oracle. Contagem na filial 3:
+
+| Código | Significado | OPs | No EstoqueACK |
+|---|---|---|---|
+| `EN` | Encerrada | 80.351 | **Bloqueia** (`OP_ENCERRADA`) |
+| `CA` | Cancelada | 2.975 | **Bloqueia** (`OP_ENCERRADA`) |
+| `AB` | Aberta | 1.344 | Aceita |
+| `FP` | Firme planejada | 211 | Alerta `OP_NAO_ABERTA` (nenhuma tem baixa de MP nem abertura real) |
+| `LB` | Liberada | 15 | Alerta `OP_NAO_ABERTA` |
+| `PL` | Planejada | 1 | Alerta `OP_NAO_ABERTA` |
+| `SI` | Simulada | 0 | Alerta `OP_NAO_ABERTA` |
+
+Datas úteis: `ORD_DT_ENCERRAMENTO_REAL`, `ORD_DT_CANCELAMENTO`. Tipo da OP (`TPO_ST_CODIGO_TIPO`): `OP001` normal, `OP015`, `OP016` (para estoque, sem pedido), `OS001` (ordem de serviço).
+
+### Cliente e pedido da OP, mapeado em 2026-11-03
+
+```
+PRO_ORDENS ─(chave org + ORD_TAB/ORD_SEQ/ORD_IN_CODIGO)→ PRO_ORIGEM (ORI_CH_TIPOORIGEM = 'D' = pedido de venda)
+           ─(org + PED_SER_ST_CODIGO/PED_IN_CODIGO)→ VEN_PEDIDOVENDA ─(CLI_TAB/CLI_PAD/CLI_IN_CODIGO)→ GLO_AGENTES
+cliente = GLO_AGENTES.AGN_ST_FANTASIA (ex.: 414 "ARCELORMITTAL - BELGO PIRACICABA")
+```
+
+- **Conferência:** as 79 OPs da planilha de corte desde 01/09/2026 batem 79/79 no cliente (as 2 sem cliente na planilha são OP016 de estoque, sem pedido no Mega também). Item da OP difere em 5 linhas da planilha (100100–100104, 100359, 99825): a planilha usa outro código; vai para a lista de pendências da carga.
+- **Multiplicidade:** desde 2025, 8.554 OPs têm 1 origem 'D' e 37 têm 2 a 4 linhas, sempre do **mesmo** cliente. A consulta pega a de menor `ORI_IN_SEQUENCIA`.
+- **Sem origem 'D':** 146 OPs abertas em 2026 (ex.: 100591). Nelas, `ORD_ST_ALTERNATIVO` é o nº do pedido (série '1'); conferido em 100591 → pedido 82402, SYLVAMO (bate com a planilha de SA). Em 3.230 OPs de 2026 o alternativo é igual ao pedido da origem.
+- Consulta oficial: `consultas.ORDEM_PRODUCAO` (com o filtro `:numero` também dentro da subconsulta de origem, por desempenho).
+
+### SA (semiacabado), mapeado em 2026-11-03
+
+O SA é um produto em `EST_PRODUTOS` com descrição "SA … - CÓD.<item da peça>", **unidade PC**, `PRO_ST_DEFITEM = 'CO'`. `PRO_ST_ALTERNATIVO` às vezes traz "37983 - H13".
+
+**Carga do SA** (validada com os 7 SAs da planilha de 28/10/2026: 37983 OP 100592, 91773 OP 100553, 48512, 93972, 90762, 94811, 71526), sempre no mesmo dia do SA na planilha:
+
+| Ordem | Filial | Movimento | Documento |
+|---|---|---|---|
+| 1 | **13** | ED TPM 1 "Entrada por Compras", qtd = **peças** | **NF Fio Certo / Médio Vale** (ex.: 3215, a mesma da coluna da planilha) |
+| 2 | 13 → 3 | SD TPM 77 / ED TPM 76 "Transferência entre Filiais" | NF de transferência (ex.: 3166) |
+| 3 | 3 | SD TPM 13 na OP | nº da OP |
+
+Até maio/2026 a compra (TPM 1) entrava direto na filial 3 (294 movimentos em 2026). Desde 25/03/2026, pela filial 13 (615). A confirmação aceita os dois: entrada TPM 1/76 nas filiais 3 ou 13, sem estorno, a partir da data do SA − 7 dias (`consultas.SITUACAO_SA`).
+
+- **Inativo:** não existe coluna de situação no produto. O Mega marca no texto ("… INATIVO"; só 3 de 2.997 SAs). O "39294 - INAT" é anotação da planilha; no Mega, o 39294 está sem a marca. SA inativo nunca é confirmado e pede justificativa (`SA_INATIVO_MEGA`).
+- **NCM:** `EST_PRODUTOS.NCM_IN_CODIGO`, bate com a planilha.
+- **IPI:** `TRF_NCM.NCM_RE_ALIQIPI` (por NCM, em %). 82081000 = 5,2 % (planilha 0,052 ✓), 84669490 = 0 % ✓, 82089000 = 5,2 % no Mega × 0,08 na planilha (divergência para o Fabiano ver).
+- **ICMS:** não fica no produto (depende da operação/UF); continua vindo do histórico do item (planilha de SA e SAs confirmados).
+
+### Estrutura da OP (`PRO_DEMANDA_DEP`), mapeada em 2026-11-03
+
+Demanda dependente da OP, ligada pela chave completa da OP (org + `ORD_TAB/ORD_SEQ/ORD_IN_CODIGO`). Componente em `COM_IN_CODIGO`; quantidade total em `DDE_RE_QTDE_NECESSARIA`, por peça em `DDE_RE_QTDE_UNITARIA`, baixada em `DDE_RE_QTDE_REQUISITADA`.
+
+- **OP de material RJ:** o componente é o **SA** (1 PC por peça). Ex.: 100592 → 37983, 100553 → 91773, 100508 → 78988, 100092 → 68946. É a melhor sugestão de código de SA: o sistema usa o SA da estrutura e, se não houver, o mais recente do item (`sas.sugerir`).
+- **OP de material Itu (caminho C):** o componente é a **MP** em kg. Ex.: 100410 → 5838 IMP-A8 RETO, 80 kg (4 × 20), baixado 80; 100408 → 98559 S1 35×125, 5,4 kg.
+- Abertas desde 07/2026 (OP001): 244 com SA, 803 com MP, 1 sem estrutura.
+- A API devolve `estrutura[]` em `GET /api/mega/op/{n}` (T07, informativo).
+
 ### Ainda a mapear
 
-- **Cliente da OP:** via pedido de venda ou demanda (`ORD_ST_ALTERNATIVO`?, módulo `VEN_`).
-- **Códigos de situação da OP** (encerrada e cancelada).
-- **SA:** o SA é um produto em `EST_PRODUTOS` (descrição "SA ..."). É preciso confirmar a carga de saldo, provavelmente uma entrada (ED) no código do SA.
-- **MP prevista na estrutura da OP:** informativa.
+- **Preço médio por código de MP** (filial 3).
 
 ## Permissões
 

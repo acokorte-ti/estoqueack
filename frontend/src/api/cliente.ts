@@ -76,7 +76,7 @@ export interface Validacao<R = Record<string, unknown>> {
 }
 
 /** Se o erro for um 409 com corpo de validação, devolve esse corpo; senão, null. */
-export function validacaoDoErro<R>(e: unknown): Validacao<R> | null {
+export function validacaoDoErro<R = Record<string, unknown>>(e: unknown): Validacao<R> | null {
   if (e instanceof ErroApi && e.status === 409) {
     const d = e.dados as Partial<Validacao<R>> | undefined;
     if (d && Array.isArray(d.ocorrencias)) return { ok: false, ocorrencias: d.ocorrencias, resultado: d.resultado ?? null };

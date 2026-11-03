@@ -234,7 +234,7 @@ export default function NovaSolicitacao() {
           </p>
           <ul>
             {gravado.r.solicitacoes.map((s) => (
-              <li key={s.id}><strong>{s.numero}</strong>{s.lote ? `, lote ${s.lote.codigo}` : ""}</li>
+              <li key={s.id}><Link to={`/solicitacoes/${s.id}`}><strong>{s.numero}</strong></Link>{s.lote ? `, lote ${s.lote.codigo}` : ""}</li>
             ))}
           </ul>
           <div className="botoes">

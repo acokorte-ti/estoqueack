@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, kg } from "../api/cliente";
 import { useSessao } from "../api/sessao";
+import SyncMega from "../components/SyncMega";
 
 interface Resumo {
   baldes: Record<"ESTOQUE_MEGA" | "RJ_NO_RIO" | "RJ_EM_ITU", { lotes: number; kg: number }>;
@@ -31,6 +32,8 @@ export default function Painel() {
         <h1>Olá, {usuario?.nome.split(" ")[0]}</h1>
         <p>Saldo de matéria-prima por local de estoque.</p>
       </header>
+
+      <SyncMega />
 
       {erro && <p className="erro">{erro}</p>}
 

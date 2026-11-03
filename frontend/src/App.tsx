@@ -13,6 +13,10 @@ import EsqueciSenha from "./pages/EsqueciSenha";
 import RedefinirSenha from "./pages/RedefinirSenha";
 import NovaSolicitacao from "./pages/NovaSolicitacao";
 import Sas from "./pages/Sas";
+import Solicitacoes from "./pages/Solicitacoes";
+import SolicitacaoDetalhe from "./pages/SolicitacaoDetalhe";
+import FilaRj from "./pages/FilaRj";
+import RegistrarCorte from "./pages/RegistrarCorte";
 
 import { ACESSO } from "./api/acesso";
 
@@ -38,8 +42,12 @@ export default function App() {
         <Route index element={<Painel />} />
         <Route path="calculadora" element={<Calculadora />} />
         <Route path="estoque" element={<EmBreve titulo="Consulta de estoque" fase="Fase 1" />} />
+        <Route path="solicitacoes" element={<Protegido perfis={ACESSO.solicitacoes}><Solicitacoes /></Protegido>} />
         <Route path="solicitacoes/nova" element={<Protegido perfis={ACESSO.novaSolicitacao}><NovaSolicitacao /></Protegido>} />
-        <Route path="corte" element={<Navigate to="/solicitacoes/nova" replace />} />
+        <Route path="solicitacoes/:id" element={<Protegido perfis={ACESSO.solicitacoes}><SolicitacaoDetalhe /></Protegido>} />
+        <Route path="fila-rj" element={<Protegido perfis={ACESSO.filaRj}><FilaRj /></Protegido>} />
+        <Route path="fila-rj/:id/corte" element={<Protegido perfis={ACESSO.registrarCorte}><RegistrarCorte /></Protegido>} />
+        <Route path="corte" element={<Navigate to="/solicitacoes" replace />} />
         <Route path="corte-itu" element={<Protegido perfis={ACESSO.corteItu}><EmBreve titulo="Corte em Itu" fase="Fase 1 (próxima tela)" /></Protegido>} />
         <Route path="cop" element={<EmBreve titulo="COP" fase="Fase 1" />} />
         <Route path="sa" element={<Protegido perfis={ACESSO.sa}><Sas /></Protegido>} />

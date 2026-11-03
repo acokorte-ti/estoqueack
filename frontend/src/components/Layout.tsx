@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useSessao } from "../api/sessao";
 import { NOME_PERFIL, type Perfil } from "../api/cliente";
 import { ACESSO } from "../api/acesso";
+import Sino from "./Sino";
 
 interface Item {
   para: string;
@@ -15,6 +16,8 @@ const OPERACAO: Item[] = [
   { para: "/", rotulo: "Painel", pronto: true },
   { para: "/estoque", rotulo: "Estoque por lote" },
   { para: "/solicitacoes/nova", rotulo: "Nova solicitação de corte", pronto: true, perfis: ACESSO.novaSolicitacao },
+  { para: "/solicitacoes", rotulo: "Solicitações de corte", pronto: true, perfis: ACESSO.solicitacoes },
+  { para: "/fila-rj", rotulo: "Fila RJ", pronto: true, perfis: ACESSO.filaRj },
   { para: "/cop", rotulo: "COP" },
   { para: "/sa", rotulo: "SA", pronto: true, perfis: ACESSO.sa },
   { para: "/corte-itu", rotulo: "Corte em Itu", perfis: ACESSO.corteItu },
@@ -34,7 +37,7 @@ function Lista({ itens }: { itens: Item[] }) {
         <li key={i.para}>
           <NavLink
             to={i.para}
-            end={i.para === "/"}
+            end={i.para === "/" || i.para === "/solicitacoes"}
             className={({ isActive }) => [isActive ? "ativo" : "", i.pronto ? "" : "em-breve"].join(" ").trim()}
           >
             <span>{i.rotulo}</span>
@@ -82,6 +85,7 @@ export default function Layout() {
           <span className="topo-sistema">EstoqueACK</span>
         </Link>
         <span className="topo-espaco" />
+        <Sino />
         <div className="topo-usuario">
           <strong>{usuario?.nome}</strong>
           <span>

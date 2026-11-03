@@ -2,6 +2,14 @@
 
 Versão 1, 2026-10-30, feita pelo chat FUNCIONAL.
 
+> **Atualização de 2026-11-03, com as respostas do Eduardo (detalhes no §12 da especificação v3):**
+>
+> - **P13 confirmada, com um ajuste:** o SA é feito **com as informações do COP**. A ordem fica corte → COP fechado → SA → NF → envio. Na v2, o COP só podia ser fechado depois do SA.
+> - **P14 não aceita:** não haverá controle barra a barra. O comprimento fica como campo **opcional**. Os itens 2.4 e 2.18 (peças) ficam só como informação.
+> - **P15:** não existe material sem OP. Os casos "SEM OP" são erro.
+> - **P16:** o R$/kg é preenchido manualmente.
+> - **P17 e P18:** aceitas como propostas.
+
 **Objetivo:** ler as 4 planilhas linha a linha, entender como a AçoKorte trabalha hoje e ver onde a especificação funcional (`03_especificacao_funcional.md`) acerta, erra ou deixa algo de fora.
 
 **Como foi feito:** as planilhas foram lidas com script, incluindo fórmulas, comentários de célula e comentários encadeados. Depois, as OPs foram cruzadas entre elas:

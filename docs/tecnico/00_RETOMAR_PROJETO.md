@@ -106,6 +106,13 @@ curl -s http://127.0.0.1:8090/api/saude               # saúde da API
 - **Como trabalhar no system-lab a partir do chat:** Desktop Commander com `start_process("ssh -tt -o ServerAliveInterval=30 system-lab", shell="cmd.exe")` e depois `interact_with_process`. **Uma sessão só.** Se ela parar de responder, conferir pelo site (`curl --resolve estoque.acokorte.com.br:443:204.216.137.171 …`, que funciona porque o sandbox sai com o IP do Eduardo) antes de abrir outra. O `sudo` está liberado no Desktop Commander.
 - **Commit e push a partir do sandbox:** `git -c http.extraHeader="Authorization: Basic $(printf 'x-access-token:%s' "$(tr -d ' \r\n' < .github_token)" | base64 -w0)" push`. Adicionar só arquivos explícitos. Testes: venv em `/tmp/venv` (recriar com `pip install -r backend/requirements-dev.txt`). gitleaks em `/tmp/gitleaks` (baixar da release v8.21.2).
 
+## 7.2 Situação em 2026-11-03 (Fase 1 iniciada)
+
+- Especificação v3 liberada (R022). Migração **0003** criou o modelo da Fase 1. Serviços em `app/services/` (`solicitacoes`, `cops`, `sas`, `corte_itu`, `operacoes`, `movimentos`, `fluxo`, `ops`, `base`), rotas em `app/api/routes/` (`solicitacoes`, `cops`, `operacoes`, `notificacoes`). Contrato: `docs/api/02_contrato_fase1.md`.
+- Regras de implementação: todo movimento passa por `movimentos.lancar` (saldo nunca negativo); a situação da solicitação é **derivada** (`fluxo.recalcular_solicitacao`); reserva = previsto ainda não cortado das solicitações Enviadas/Parciais + reservas de T17 (`movimentos.reservado`); validação = `Previa` + `exigir_sem_pendencias` (409 com a prévia), `ErroNegocio` = 400.
+- Testes do fluxo usam `tests/fluxo_util.py` (usuários por perfil, catálogo, `MegaFalso`).
+- **Git a partir do sandbox deixa `.git/index.lock` preso** (a pasta montada não deixa apagar). Commit e push pelo Windows (Desktop Commander, PowerShell).
+
 ## 8. Registro de incidentes
 
 **2026-10-29, senha do backup publicada no GitHub.** O commit `ea2b71b (antigo 3422e54)` (13h04), feito pelo chat TÉCNICO com `git add -A`, incluiu `pass_bkp/pass.txt`, uma anotação local do Eduardo com a senha GPG dos backups, num repositório **público**.

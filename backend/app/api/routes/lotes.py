@@ -13,6 +13,9 @@ from app.api import deps
 from app.core.db import get_db
 from app.models import Destinacao, Lote, Nota, Usuario
 from app.services import auditoria, estoque
+from app.services import movimentos as mov
+from app.services.base import lote_visivel, so_rj_no_rio
+from app.services.solicitacoes import ligas_equivalentes
 
 router = APIRouter(prefix="/lotes", tags=["estoque"])
 
@@ -38,30 +41,81 @@ def paginar(itens: list, pagina: int, por_pagina: int) -> dict:
     return {"itens": itens[ini:ini + por_pagina], "total": len(itens), "pagina": pagina, "por_pagina": por_pagina}
 
 
-def _lote(db: Session, lote_id: int) -> Lote:
+def _lote(db: Session, lote_id: int, usuario: Usuario | None = None) -> Lote:
     l = db.get(Lote, lote_id)
-    if l is None:
+    if l is None or (usuario is not None and not lote_visivel(usuario, l)):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Lote não encontrado.")
     return l
 
 
+def _visivel(f: dict, u: Usuario) -> dict:
+    """[P10] Operação RJ vê só o RJ no Rio: o filtro de estoque fica travado."""
+    if so_rj_no_rio(u):
+        f = {**f, "estoque": "RJ_NO_RIO"}
+    return f
+
+
 @router.get("")
 def listar(f: dict = Depends(filtros), pagina: int = Query(1, ge=1), por_pagina: int = Query(50, ge=1, le=200),
-           db: Session = Depends(get_db), _: Usuario = Depends(deps.usuario_liberado)) -> dict:
-    return paginar(estoque.lote_resumo(db, estoque.consulta_lotes(db, f)), pagina, por_pagina)
+           db: Session = Depends(get_db), u: Usuario = Depends(deps.usuario_liberado)) -> dict:
+    return paginar(estoque.lote_resumo(db, estoque.consulta_lotes(db, _visivel(f, u))), pagina, por_pagina)
 
 
 @router.get("/agrupado")
 def listar_agrupado(f: dict = Depends(filtros), pagina: int = Query(1, ge=1),
                     por_pagina: int = Query(50, ge=1, le=200), db: Session = Depends(get_db),
-                    _: Usuario = Depends(deps.usuario_liberado)) -> dict:
-    itens = estoque.lote_resumo(db, estoque.consulta_lotes(db, f))
+                    u: Usuario = Depends(deps.usuario_liberado)) -> dict:
+    itens = estoque.lote_resumo(db, estoque.consulta_lotes(db, _visivel(f, u)))
     return paginar(estoque.agrupado(itens), pagina, por_pagina)
 
 
+@router.get("/compativeis")
+def compativeis(liga: str, formato: Literal["RETANGULAR", "REDONDO"] = "RETANGULAR",
+                espessura: float | None = Query(None, gt=0), largura: float | None = Query(None, gt=0),
+                diametro: float | None = Query(None, gt=0), comprimento: float | None = Query(None, gt=0),
+                quantidade: int = Query(1, ge=1), estoque_: Estoque | None = Query(None, alias="estoque"),
+                db: Session = Depends(get_db), u: Usuario = Depends(deps.usuario_liberado)) -> dict:
+    """T07 passo 2: mesma liga (ou equivalente, com selo), bitola que comporta a peça e saldo disponível.
+    Ordem: menor sobremetal, depois o lote mais antigo."""
+    from app.domain import corte as calc
+    from app.models import Liga
+    alvo = db.scalar(select(Liga).where(Liga.codigo == liga.strip().upper()))
+    if alvo is None:
+        return {"itens": [], "total": 0}
+    ligas = {alvo.id} | ligas_equivalentes(db, alvo.id)
+    f = _visivel({"estoque": estoque_, "com_saldo": True}, u)
+    lotes = [l for l in estoque.consulta_lotes(db, f) if l.item.liga_id in ligas and l.status == "ATIVO"]
+    res = mov.reservado(db, [l.id for l in lotes])
+    acabada = calc.Dimensoes(formato, espessura, largura, diametro, comprimento)
+    saida = []
+    for l, base in zip(lotes, estoque.lote_resumo(db, lotes), strict=True):
+        it = l.item
+        if it.formato != "RETO":
+            if formato == "REDONDO" and (it.formato != "REDONDO" or (diametro and it.diametro < diametro)):
+                continue
+            if formato == "RETANGULAR":
+                if it.formato != "RETANGULAR":
+                    continue
+                bit, pec = sorted([it.espessura or 0, it.largura or 0]), sorted([espessura or 0, largura or 0])
+                if pec[0] > bit[0] + 1e-9 or pec[1] > bit[1] + 1e-9:
+                    continue
+        disponivel = round(float(l.saldo_kg) - res.get(l.id, 0.0), 3)
+        if disponivel <= 0:
+            continue
+        bitola = None if it.formato == "RETO" else calc.Dimensoes(it.formato, it.espessura, it.largura, it.diametro)
+        c = calc.calcular(bitola=bitola, acabada=acabada, quantidade=quantidade, densidade=float(it.liga.densidade),
+                          sobremetal_comprimento_mm=5, sobremetal_largura_mm=None)
+        saida.append({**base, "disponivel_kg": disponivel, "liga_equivalente": it.liga_id != alvo.id,
+                      "peso_previsto_kg": c.peso_previsto_kg, "peso_peca_kg": c.peso_peca_kg,
+                      "sobremetal_pct": c.sobremetal_pct, "substituido_por_id": it.substituido_por_id,
+                      "criado_em": l.criado_em.isoformat()})
+    saida.sort(key=lambda x: (x["sobremetal_pct"] if x["sobremetal_pct"] is not None else 1e9, x["criado_em"]))
+    return {"itens": saida, "total": len(saida)}
+
+
 @router.get("/{lote_id}")
-def detalhe(lote_id: int, db: Session = Depends(get_db), _: Usuario = Depends(deps.usuario_liberado)) -> dict:
-    l = _lote(db, lote_id)
+def detalhe(lote_id: int, db: Session = Depends(get_db), u: Usuario = Depends(deps.usuario_liberado)) -> dict:
+    l = _lote(db, lote_id, u)
     base = estoque.lote_resumo(db, [l])[0]
     base.update({"peso_inicial_kg": round(l.peso_inicial_kg, 3), "pecas_iniciais": l.pecas_iniciais,
                  "documento_entrada": l.documento_entrada,
@@ -71,20 +125,20 @@ def detalhe(lote_id: int, db: Session = Depends(get_db), _: Usuario = Depends(de
 
 
 @router.get("/{lote_id}/arvore")
-def arvore(lote_id: int, db: Session = Depends(get_db), _: Usuario = Depends(deps.usuario_liberado)) -> dict:
-    return estoque.arvore(db, _lote(db, lote_id))
+def arvore(lote_id: int, db: Session = Depends(get_db), u: Usuario = Depends(deps.usuario_liberado)) -> dict:
+    return estoque.arvore(db, _lote(db, lote_id, u))
 
 
 @router.get("/{lote_id}/movimentos")
 def movimentos(lote_id: int, pagina: int = Query(1, ge=1), por_pagina: int = Query(100, ge=1, le=500),
-               db: Session = Depends(get_db), _: Usuario = Depends(deps.usuario_liberado)) -> dict:
-    _lote(db, lote_id)
+               db: Session = Depends(get_db), u: Usuario = Depends(deps.usuario_liberado)) -> dict:
+    _lote(db, lote_id, u)
     return paginar(estoque.movimentos(db, lote_id), pagina, por_pagina)
 
 
 @router.get("/{lote_id}/destinacoes")
-def destinacoes(lote_id: int, db: Session = Depends(get_db), _: Usuario = Depends(deps.usuario_liberado)) -> list:
-    _lote(db, lote_id)
+def destinacoes(lote_id: int, db: Session = Depends(get_db), u: Usuario = Depends(deps.usuario_liberado)) -> list:
+    _lote(db, lote_id, u)
     hoje = date.today()
     q = (select(Destinacao, Usuario.nome).outerjoin(Usuario, Destinacao.criado_por_id == Usuario.id)
          .where(Destinacao.lote_id == lote_id, Destinacao.ativa.is_(True),
@@ -99,8 +153,8 @@ class NotaEntrada(BaseModel):
 
 
 @router.get("/{lote_id}/notas")
-def notas(lote_id: int, db: Session = Depends(get_db), _: Usuario = Depends(deps.usuario_liberado)) -> list:
-    _lote(db, lote_id)
+def notas(lote_id: int, db: Session = Depends(get_db), u: Usuario = Depends(deps.usuario_liberado)) -> list:
+    _lote(db, lote_id, u)
     q = (select(Nota, Usuario.nome).outerjoin(Usuario, Nota.usuario_id == Usuario.id)
          .where(Nota.entidade == "LOTE", Nota.entidade_id == lote_id).order_by(Nota.id))
     return [{"id": n.id, "texto": n.texto, "usuario": nome, "criado_em": n.criado_em.isoformat()}
@@ -110,7 +164,7 @@ def notas(lote_id: int, db: Session = Depends(get_db), _: Usuario = Depends(deps
 @router.post("/{lote_id}/notas", status_code=201)
 def adicionar_nota(lote_id: int, dados: NotaEntrada, request: Request, db: Session = Depends(get_db),
                    u: Usuario = Depends(deps.usuario_liberado)) -> dict:
-    _lote(db, lote_id)
+    _lote(db, lote_id, u)
     n = Nota(entidade="LOTE", entidade_id=lote_id, texto=dados.texto.strip(), usuario_id=u.id)
     db.add(n)
     db.flush()

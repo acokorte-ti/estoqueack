@@ -7,6 +7,9 @@ ESQUEMA = "ACOKORTE"
 FILIAL_ITU = 3           # "00003 - AÇOKORTE - MATRIZ"
 TPM_REQUISICAO_OP = 13   # Requisição Materiais Ordem de Produção (MVT_ST_NUMDOC = nº da OP)
 
+# PRO_ORDENS.ORD_ST_SITUACAO → (descrição, aceita solicitação/corte). Códigos ainda não mapeados → aberta = None
+SITUACOES_OP: dict[str, tuple[str, bool]] = {"AB": ("Aberta", True)}
+
 # Saldo físico por código de MP numa data de corte (soma de movimentos).
 # Validado: diferença 0,000 kg contra o relatório "Inventário C.M.D." de 20/10/2026.
 SALDOS_MP = f"""

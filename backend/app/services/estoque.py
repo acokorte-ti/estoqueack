@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.models import Conteiner, Destinacao, ItemMP, Liga, Lote, Movimento, Nota, Usuario
 
+from . import movimentos as mov
+
 BALDE = {("ITU", "ITU"): "ESTOQUE_MEGA", ("RJ", "RJ"): "RJ_NO_RIO", ("RJ", "ITU"): "RJ_EM_ITU"}
 BALDE_INV = {v: k for k, v in BALDE.items()}
 
@@ -17,7 +19,7 @@ TIPO_MOV_DESCRICAO = {
     "SALDO_INICIAL": "Saldo inicial (carga)", "ENTRADA": "Entrada", "SAIDA_CORTE_RJ": "Corte no RJ",
     "ENVIO_ITU": "Envio para Itu", "RECEBIMENTO_ITU": "Recebimento em Itu", "CONSUMO_OP": "Consumo em OP",
     "GERA_SOBRA": "Sobra gerada", "GERA_RETO": "RETO gerado", "AJUSTE_INVENTARIO": "Ajuste de inventário",
-    "ESTORNO": "Estorno", "SUCATA": "Sucata",
+    "ESTORNO": "Estorno", "SUCATA": "Sucata", "PERDA_CORTE": "Perda de corte", "ATRIBUIR_ORIGEM": "Origem atribuída",
 }
 
 
@@ -29,17 +31,6 @@ def bitola(item: ItemMP) -> str:
     if item.espessura and item.largura:
         return f"{item.espessura:g}X{item.largura:g}"
     return item.formato
-
-
-def _reservas(db: Session, ids: list[int]) -> dict[int, float]:
-    if not ids:
-        return {}
-    hoje = date.today()
-    q = (select(Destinacao.lote_id, func.coalesce(func.sum(Destinacao.kg), 0))
-         .where(Destinacao.lote_id.in_(ids), Destinacao.ativa.is_(True), Destinacao.tipo == "RESERVA",
-                or_(Destinacao.validade.is_(None), Destinacao.validade >= hoje))
-         .group_by(Destinacao.lote_id))
-    return {i: float(k) for i, k in db.execute(q)}
 
 
 def _com_destinacao(db: Session, ids: list[int]) -> set[int]:
@@ -103,7 +94,7 @@ def consulta_lotes(db: Session, f: dict[str, Any]):
 
 def lote_resumo(db: Session, lotes: list[Lote]) -> list[dict]:
     ids = [l.id for l in lotes]
-    res, dest, notas = _reservas(db, ids), _com_destinacao(db, ids), _com_nota(db, ids)
+    res, dest, notas = mov.reservado(db, ids), _com_destinacao(db, ids), _com_nota(db, ids)
     saida = []
     for l in lotes:
         reservado = round(min(res.get(l.id, 0.0), l.saldo_kg), 3)

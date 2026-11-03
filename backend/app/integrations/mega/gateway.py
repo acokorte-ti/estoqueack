@@ -37,6 +37,8 @@ class OrdemProducao:
     data_emissao: date | None
     quantidade: float | None = None
     data_recebimento: date | None = None
+    pedido: str | None = None
+    cliente_codigo: int | None = None
 
 
 @dataclass(frozen=True)

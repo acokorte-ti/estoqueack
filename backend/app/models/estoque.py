@@ -41,6 +41,7 @@ class Lote(Base):
     status: Mapped[str] = mapped_column(String(12), default="ATIVO")     # ATIVO | ESGOTADO
     criado_em: Mapped[datetime] = mapped_column(DataHora, default=agora)
     criado_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    origem_ref: Mapped[dict[str, Any] | None] = mapped_column(JsonDoc)    # carga: {arquivo, aba, linha}
 
     conteiner: Mapped[Conteiner | None] = relationship()
     item: Mapped[ItemMP] = relationship()
@@ -56,7 +57,7 @@ class Movimento(Base):
     lote_id: Mapped[int] = mapped_column(ForeignKey("lote.id"), index=True)
     tipo: Mapped[str] = mapped_column(String(20), index=True)
     # ENTRADA | SAIDA_CORTE_RJ | ENVIO_ITU | RECEBIMENTO_ITU | CONSUMO_OP | GERA_SOBRA | GERA_RETO
-    # | AJUSTE_INVENTARIO | ESTORNO | SALDO_INICIAL
+    # | AJUSTE_INVENTARIO | ESTORNO | SALDO_INICIAL | PERDA_CORTE | SUCATA | ATRIBUIR_ORIGEM
     kg: Mapped[float] = mapped_column(Kg)                  # + entrada, − saída
     pecas: Mapped[int | None] = mapped_column(Integer)
     op: Mapped[int | None] = mapped_column(Integer, index=True)
@@ -67,6 +68,10 @@ class Movimento(Base):
     justificativa: Mapped[str | None] = mapped_column(String(500))
     confirmacoes: Mapped[dict[str, Any] | None] = mapped_column(JsonDoc)   # {codigo_ocorrencia: justificativa}
     estorno_de_id: Mapped[int | None] = mapped_column(ForeignKey("movimento.id"))
+    solicitacao_id: Mapped[int | None] = mapped_column(ForeignKey("solicitacao_corte.id"), index=True)
+    liberacao_id: Mapped[int | None] = mapped_column(ForeignKey("liberacao_corte.id"), index=True)
+    corte_itu_id: Mapped[int | None] = mapped_column(ForeignKey("corte_itu.id"), index=True)
+    origem_ref: Mapped[dict[str, Any] | None] = mapped_column(JsonDoc)
     usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
     criado_em: Mapped[datetime] = mapped_column(DataHora, default=agora, index=True)
 

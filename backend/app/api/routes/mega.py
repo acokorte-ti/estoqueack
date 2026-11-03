@@ -7,12 +7,12 @@ from fastapi.responses import JSONResponse
 from app.api import deps
 from app.domain.medidas import interpretar
 from app.integrations.mega import fabrica
+from app.integrations.mega.consultas import SITUACOES_OP
 from app.models import Usuario
 
 router = APIRouter(prefix="/mega", tags=["mega"])
 
-# Códigos de situação de PRO_ORDENS confirmados até agora (docs/integracao_mega.md)
-SITUACAO = {"AB": ("Aberta", True)}
+SITUACAO = SITUACOES_OP
 
 
 @router.get("/op/{numero}")

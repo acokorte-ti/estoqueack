@@ -37,6 +37,7 @@ class ItemMP(Base):
     comprimento_fixado: Mapped[str | None] = mapped_column(String(120))
     um: Mapped[str] = mapped_column(String(5), default="KG")
     observacao_uso: Mapped[str | None] = mapped_column(String(500))
+    substituido_por_id: Mapped[int | None] = mapped_column(ForeignKey("item_mp.id"))   # "SUBSTITUÍDO POR …"
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
 
     liga: Mapped[Liga] = relationship()

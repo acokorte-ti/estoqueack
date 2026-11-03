@@ -42,6 +42,16 @@ class OrdemProducao:
 
 
 @dataclass(frozen=True)
+class SituacaoSa:
+    codigo: int
+    existe: bool
+    descricao: str | None = None
+    ativo: bool | None = None
+    data_cadastro: date | None = None
+    kg_entrada: float = 0.0          # entradas (ED) na filial 3 desde a data pedida = carga de saldo do SA
+
+
+@dataclass(frozen=True)
 class SemiAcabado:
     codigo: int
     descricao: str
@@ -52,6 +62,7 @@ class MegaGateway(Protocol):
     def saldos_mp(self) -> list[SaldoMega]: ...
     def ordem_producao(self, numero: int) -> OrdemProducao | None: ...
     def buscar_sa(self, texto: str) -> list[SemiAcabado]: ...
+    def situacao_sa(self, codigo: int, desde: date) -> SituacaoSa | None: ...
 
 
 class EscritaDesabilitada(RuntimeError):
@@ -102,6 +113,13 @@ class OracleMegaGateway:
         return [SemiAcabado(int(c), d, dt.date() if dt else None)
                 for c, d, dt in self._consultar(consultas.BUSCAR_SA, texto=f"%{texto.upper()}%")]
 
+    def situacao_sa(self, codigo: int, desde: date) -> SituacaoSa:
+        linhas = self._consultar(consultas.SITUACAO_SA, codigo=codigo, filial=consultas.FILIAL_ITU, desde=desde)
+        if not linhas:
+            return SituacaoSa(codigo, False)
+        _c, desc, dt, kg = linhas[0]
+        return SituacaoSa(codigo, True, desc, None, dt.date() if dt else None, float(kg or 0))
+
     # ---- Reservado para o futuro (atualizações no Mega pelo sistema) ----
     def solicitar_cadastro_sa(self, *_args, **_kwargs):
         if not self._cfg.mega_escrita_habilitada:
@@ -112,10 +130,11 @@ class OracleMegaGateway:
 class MegaFalso:
     """Implementação em memória para testes e desenvolvimento sem acesso ao ERP."""
 
-    def __init__(self, saldos=None, ops=None, sas=None):
+    def __init__(self, saldos=None, ops=None, sas=None, situacoes_sa=None):
         self._saldos = saldos or []
         self._ops = {o.numero: o for o in (ops or [])}
         self._sas = sas or []
+        self.situacoes_sa: dict[int, SituacaoSa] = dict(situacoes_sa or {})
 
     def saldos_mp(self):
         return list(self._saldos)
@@ -125,3 +144,6 @@ class MegaFalso:
 
     def buscar_sa(self, texto):
         return [s for s in self._sas if texto.upper() in s.descricao.upper()]
+
+    def situacao_sa(self, codigo, desde):
+        return self.situacoes_sa.get(codigo, SituacaoSa(codigo, False))

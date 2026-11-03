@@ -55,6 +55,17 @@ SELECT m.MVT_DT_MOVIMENTO, m.PRO_IN_CODIGO, m.PRO_ST_DESCRICAO, m.MVT_RE_QUANTID
  WHERE m.FIL_IN_CODIGO = :filial AND m.TPM_IN_CODIGO = {TPM_REQUISICAO_OP} AND m.MVT_ST_NUMDOC = :op
 """
 
+# SA: cadastro + entradas (ED) na filial 3 desde a data = carga de saldo. A VALIDAR com SAs reais (F1-F).
+SITUACAO_SA = f"""
+SELECT p.PRO_IN_CODIGO, p.PRO_ST_DESCRICAO, p.PRO_DT_INCLUSAO,
+       (SELECT NVL(SUM(m.MVT_RE_QUANTIDADE), 0)
+          FROM {ESQUEMA}.EST_VW_MOVIMENTOESTOQUE m
+         WHERE m.PRO_IN_CODIGO = p.PRO_IN_CODIGO AND m.FIL_IN_CODIGO = :filial
+           AND m.MVT_ST_ENTRSAIDA = 'ED' AND m.MVT_DT_MOVIMENTO >= :desde) AS kg_entrada
+  FROM {ESQUEMA}.EST_PRODUTOS p
+ WHERE p.PRO_IN_CODIGO = :codigo
+"""
+
 # Produtos SA (semiacabados) por texto da descrição.
 BUSCAR_SA = f"""
 SELECT p.PRO_IN_CODIGO, p.PRO_ST_DESCRICAO, p.PRO_DT_INCLUSAO

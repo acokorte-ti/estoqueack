@@ -64,7 +64,48 @@ export const api = {
   get: <T,>(c: string) => requisitar<T>("GET", c),
   post: <T,>(c: string, b?: unknown) => requisitar<T>("POST", c, b ?? {}),
   patch: <T,>(c: string, b: unknown) => requisitar<T>("PATCH", c, b),
+  put: <T,>(c: string, b: unknown) => requisitar<T>("PUT", c, b),
+  delete: <T,>(c: string) => requisitar<T>("DELETE", c),
 };
+
+/** Resposta do padrão prévia/validação (contrato §1.5). O 409 da gravação traz o mesmo corpo. */
+export interface Validacao<R = Record<string, unknown>> {
+  ok: boolean;
+  ocorrencias: Ocorrencia[];
+  resultado: R | null;
+}
+
+/** Se o erro for um 409 com corpo de validação, devolve esse corpo; senão, null. */
+export function validacaoDoErro<R>(e: unknown): Validacao<R> | null {
+  if (e instanceof ErroApi && e.status === 409) {
+    const d = e.dados as Partial<Validacao<R>> | undefined;
+    if (d && Array.isArray(d.ocorrencias)) return { ok: false, ocorrencias: d.ocorrencias, resultado: d.resultado ?? null };
+  }
+  return null;
+}
+
+/** Monta a query string ignorando vazios; arrays viram parâmetros repetidos. */
+export function qs(p: Record<string, string | number | boolean | null | undefined | (string | number)[]>): string {
+  const u = new URLSearchParams();
+  for (const [k, v] of Object.entries(p)) {
+    if (v === null || v === undefined || v === "") continue;
+    if (Array.isArray(v)) v.forEach((x) => u.append(k, String(x)));
+    else u.append(k, String(v));
+  }
+  const s = u.toString();
+  return s ? `?${s}` : "";
+}
+
+export const ESTOQUE_NOME: Record<string, string> = {
+  ESTOQUE_MEGA: "Estoque Mega",
+  RJ_NO_RIO: "RJ no Rio",
+  RJ_EM_ITU: "RJ em Itu",
+};
+
+export const data = (iso: string | null | undefined) =>
+  iso ? new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString("pt-BR") : "—";
+
+export const num = (s: string) => (s.trim() === "" ? undefined : Number(s.replace(",", ".")));
 
 export type Perfil = "ADMIN" | "ESTOQUE" | "OPERACAO_RJ" | "ANALISE";
 

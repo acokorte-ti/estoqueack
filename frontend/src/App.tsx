@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useSessao } from "./api/sessao";
+import type { Perfil } from "./api/cliente";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import TrocarSenha from "./pages/TrocarSenha";
@@ -10,14 +11,19 @@ import Ligas from "./pages/Ligas";
 import EmBreve from "./pages/EmBreve";
 import EsqueciSenha from "./pages/EsqueciSenha";
 import RedefinirSenha from "./pages/RedefinirSenha";
+import NovaSolicitacao from "./pages/NovaSolicitacao";
+import Sas from "./pages/Sas";
 
-function Protegido({ children, admin = false }: { children: JSX.Element; admin?: boolean }) {
+import { ACESSO } from "./api/acesso";
+
+function Protegido({ children, admin = false, perfis }: { children: JSX.Element; admin?: boolean; perfis?: Perfil[] }) {
   const { usuario, carregando } = useSessao();
   const local = useLocation();
   if (carregando) return <div className="carregando">Carregando…</div>;
-  if (!usuario) return <Navigate to="/entrar" state={{ de: local.pathname }} replace />;
+  if (!usuario) return <Navigate to="/entrar" state={{ de: local.pathname + local.search }} replace />;
   if (usuario.trocar_senha && local.pathname !== "/trocar-senha") return <Navigate to="/trocar-senha" replace />;
   if (admin && usuario.perfil !== "ADMIN") return <Navigate to="/" replace />;
+  if (perfis && !perfis.includes(usuario.perfil)) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -32,9 +38,11 @@ export default function App() {
         <Route index element={<Painel />} />
         <Route path="calculadora" element={<Calculadora />} />
         <Route path="estoque" element={<EmBreve titulo="Consulta de estoque" fase="Fase 1" />} />
-        <Route path="corte" element={<EmBreve titulo="Solicitações de corte" fase="Fase 1" />} />
+        <Route path="solicitacoes/nova" element={<Protegido perfis={ACESSO.novaSolicitacao}><NovaSolicitacao /></Protegido>} />
+        <Route path="corte" element={<Navigate to="/solicitacoes/nova" replace />} />
+        <Route path="corte-itu" element={<Protegido perfis={ACESSO.corteItu}><EmBreve titulo="Corte em Itu" fase="Fase 1 (próxima tela)" /></Protegido>} />
         <Route path="cop" element={<EmBreve titulo="COP" fase="Fase 1" />} />
-        <Route path="sa" element={<EmBreve titulo="Cadastro de SA" fase="Fase 1" />} />
+        <Route path="sa" element={<Protegido perfis={ACESSO.sa}><Sas /></Protegido>} />
         <Route path="consumo" element={<EmBreve titulo="Consumo, sobra e RETO" fase="Fase 2" />} />
         <Route path="relatorios" element={<EmBreve titulo="Relatórios" fase="Fase 4" />} />
         <Route path="admin/usuarios" element={<Protegido admin><Usuarios /></Protegido>} />

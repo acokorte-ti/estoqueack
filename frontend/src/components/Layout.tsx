@@ -1,21 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useSessao } from "../api/sessao";
-import { NOME_PERFIL } from "../api/cliente";
+import { NOME_PERFIL, type Perfil } from "../api/cliente";
+import { ACESSO } from "../api/acesso";
 
 interface Item {
   para: string;
   rotulo: string;
   pronto?: boolean;
+  perfis?: Perfil[];
 }
 
 const OPERACAO: Item[] = [
   { para: "/", rotulo: "Painel", pronto: true },
   { para: "/estoque", rotulo: "Estoque por lote" },
-  { para: "/corte", rotulo: "Solicitações de corte" },
+  { para: "/solicitacoes/nova", rotulo: "Nova solicitação de corte", pronto: true, perfis: ACESSO.novaSolicitacao },
   { para: "/cop", rotulo: "COP" },
-  { para: "/sa", rotulo: "Cadastro de SA" },
-  { para: "/consumo", rotulo: "Consumo, sobra e RETO" },
+  { para: "/sa", rotulo: "SA", pronto: true, perfis: ACESSO.sa },
+  { para: "/corte-itu", rotulo: "Corte em Itu", perfis: ACESSO.corteItu },
   { para: "/relatorios", rotulo: "Relatórios" },
   { para: "/calculadora", rotulo: "Calculadora de peso", pronto: true },
 ];
@@ -99,7 +101,7 @@ export default function Layout() {
           </button>
         </div>
         <nav aria-label="Navegação principal">
-          <Lista itens={OPERACAO} />
+          <Lista itens={OPERACAO.filter((i) => !i.perfis || (usuario && i.perfis.includes(usuario.perfil)))} />
           {usuario?.perfil === "ADMIN" && (
             <>
               <p className="grupo">Administração</p>

@@ -109,8 +109,11 @@ def validar_bitola(bitola_esp: float | None, bitola_larg: float | None, bitola_d
 
 
 def validar_perda_corte(peso_antes_kg: float, consumo_kg: float, sobra_kg: float,
-                        perda_esperada_kg: float, margem_pct: float = 20.0) -> Resultado:
-    """Peso antes = consumo + sobra + perda. Alerta se a perda real foge muito da esperada."""
+                        perda_esperada_kg: float, margem_pct: float = 50.0) -> Resultado:
+    """Peso antes = consumo + sobra + perda. Justificativa se a perda passar da esperada de serra + margem.
+
+    Especificação v3 (T23, R008): margem = 50 % ACIMA da perda esperada (3 mm × seção × densidade × cortes).
+    """
     r = Resultado()
     if consumo_kg < 0 or sobra_kg < 0:
         return r.adicionar("PESO_INVALIDO", Nivel.ERRO, "Consumo e sobra não podem ser negativos.")
@@ -121,7 +124,7 @@ def validar_perda_corte(peso_antes_kg: float, consumo_kg: float, sobra_kg: float
                     f"({kg_br(peso_antes_kg)}).",
                     perda_real_kg=perda_real)
         return r
-    limite = perda_esperada_kg + peso_antes_kg * margem_pct / 100
+    limite = perda_esperada_kg * (1 + margem_pct / 100)
     if perda_real > limite + EPS:
         r.adicionar("PERDA_CORTE_ALTA", Nivel.CIENCIA,
                     f"Diferença de {kg_br(perda_real)} entre o peso do lote e consumo + sobra. "

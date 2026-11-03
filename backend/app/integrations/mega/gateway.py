@@ -33,12 +33,13 @@ class OrdemProducao:
     item_codigo: int | None
     item_descricao: str | None
     cliente: str | None
-    situacao: str | None            # 'AB' = aberta (demais códigos a confirmar)
+    situacao: str | None            # ORD_ST_SITUACAO (ver consultas.SITUACOES_OP)
     data_emissao: date | None
     quantidade: float | None = None
     data_recebimento: date | None = None
-    pedido: str | None = None
+    pedido: str | None = None       # nº do pedido de venda (série '1'), sem a série
     cliente_codigo: int | None = None
+    tipo: str | None = None         # TPO_ST_CODIGO_TIPO (OP001 normal, OP016 estoque, OS001 serviço…)
 
 
 @dataclass(frozen=True)
@@ -70,7 +71,7 @@ class EscritaDesabilitada(RuntimeError):
 
 
 class OracleMegaGateway:
-    """Acesso de leitura via python-oracledb (modo thin, sem Oracle Client)."""
+    """Acesso de leitura via python-oracledb em modo thick (Instant Client 19; o banco exige NNE)."""
 
     def __init__(self, cfg: Config):
         if not cfg.mega_habilitado:
@@ -105,9 +106,11 @@ class OracleMegaGateway:
         linhas = self._consultar(consultas.ORDEM_PRODUCAO, numero=numero, filial=consultas.FILIAL_ITU)
         if not linhas:
             return None
-        n, ic, idesc, cli, sit, dt, qtd, receb = linhas[0]
+        n, ic, idesc, cli, sit, dt, qtd, receb, ped, cli_cod, tipo = linhas[0]
         return OrdemProducao(int(n), int(ic) if ic else None, idesc, cli, sit, dt.date() if dt else None,
-                             float(qtd) if qtd is not None else None, receb.date() if receb else None)
+                             float(qtd) if qtd is not None else None, receb.date() if receb else None,
+                             pedido=str(int(ped)) if ped is not None else None,
+                             cliente_codigo=int(cli_cod) if cli_cod is not None else None, tipo=tipo)
 
     def buscar_sa(self, texto: str) -> list[SemiAcabado]:
         return [SemiAcabado(int(c), d, dt.date() if dt else None)

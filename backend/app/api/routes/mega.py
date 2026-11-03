@@ -34,7 +34,8 @@ def ordem_producao(numero: int, _: Usuario = Depends(deps.usuario_liberado)):
             medida = {"formato": m.formato, "espessura": m.espessura, "largura": m.largura,
                       "diametro": m.diametro, "comprimento": m.comprimento}
     return {"numero": op.numero, "item_codigo": op.item_codigo, "item_descricao": op.item_descricao,
-            "cliente": op.cliente, "situacao": op.situacao, "situacao_descricao": desc, "aberta": aberta,
+            "cliente": op.cliente, "cliente_codigo": op.cliente_codigo, "pedido": op.pedido, "tipo": op.tipo,
+            "situacao": op.situacao, "situacao_descricao": desc, "aberta": aberta,
             "quantidade": op.quantidade,
             "data_recebimento": op.data_recebimento.isoformat() if op.data_recebimento else None,
             "medida_sugerida": medida, "historico": {"solicitacoes": [], "sas": []}, "fonte": "MEGA"}

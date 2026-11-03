@@ -15,6 +15,7 @@ from app.core.config import Config
 from app.domain import corte, regras
 from app.domain.formato import kg_br, pct_br
 from app.domain.validacao import Nivel, Ocorrencia, Resultado
+from app.integrations.mega.consultas import SITUACOES_OP
 from app.models import (CadastroSa, Conteiner, ItemMP, LiberacaoCorte, Liga, LigaEquivalente, Lote,
                         SolicitacaoCorte, Usuario)
 
@@ -107,9 +108,13 @@ def _validar_op(db: Session, dados: ops.DadosOp, ignorar_solicitacao: int | None
     if dados.aberta is False:
         r.adicionar("OP_ENCERRADA", Nivel.ERRO,
                     f"A OP está {dados.situacao_descricao or dados.situacao} no Mega.", situacao=dados.situacao)
+    elif dados.aberta is None and dados.situacao in SITUACOES_OP:
+        r.adicionar("OP_NAO_ABERTA", Nivel.ALERTA,
+                    f"A OP está {dados.situacao_descricao} no Mega (ainda não aberta). Confira antes de cortar.",
+                    situacao=dados.situacao)
     elif dados.aberta is None and dados.situacao:
         r.adicionar("OP_SITUACAO_DESCONHECIDA", Nivel.ALERTA,
-                    f"Situação da OP no Mega ainda não mapeada ({dados.situacao}). Confira se ela está aberta.")
+                    f"Situação da OP no Mega desconhecida ({dados.situacao}). Confira se ela está aberta.")
     if not dados.confirmada_mega:
         r.adicionar("OP_NAO_CONFIRMADA", Nivel.ALERTA,
                     "Dado não confirmado no Mega (Mega fora do ar). A confirmação acontece depois.")

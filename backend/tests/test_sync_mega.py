@@ -79,11 +79,22 @@ def test_falha_registra_erro_e_avisa_admin(client, fab):
 def test_agendamento_06h_13h(fab):
     from app.services import sync_mega
     from app.services.sync_mega import FUSO
+    from app.models import SyncMega
     with _db() as db:
-        dia = datetime.now(FUSO).replace(hour=7, minute=0, second=0, microsecond=0)
-        assert sync_mega.rodar_agendado(db, dia) == {"estoque": "OK"}       # 06:00 de hoje venceu
-        assert sync_mega.rodar_agendado(db, dia + timedelta(minutes=5)) == {}   # já rodou depois das 06:00
-        assert sync_mega.rodar_agendado(db, dia.replace(hour=13, minute=2)) == {"estoque": "OK"}
+        agora_ = datetime.now(FUSO)
+        assert sync_mega.rodar_agendado(db, agora_) == {"estoque": "OK"}        # nunca rodou
+        assert sync_mega.rodar_agendado(db, agora_ + timedelta(minutes=5)) == {}  # já rodou depois do último horário
+        # a última sincronização passa a ser de anteontem: o horário de hoje (ou de ontem) está vencido
+        s = db.query(SyncMega).order_by(SyncMega.id.desc()).first()
+        s.iniciado_em = agora_ - timedelta(days=2)
+        db.commit()
+        assert sync_mega.rodar_agendado(db, agora_) == {"estoque": "OK"}
+        # horários: às 07:00 o último previsto é 06:00; às 13:02, 13:00; às 05:00, 13:00 de ontem
+        dia = agora_.replace(hour=7, minute=0, second=0, microsecond=0)
+        assert sync_mega.ultimo_horario_previsto(db, dia).hour == 6
+        assert sync_mega.ultimo_horario_previsto(db, dia.replace(hour=13, minute=2)).hour == 13
+        ontem = sync_mega.ultimo_horario_previsto(db, dia.replace(hour=5))
+        assert ontem.hour == 13 and ontem.date() == (dia - timedelta(days=1)).date()
 
 
 def test_sincronizar_agora_por_perfil(client, fab):

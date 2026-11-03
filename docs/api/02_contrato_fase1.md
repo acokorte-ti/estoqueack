@@ -15,7 +15,7 @@ Situação: ✅ no ar (commit `e9fe723` em diante) · 📋 contrato definido, ai
 
 ### Passo 2: `GET /api/lotes/compativeis` ✅
 
-Parâmetros: `liga` (obrigatório), `formato` (`RETANGULAR`/`REDONDO`), `espessura`, `largura`, `diametro`, `comprimento`, `quantidade`, `estoque` (opcional). Traz lotes da liga **e das ligas equivalentes** (`liga_equivalente: true` → selo), cuja bitola comporta a medida acabada e com disponível > 0. Cada item tem os campos de `GET /api/lotes` mais `peso_previsto_kg`, `peso_peca_kg`, `sobremetal_pct` (estimados com 5 mm) e `substituido_por_id`. Ordem: menor sobremetal, depois o mais antigo.
+Parâmetros: `liga` (obrigatório), `formato` (`RETANGULAR`/`REDONDO`), `espessura`, `largura`, `diametro`, `comprimento`, `quantidade`, `estoque` (opcional). Resposta paginada `{ itens: [...], total }` (como `GET /api/lotes`). Traz lotes da liga **e das ligas equivalentes** (`liga_equivalente: true` → selo), cuja bitola comporta a medida acabada e com disponível > 0. Cada item tem os campos de `GET /api/lotes` mais `peso_previsto_kg`, `peso_peca_kg`, `sobremetal_pct` (estimados com 5 mm) e `substituido_por_id`. Ordem: menor sobremetal, depois o mais antigo.
 
 ### Passos 3 e 4: `POST /api/solicitacoes/validar` e `POST /api/solicitacoes` ✅
 

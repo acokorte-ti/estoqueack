@@ -164,6 +164,7 @@ COP: `{ id, numero, situacao, data, fechado_em, enviado_em, qtd_itens, peso_tota
 ```
 
 - `sa_novo: true` → linha "SA novo – cadastrar no Mega". `atrasado: true` → vermelho (48 h sem confirmação).
+- `avisos[]` (R026, v3.1; aviso cinza, não bloqueia): `{ codigo, nivel: "ALERTA", mensagem, … }`. `NF_DIFERENTE_MEGA` (NF informada ≠ NF da entrada do SA no Mega; traz `nf`, `nf_mega`) e `IPI_DIFERENTE_MEGA` (IPI do histórico ≠ IPI do NCM no Mega; traz `ipi`, `ipi_mega` em %). `IPI_DIFERENTE_MEGA` também aparece como ALERTA no `/codigo/validar`; `NF_DIFERENTE_MEGA` também no `/cops/{id}/enviar/validar` (com `dados.itens`).
 - `PATCH /api/sas/{id}` `{ rs_kg, sa_descricao, ncm, icms, ipi, pedido, quantidade, peso_kg }` (Análise: só `rs_kg`; confirmado: só `rs_kg`).
 - `POST /api/sas/preparar` `{ ids }` → Preparado.
 - `POST /api/sas/{id}/codigo/validar` e `POST /api/sas/{id}/codigo` `{ sa_codigo, confirmacoes }`: `SA_CODIGO_TROCADO` (CIENCIA) se diferente do sugerido. Fica *Aguardando Mega* e o sistema já tenta confirmar.

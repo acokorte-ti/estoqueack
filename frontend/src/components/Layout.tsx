@@ -18,9 +18,10 @@ const OPERACAO: Item[] = [
   { para: "/solicitacoes/nova", rotulo: "Nova solicitação de corte", pronto: true, perfis: ACESSO.novaSolicitacao },
   { para: "/solicitacoes", rotulo: "Solicitações de corte", pronto: true, perfis: ACESSO.solicitacoes },
   { para: "/fila-rj", rotulo: "Fila RJ", pronto: true, perfis: ACESSO.filaRj },
-  { para: "/cop", rotulo: "COP" },
+  { para: "/cops", rotulo: "COP", pronto: true, perfis: ACESSO.cop },
+  { para: "/recebimentos", rotulo: "Receber COP", pronto: true, perfis: ACESSO.receberCop },
+  { para: "/corte-itu", rotulo: "Corte em Itu", pronto: true, perfis: ACESSO.corteItu },
   { para: "/sa", rotulo: "SA", pronto: true, perfis: ACESSO.sa },
-  { para: "/corte-itu", rotulo: "Corte em Itu", perfis: ACESSO.corteItu },
   { para: "/relatorios", rotulo: "Relatórios" },
   { para: "/calculadora", rotulo: "Calculadora de peso", pronto: true },
 ];

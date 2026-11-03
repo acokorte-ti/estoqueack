@@ -17,6 +17,10 @@ import Solicitacoes from "./pages/Solicitacoes";
 import SolicitacaoDetalhe from "./pages/SolicitacaoDetalhe";
 import FilaRj from "./pages/FilaRj";
 import RegistrarCorte from "./pages/RegistrarCorte";
+import Cops from "./pages/Cops";
+import CopDetalhe from "./pages/CopDetalhe";
+import { Recebimentos, ReceberCop } from "./pages/Recebimentos";
+import CorteItu from "./pages/CorteItu";
 
 import { ACESSO } from "./api/acesso";
 
@@ -48,8 +52,12 @@ export default function App() {
         <Route path="fila-rj" element={<Protegido perfis={ACESSO.filaRj}><FilaRj /></Protegido>} />
         <Route path="fila-rj/:id/corte" element={<Protegido perfis={ACESSO.registrarCorte}><RegistrarCorte /></Protegido>} />
         <Route path="corte" element={<Navigate to="/solicitacoes" replace />} />
-        <Route path="corte-itu" element={<Protegido perfis={ACESSO.corteItu}><EmBreve titulo="Corte em Itu" fase="Fase 1 (próxima tela)" /></Protegido>} />
-        <Route path="cop" element={<EmBreve titulo="COP" fase="Fase 1" />} />
+        <Route path="corte-itu" element={<Protegido perfis={ACESSO.corteItu}><CorteItu /></Protegido>} />
+        <Route path="cops" element={<Protegido perfis={ACESSO.cop}><Cops /></Protegido>} />
+        <Route path="cops/:id" element={<Protegido perfis={ACESSO.cop}><CopDetalhe /></Protegido>} />
+        <Route path="cop" element={<Navigate to="/cops" replace />} />
+        <Route path="recebimentos" element={<Protegido perfis={ACESSO.receberCop}><Recebimentos /></Protegido>} />
+        <Route path="recebimentos/:id" element={<Protegido perfis={ACESSO.receberCop}><ReceberCop /></Protegido>} />
         <Route path="sa" element={<Protegido perfis={ACESSO.sa}><Sas /></Protegido>} />
         <Route path="consumo" element={<EmBreve titulo="Consumo, sobra e RETO" fase="Fase 2" />} />
         <Route path="relatorios" element={<EmBreve titulo="Relatórios" fase="Fase 4" />} />

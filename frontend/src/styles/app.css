@@ -293,6 +293,10 @@ tr.selecionada td { background: #f4f4f4; }
 .paginacao { display: flex; gap: var(--esp-3); align-items: center; justify-content: center; margin-top: var(--esp-4); color: var(--aco-medio); }
 .tabela-clicavel tbody tr { cursor: pointer; }
 .janela.larga { width: min(46rem, calc(100vw - 2rem)); }
+.cartao.inativo { opacity: 0.7; }
+.cartoes-lista { grid-template-columns: 1fr; }
+.fazer-mega { border-left: 5px solid var(--estoque-mega); }
+.validacao.ok > span + span { margin-top: 4px; }
 
 /* Sincronização com o Mega */
 .sync-mega { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-3); margin-bottom: var(--esp-5); }

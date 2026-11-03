@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.domain.formato import kg_br
+from app.domain.formato import kg_br, pct_br
 from app.domain.validacao import Nivel, Resultado
 from app.integrations.mega import fabrica
 from app.models import CadastroSa, CopItem, Lote, NfTransferencia, SolicitacaoCorte, Usuario
@@ -160,8 +160,44 @@ def validar_codigo(db: Session, sa: CadastroSa, codigo: int) -> Previa:
         p.resultado.adicionar("SA_INATIVO_MEGA", Nivel.CIENCIA,
                               f"O SA {codigo} está INATIVO no Mega ({st.descricao}). Justifique o uso.",
                               sa_codigo=codigo)
+    if st is not None and st.existe and ipi_difere(sa.ipi, st.ipi_pct):
+        p.resultado.adicionar("IPI_DIFERENTE_MEGA", Nivel.ALERTA,
+                              f"IPI do histórico do item ({sa.ipi}) diferente do IPI do NCM {st.ncm} no Mega "
+                              f"({pct_br(st.ipi_pct)}). Confira antes de cadastrar.", ipi=sa.ipi, ipi_mega=st.ipi_pct)
     p.frase = f"SA {codigo} para a OP {sa.op} ({kg_br(sa.peso_kg or 0)}). O sistema confirma lendo o Mega."
     return p
+
+
+def _numero_nf(n) -> str:
+    return str(n or "").strip().lstrip("0")
+
+
+def ipi_difere(ipi_historico: str | None, ipi_mega_pct: float | None) -> bool:
+    """IPI do histórico (planilha: fração 0,052; às vezes % 5,2) × alíquota do NCM no Mega (em %)."""
+    if ipi_mega_pct is None or ipi_historico in (None, ""):
+        return False
+    try:
+        v = float(str(ipi_historico).replace(",", ".").replace("%", "").strip())
+    except ValueError:
+        return False
+    fracao = v / 100 if v > 1 else v
+    return abs(fracao - ipi_mega_pct / 100) > 0.0005
+
+
+def avisos(sa: CadastroSa) -> list[dict[str, Any]]:
+    """Avisos cinza da T14 (R026, especificação v3.1): NF e IPI diferentes do que o Mega registrou."""
+    mega = (sa.dados_extra or {}).get("mega") or {}
+    out: list[dict[str, Any]] = []
+    nf_mega = mega.get("nf_entrada")
+    if nf_mega and sa.nf is not None and _numero_nf(sa.nf.numero) != _numero_nf(nf_mega):
+        out.append({"codigo": "NF_DIFERENTE_MEGA", "nivel": "ALERTA", "nf": sa.nf.numero, "nf_mega": nf_mega,
+                    "mensagem": f"A NF informada ({sa.nf.numero}) é diferente da NF da entrada do SA no Mega "
+                                f"({nf_mega}). Confira."})
+    if ipi_difere(sa.ipi, mega.get("ipi_pct")):
+        out.append({"codigo": "IPI_DIFERENTE_MEGA", "nivel": "ALERTA", "ipi": sa.ipi, "ipi_mega": mega["ipi_pct"],
+                    "mensagem": f"IPI do histórico do item ({sa.ipi}) diferente do IPI do NCM no Mega "
+                                f"({pct_br(mega['ipi_pct'])})."})
+    return out
 
 
 def _ler_sa_mega(codigo: int, sa: CadastroSa):
@@ -213,7 +249,8 @@ def verificar(db: Session, sas: list[CadastroSa]) -> dict[str, Any]:
             if st.ipi_pct is not None and not sa.ipi:
                 sa.ipi = f"{st.ipi_pct / 100:.4g}"
             sa.dados_extra = {**(sa.dados_extra or {}),
-                              "mega": {"qtd_entrada": st.qtd_entrada, "nf_entrada": st.nf_entrada}}
+                              "mega": {"qtd_entrada": st.qtd_entrada, "nf_entrada": st.nf_entrada,
+                                       "ncm": st.ncm, "ipi_pct": st.ipi_pct}}
             confirmados += 1
             _ao_confirmar(db, sa)
     db.flush()
@@ -307,6 +344,7 @@ def para_dict(db: Session, sa: CadastroSa) -> dict[str, Any]:
         "exportado_renato_em": sa.exportado_renato_em.isoformat() if sa.exportado_renato_em else None,
         "alterado_apos_exportar": sa.alterado_apos_exportar,
         "atrasado": atrasado(db, sa),
+        "avisos": avisos(sa),
     }
 
 

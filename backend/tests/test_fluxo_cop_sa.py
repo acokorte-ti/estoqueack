@@ -192,3 +192,34 @@ def test_confirmacao_preenche_ncm_ipi_e_nf_do_mega(amb):
     client.post(f"/api/sas/{sa['id']}/codigo", json={"sa_codigo": 37983}, headers=h)
     j = client.get(f"/api/sas/{sa['id']}").json()
     assert j["situacao"] == "CONFIRMADO" and j["ncm"] == "82081000" and j["ipi"] == "0.052"
+
+
+def test_aviso_nf_diferente_da_entrada_no_mega(amb):
+    """R026 (v3.1): NF informada no COP ≠ NF da entrada do SA no Mega → aviso cinza no SA e no envio do COP."""
+    from app.integrations.mega.gateway import SituacaoSa
+    client, u, ids, fab = amb
+    h, sa = _sa_pendente(client, u, ids)
+    fab.obter().situacoes_sa[37983] = SituacaoSa(37983, True, "SA FACA - CÓD.777", True, date(2016, 9, 8), 12,
+                                                 "3215", "82081000", 5.2)
+    client.post(f"/api/sas/{sa['id']}/codigo", json={"sa_codigo": 37983}, headers=h)
+    cop_id = client.get(f"/api/sas/{sa['id']}").json()["cop"]["id"]
+    h = entrar(client, u["rj"])
+    client.post(f"/api/cops/{cop_id}/nf", json={"numero": "3215", "emitente": "FIO_CERTO"}, headers=h)
+    v = client.post(f"/api/cops/{cop_id}/enviar/validar", headers=h).json()
+    assert "NF_DIFERENTE_MEGA" not in [o["codigo"] for o in v["ocorrencias"]]      # mesma NF: sem aviso
+    client.post(f"/api/cops/{cop_id}/nf", json={"numero": "556", "emitente": "FIO_CERTO"}, headers=h)
+    v = client.post(f"/api/cops/{cop_id}/enviar/validar", headers=h).json()
+    assert {o["codigo"]: o["nivel"] for o in v["ocorrencias"]}.get("NF_DIFERENTE_MEGA") == "ALERTA"
+    assert client.post(f"/api/cops/{cop_id}/enviar", headers=h).status_code == 200   # aviso não bloqueia
+    h = entrar(client, u["itu"])
+    assert [a["codigo"] for a in client.get(f"/api/sas/{sa['id']}").json()["avisos"]] == ["NF_DIFERENTE_MEGA"]
+
+
+def test_ipi_do_historico_diferente_do_mega():
+    from types import SimpleNamespace
+
+    from app.services import sas
+    assert sas.ipi_difere("0.08", 5.2) and sas.ipi_difere("8", 5.2)
+    assert not sas.ipi_difere("0,052", 5.2) and not sas.ipi_difere("5,2", 5.2) and not sas.ipi_difere(None, 5.2)
+    sa = SimpleNamespace(ipi="0.08", nf=None, dados_extra={"mega": {"ipi_pct": 5.2, "nf_entrada": "3215"}})
+    assert [a["codigo"] for a in sas.avisos(sa)] == ["IPI_DIFERENTE_MEGA"]

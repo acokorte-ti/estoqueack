@@ -194,6 +194,13 @@ def validar_envio(db: Session, cop: Cop) -> Previa:
     if sem_nf:
         r.adicionar("NF_PENDENTE", Nivel.ERRO, f"{len(sem_nf)} item(ns) sem NF de transferência.",
                     itens=[i.id for i in sem_nf])
+    from .sas import avisos as avisos_sa
+    nf_dif = [i for i in cop.itens if (s := _sa_do_item(db, i)) is not None
+              and any(a["codigo"] == "NF_DIFERENTE_MEGA" for a in avisos_sa(s))]
+    if nf_dif:
+        r.adicionar("NF_DIFERENTE_MEGA", Nivel.ALERTA,
+                    f"{len(nf_dif)} item(ns) com NF diferente da NF da entrada do SA no Mega. Confira antes de enviar.",
+                    itens=[i.id for i in nf_dif])
     total = sum(float(i.liberacao.peso_real_kg) for i in cop.itens)
     p.frase = f"COP {cop.numero}: {len(cop.itens)} item(ns), {kg_br(total)}, ficam Em trânsito para Itu."
     return p

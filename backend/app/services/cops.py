@@ -65,10 +65,14 @@ def criar(db: Session, numero: int | None, observacao: str | None, *, usuario: U
 
 
 def cortes_prontos(db: Session) -> list[LiberacaoCorte]:
-    """Cortes (e peças inteiras separadas) ainda fora de COP."""
+    """Cortes (e peças inteiras separadas) ainda fora de COP, de solicitações Cortadas ou Parciais.
+
+    O filtro pela situação também deixa de fora os cortes históricos da carga que foram liberados sem número de
+    COP (já Concluídos ou Em trânsito)."""
     q = (select(LiberacaoCorte).outerjoin(CopItem, CopItem.liberacao_id == LiberacaoCorte.id)
          .join(SolicitacaoCorte, LiberacaoCorte.solicitacao_id == SolicitacaoCorte.id)
-         .where(CopItem.id.is_(None), LiberacaoCorte.estornada.is_(False), SolicitacaoCorte.situacao != "CANCELADA")
+         .where(CopItem.id.is_(None), LiberacaoCorte.estornada.is_(False),
+                SolicitacaoCorte.situacao.in_(("CORTADA", "CORTADA_PARCIAL")))
          .order_by(LiberacaoCorte.data_corte, LiberacaoCorte.id))
     return list(db.scalars(q))
 

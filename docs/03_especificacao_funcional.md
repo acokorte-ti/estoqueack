@@ -1,6 +1,6 @@
 # EstoqueACK — Especificação Funcional Completa
 
-Versão 3, 03/11/2026. A v3 incorpora as **respostas do Eduardo às perguntas P01–P18** (arquivo "Questões IA.xlsx", 2026-11-03) e as respostas do FUNCIONAL aos pedidos R003–R009, R014 e R017. A v2 tinha incorporado a conferência com as planilhas (`04_conferencia_planilhas_x_fluxo.md`) e as regras do Matheus. **Data alvo de implantação: 13/11/2026 [P08].** Este documento descreve o sistema **como se ele já estivesse funcionando**: o que cada tela faz, quais botões existem, de onde vem cada informação e o que acontece no banco de dados a cada ação. Ele complementa `02_proposta_arquitetura.md`, que trata da parte técnica.
+Versão 3.1, 03/11/2026. A 3.1 registra as leituras do Mega confirmadas no R026 (situação da OP, SA pela estrutura da OP, confirmação do SA, NCM/IPI). A v3 incorpora as **respostas do Eduardo às perguntas P01–P18** (arquivo "Questões IA.xlsx", 2026-11-03) e as respostas do FUNCIONAL aos pedidos R003–R009, R014 e R017. A v2 tinha incorporado a conferência com as planilhas (`04_conferencia_planilhas_x_fluxo.md`) e as regras do Matheus. **Data alvo de implantação: 13/11/2026 [P08].** Este documento descreve o sistema **como se ele já estivesse funcionando**: o que cada tela faz, quais botões existem, de onde vem cada informação e o que acontece no banco de dados a cada ação. Ele complementa `02_proposta_arquitetura.md`, que trata da parte técnica.
 
 As decisões estão marcadas como **[P01]**, **[P02]** etc. e reunidas no fim (§12), já com a resposta.
 
@@ -387,7 +387,7 @@ Quem usa: Fabiano e Matheus. É um assistente em quatro passos.
 | Nº da OP | [DIGITADO] |
 | Item (código e descrição) | [MEGA] pela OP |
 | Cliente | [MEGA] pela OP |
-| Situação da OP | [MEGA]. Bloqueia se estiver encerrada ou cancelada |
+| Situação da OP | [MEGA] (`ORD_ST_SITUACAO`). **Encerrada (EN) ou Cancelada (CA): bloqueia.** **Aberta (AB): aceita.** **Firme planejada (FP), Liberada (LB), Planejada (PL) ou Simulada (SI)**, ou seja, ainda não aberta no Mega: **só avisa** (`OP_NAO_ABERTA`, cinza) e deixa seguir, **em todas as telas** (T07, T13, T14). Decisão do Eduardo em 2026-11-03 **[R026]** |
 | Quantidade da OP | [MEGA] |
 | MP prevista na estrutura | [MEGA], só informativo. Você informou que geralmente não é a correta |
 | Medida acabada (E × L × C ou Ø × C) | [SUGERIDO] da descrição do item no Mega, editável |
@@ -561,9 +561,12 @@ Para lote Mega, depois de confirmar, aparece um quadro **"Fazer no Mega"** com a
 | Peso | [CALC] peso previsto (bitola + sobremetal) para peça inteira, ou peso real do corte para corte no RJ [P03] |
 | R$/kg | [DIGITADO], **manual e opcional** **[P16]**. Preenchido por quem cuida do custo, como hoje; o sistema não calcula |
 | Valor precificador | [CALC] R$/kg × peso ÷ quantidade, quando o R$/kg estiver preenchido |
-| Código Mega do SA | [SISTEMA] o código de SA **mais recente e ativo** já usado para o **item da peça acabada** (o item da OP). Ver regra abaixo |
+| Código Mega do SA | [MEGA] 1º o **SA da estrutura da OP** no Mega (o Mega já põe o SA como componente da OP de material RJ, ex.: OP 100592 → 37983) **[R026]**; se não houver, [SISTEMA] o código **mais recente e ativo** já usado para o **item da peça acabada**. Ver regra abaixo |
 | Descrição | [SUGERIDO] "SA <descrição do item [MEGA]> - CÓD.<item>" ou a do SA anterior |
-| NCM, ICMS, IPI | [SUGERIDO] do SA anterior do mesmo item, ou [MEGA] do cadastro do item |
+| NCM, IPI | [MEGA] NCM do cadastro do produto e IPI pela alíquota do NCM no Mega **[R026]**. Se o IPI do Mega for diferente do usado no histórico do item, aviso cinza (ex.: NCM 82089000: 5,2 % no Mega × 0,08 na planilha) |
+| ICMS | [SUGERIDO] do SA anterior do mesmo item (o Mega não guarda ICMS no produto) |
+| Pedido | [MEGA] pedido de venda da OP, se disponível; senão [DIGITADO] |
+| NF de transferência | Corte no RJ e peça inteira: [SISTEMA] do item do COP, quando o Marcelo informar. Corte em Itu de lote RJ (B2): [DIGITADO] pelo Fabiano, com o emitente. Uma NF pode servir várias linhas |
 
 **Regra do código de SA** *(confirmada pelo Matheus em 2026-10-30)*: o código de SA pertence ao **item da peça acabada**, que é o item que vem na OP. A bitola, a liga e a matéria-prima **não importam**.
 
@@ -571,16 +574,15 @@ Para lote Mega, depois de confirmar, aparece um quadro **"Fazer no Mega"** com a
 - **A peça acabada nunca teve SA:** só nesse caso é preciso **criar um SA novo** no Mega. A linha aparece como "SA novo – cadastrar no Mega", e o código é [DIGITADO] depois do cadastro.
 - **O item tem mais de um código no histórico** (100 dos 2.787 itens de 2016 a 2026, quase sempre porque o antigo foi inativado: "39294 - INAT"): o sistema usa o mais recente **ativo no Mega** e mostra os outros. Trocar o código exige justificativa.
 - **Comprovado nas planilhas:** 889 itens usaram o mesmo código de SA com bitolas diferentes.
-- **Fonte do vínculo item → SA:** a carga da planilha de SA e, depois, os SAs confirmados no sistema.
-| Pedido | [MEGA] pedido de venda da OP, se disponível; senão [DIGITADO] |
-| NF de transferência | Corte no RJ e peça inteira: [SISTEMA] do item do COP, quando o Marcelo informar. Corte em Itu de lote RJ (B2): [DIGITADO] pelo Fabiano, com o emitente. Uma NF pode servir várias linhas |
+- **Fonte do vínculo item → SA:** 1º a estrutura da OP no Mega; depois a carga da planilha de SA e os SAs confirmados no sistema. Se a estrutura e o histórico trouxerem códigos diferentes, o sistema usa o da estrutura e mostra o outro **[R026]**.
+- **SA inativo no Mega** (descrição "… INATIVO"): pede "estou ciente" com justificativa (`SA_INATIVO_MEGA`) e **nunca é confirmado**; na prática, é preciso cadastrar um SA novo. **Código que não existe no Mega:** aviso `SA_NAO_ENCONTRADO_MEGA` até aparecer **[R026]**.
 
 Botões:
 
 - **"Marcar como preparado".**
 - **"Exportar pedidos selecionados"** (Excel, no mesmo layout da planilha de SA, para facilitar o lançamento no Mega).
 - **"Informar código do SA".**
-- **"Verificar no Mega agora"**: lê o Mega e confirma se o código existe e se recebeu saldo.
+- **"Verificar no Mega agora"**: lê o Mega e confirma o SA. **Regra de confirmação [R026]:** o SA está confirmado quando o Mega tem a **carga do SA**, que é uma **entrada por compra (TPM 1) na filial 13, em peças, com a NF Fio Certo / Médio Vale** (ex.: 3215), seguida da transferência 13 → 3. Até maio/2026 a entrada era direto na filial 3, e as duas formas valem. Se a NF da entrada no Mega for diferente da NF informada no COP/SA, aviso cinza.
 - **"Exportar SAs novos para o Renato"**: exporta (Excel, layout da planilha de SA) só as linhas ainda não exportadas e grava a data. Substitui o comentário "até esta linha foi baixado para computador Renato". Uma alteração em linha já exportada avisa o Renato.
 
 Uma OP com dois lotes gera duas linhas com o mesmo código de SA, como já acontece hoje.
@@ -719,7 +721,8 @@ Toda leitura é somente leitura, com o usuário `estoqueack_ro`.
 | MP prevista na estrutura da OP | T07 (informativo) | Na hora |
 | Saldo físico e preço médio por código de MP (filial 3) | T15, T16, painel | Sincronização às 6h e às 13h e sob demanda **[P04]** |
 | Movimentos de estoque dos códigos de MP (entradas por NF, baixas em OP, transferências para RETO) | T15, T16 | Junto com o saldo, às 6h e às 13h **[P01]** (confirmado: `EST_VW_MOVIMENTOESTOQUE`) |
-| SA: código, descrição, data de cadastro, saldo carregado | T14, confirmação automática | A cada 30 minutos para SAs aguardando e sob demanda |
+| SA: código, descrição (marca "INATIVO"), NCM/IPI, carga (entrada por compra na filial 13 ou 3, em peças, com a NF) | T14, confirmação automática | A cada 30 minutos para SAs aguardando e sob demanda |
+| Estrutura da OP (`PRO_DEMANDA_DEP`): componentes SA/MP | T07 (informativo), T14 (sugestão do código de SA) | Na hora |
 
 Se o Mega estiver fora do ar, o sistema continua funcionando. Os campos [MEGA] podem ser preenchidos à mão, com o aviso "dado não confirmado no Mega", e a confirmação acontece depois.
 
@@ -750,7 +753,10 @@ Se o Mega estiver fora do ar, o sistema continua funcionando. Os campos [MEGA] p
 | Código | Quando | Nível | Regra |
 |---|---|---|---|
 | OP_INEXISTENTE | T07, T13 | Bloqueia | OP não existe no Mega |
-| OP_ENCERRADA | T07, T13 | Bloqueia | OP encerrada ou cancelada |
+| OP_ENCERRADA | T07, T13 | Bloqueia | OP encerrada (EN) ou cancelada (CA) |
+| OP_NAO_ABERTA | T07, T13, T14 | Aviso | OP ainda não aberta no Mega: Firme planejada, Liberada, Planejada ou Simulada. Só avisa, não bloqueia (decisão do Eduardo, 2026-11-03) |
+| SA_INATIVO_MEGA | T14 | "Estou ciente" | Código de SA marcado como INATIVO no Mega; nunca é confirmado |
+| SA_NAO_ENCONTRADO_MEGA | T14 | Aviso | Código de SA não existe no Mega |
 | OP_DUPLICADA | T07 | Justificativa | Já existe solicitação ou SA para a OP |
 | BITOLA_MENOR_QUE_PECA | T07 | Bloqueia | A bitola não comporta a medida acabada |
 | SOBREMETAL_ACIMA_TOLERANCIA | T07 | Justificativa | Peso previsto (bitola + sobremetal) mais de 20 % acima do peso da peça acabada |

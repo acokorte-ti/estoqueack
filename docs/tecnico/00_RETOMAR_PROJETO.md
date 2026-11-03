@@ -86,6 +86,8 @@ curl -s http://127.0.0.1:8090/api/saude               # saúde da API
 | `MVT_ST_NUMDOC` no Mega também guarda número de NF | Filtrar `TPM_IN_CODIGO = 13` para baixas de OP |
 | O Git no Windows não grava o "+x" dos scripts | `git update-index --chmod=+x <arquivo>` |
 | O Desktop Commander bloqueia comandos com certas palavras (sudo etc.) e o PowerShell quebra aspas no ssh | Usar `cmd.exe` e mandar scripts por arquivo/stdin |
+| Na sessão SSH do Desktop Commander, `git log` (e outros com paginador) abre o `less` e a sessão parece travada | Sempre `git --no-pager …`. Saída com atraso: ler com `read_process_output` (offset negativo), não abrir outra sessão |
+| Consultas ao Mega para diagnóstico | `~/estoqueack-mapeamento/q.sh sql/<arquivo>.sql [max]` no system-lab (container de mapeamento, só leitura; `W=<largura>` para colunas longas). Depois do REVOKE (02_grants_restritos.sql) o dicionário deixa de ser visível |
 | **`git add -A` publicou uma senha** (§8) | Fazer commit só de arquivos explícitos e conferir `git status` antes. O CI tem gitleaks |
 
 ## 7. Pendências técnicas (ver também `ESTADO_TECNICO.md`)
@@ -112,6 +114,13 @@ curl -s http://127.0.0.1:8090/api/saude               # saúde da API
 - Regras de implementação: todo movimento passa por `movimentos.lancar` (saldo nunca negativo); a situação da solicitação é **derivada** (`fluxo.recalcular_solicitacao`); reserva = previsto ainda não cortado das solicitações Enviadas/Parciais + reservas de T17 (`movimentos.reservado`); validação = `Previa` + `exigir_sem_pendencias` (409 com a prévia), `ErroNegocio` = 400.
 - Testes do fluxo usam `tests/fluxo_util.py` (usuários por perfil, catálogo, `MegaFalso`).
 - **Git a partir do sandbox deixa `.git/index.lock` preso** (a pasta montada não deixa apagar). Commit e push pelo Windows (Desktop Commander, PowerShell).
+
+## 7.3 Situação em 2026-11-03, tarde (chat BANCO E TESTES)
+
+- **Mega fechado:** cliente/pedido e situações da OP, estrutura da OP (SA ou MP), confirmação do SA (entrada em peças, filiais 13/3), SA inativo, NCM/IPI e preço médio. Tudo em `docs/integracao_mega.md`, validado com dados reais.
+- **Sincronização no ar:** migração **0004**, `app/services/sync_mega.py`, `app/jobs/agendador.py`, cron `deploy/cron/estoqueack-agendador.sh` (a cada 5 min, instalado no `crontab` do ubuntu em 2026-11-03), `POST /api/mega/sincronizar`. 1ª carga feita (107.840 movimentos).
+- **GRANTs:** `scripts/mega/02_grants_restritos.sql`, para o Eduardo rodar como DBA.
+- **Próximo:** Parte B (PostgreSQL de verdade: trigger, FOR UPDATE, migração sobe/desce, índices) e Parte C (testes).
 
 ## 8. Registro de incidentes
 

@@ -197,6 +197,12 @@ Ocorrências: `NF_DUPLICADA`, `SEM_ITENS`, `LIGA_DESCONHECIDA#n`, `BITOLA_INCOMP
 - `GET /api/parametros` → `[{ chave, valor, tipo, descricao, atualizado_em }]`; `PATCH /api/parametros/{chave}` `{ valor }` (Admin).
 - `GET /api/notificacoes?somente_nao_lidas=` → `{ itens: [{ id, tipo, texto, link, criado_em, lida }], nao_lidas }`; `POST /api/notificacoes/{id}/lida`; `POST /api/notificacoes/lidas`. O `link` aponta para a rota de tela sugerida (`/fila-rj?solicitacao=7`, `/sa?cop=601`, `/cops/1`, `/recebimentos/1`, `/solicitacoes/7`).
 
+## 10.1 Mega: sincronização e OP ✅ (2026-11-03, chat BANCO E TESTES)
+
+- `POST /api/mega/sincronizar` (Estoque Itu, Análise, Admin) → `{ estoque: <sync>, sa: <sync> }`; `409` se já houver uma rodando. `<sync>` = `{ id, tipo: ESTOQUE|SA, gatilho: AGENDADA|MANUAL, situacao: OK|ERRO, iniciado_em, terminado_em, ultimo_lancamento, detalhes }`.
+- `GET /api/mega/sincronizacoes?limite=20` → `{ ultima_ok, itens[] }` (para "Mega atualizado em …").
+- `GET /api/mega/op/{n}`: também `pedido`, `cliente_codigo`, `tipo`, `estrutura[]` (R027).
+
 ## 11. Ainda não implementado (próximos)
 
-📋 Sincronização com o Mega (6h/13h + "Sincronizar agora"), painel com pendências por perfil (T03), T25 carga inicial, exportações em Excel, impressões em PDF (lista de corte, romaneio, ficha do lote).
+📋 Painel com pendências por perfil (T03), T25 carga inicial, exportações em Excel, impressões em PDF (lista de corte, romaneio, ficha do lote).

@@ -177,24 +177,22 @@ Demanda dependente da OP, ligada pela chave completa da OP (org + `ORD_TAB/ORD_S
 - Abertas desde 07/2026 (OP001): 244 com SA, 803 com MP, 1 sem estrutura.
 - A API devolve `estrutura[]` em `GET /api/mega/op/{n}` (T07, informativo).
 
-### Ainda a mapear
+### Preço médio (`EST_SALDOFIN`), mapeado em 2026-11-03
 
-- **Preço médio por código de MP** (filial 3).
+Custo médio diário (R$/kg) = último `SFN_RE_VLCUSTO` com `SFN_IN_TIPOCUSTO = 1`, `CRI_IN_CODIGO = 1`, org (53, 1, **3**, 'G'). Em `EST_SALDOFIN` o `ORG_IN_CODIGO` é a **filial** (3 Itu, 13 RJ); tipo 2 é o fechamento do mês. **Bate exato** com a coluna de custo do relatório "Inventário do Tipo C.M.D." de 20/10/2026 nos 6 códigos (1698 = 7,939533; 5838 = 10,735212; 78290 = 13,305297; 87780 = 35,768154; 62622 = 11,893632; 60064 = 12,721839). Há datas inválidas no Mega (ano 8014): a consulta só usa datas anteriores a amanhã. Consulta: `consultas.PRECOS_MEDIOS_MP`.
+
+### Sincronização (job das 6h e 13h + "Sincronizar agora"), no ar em 2026-11-03
+
+- **Saldo + preço médio:** leitura completa (≈ 8 mil códigos, ~2 s) e troca de `mega_saldo` (só códigos com saldo ou preço).
+- **Movimentos:** `MVT_IN_LANCAM` cresce com a inclusão, mas o Mega **altera** lançamentos depois (≈ 3 %/mês, ex.: NF com a data de movimento corrigida dias depois; `MVT_DT_ALTERA`) e **não há linha de estorno** com `MVT_BO_ESTORNO = 'S'` em 2026 (o estorno some da visão). Por isso cada sincronização relê a **janela** (movimento nos últimos 120 dias, ou alterado desde a véspera da última sincronização, ou lançamento novo) e **substitui** a cópia local da janela: pega inclusão, alteração e exclusão. Fora da janela, alterações entram por upsert. Consulta: `consultas.MOVIMENTOS_JANELA`.
+- **Resultado real (system-lab, 2026-11-03):** 1ª carga 107.840 movimentos em 1 min 18 s; incremental 1.773 linhas em 4 s. A soma dos movimentos copiados reproduz o saldo do Mega nos 6 códigos de referência (2 códigos de 7.981 diferem, por lançamentos com data futura inválida).
+- **Agendamento:** cron do system-lab a cada 5 min (`deploy/cron/estoqueack-agendador.sh` → `python -m app.jobs.agendador`). O app decide: sincroniza se passou um horário de `SYNC_MEGA_HORARIOS` (T23, padrão 06:00 e 13:00, fuso de SP) desde a última tentativa; erro tenta de novo em 30 min e avisa o Admin no sino (`SYNC_MEGA_FALHOU`); SAs "Aguardando Mega" são verificados a cada `VERIFICACAO_SA_MIN` (30). Log: `~/.local/state/estoqueack-agendador.log`.
+- **API:** `POST /api/mega/sincronizar` (Estoque Itu, Análise, Admin; 409 se já houver uma rodando) e `GET /api/mega/sincronizacoes`.
+- **Concorrência:** trava consultiva do PostgreSQL (`pg_try_advisory_xact_lock`), então cron e botão nunca rodam juntos.
 
 ## Permissões
 
-Durante a descoberta, `estoqueack_ro` tem `SELECT ANY TABLE` e `SELECT ANY DICTIONARY`. **Depois de mapear os itens acima**, trocar por GRANTs restritos (executar como DBA):
-
-```sql
-GRANT SELECT ON ACOKORTE.EST_PRODUTOS            TO estoqueack_ro;
-GRANT SELECT ON ACOKORTE.EST_VW_MOVIMENTOESTOQUE TO estoqueack_ro;
-GRANT SELECT ON ACOKORTE.PRO_ORDENS              TO estoqueack_ro;
--- + tabelas de cliente/pedido e o que mais for mapeado
-REVOKE SELECT ANY TABLE      FROM estoqueack_ro;
-REVOKE SELECT ANY DICTIONARY FROM estoqueack_ro;
-```
-
-Observação: `GRANT SELECT` numa visão de outro esquema só funciona se o dono (`ACOKORTE`) tiver os privilégios sobre as tabelas de base com `GRANT OPTION`. Se der erro, liberar as tabelas de base (`EST_MOVIMENTO` e as que a visão usar).
+Durante a descoberta, `estoqueack_ro` tem `SELECT ANY TABLE` e `SELECT ANY DICTIONARY`. O script final é **`scripts/mega/02_grants_restritos.sql`** (rodar como DBA): SELECT só em `EST_PRODUTOS`, `EST_VW_MOVIMENTOESTOQUE`, `EST_SALDOFIN`, `PRO_ORDENS`, `PRO_ORIGEM`, `PRO_DEMANDA_DEP`, `VEN_PEDIDOVENDA`, `GLO_AGENTES` e `TRF_NCM`, depois `REVOKE` dos dois privilégios amplos. As tabelas de base da visão (`EST_MOVIMENTO`, `EST_MOVPENDENTE`, `EST_PRODUTOS`, `EST_TIPOMOVTO`, `GLO_GRUPO_USUARIO`) são todas do `ACOKORTE`, então o GRANT na visão funciona sem GRANT OPTION. Depois do REVOKE, as ferramentas de descoberta (`scripts/mega/descobrir_mega.py`) deixam de enxergar o dicionário; para mapear algo novo, conceder de novo temporariamente.
 
 ## Desempenho
 

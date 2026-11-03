@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Integer, String
+from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -18,6 +18,8 @@ class Lote(Base):
     """
     __tablename__ = "lote"
     __table_args__ = (
+        Index("ix_lote_balde", "planta_fiscal", "local_fisico"),          # existe desde a 0001
+        Index("ix_lote_status", "status"),                                 # 0005
         CheckConstraint("saldo_kg >= 0", name="ck_lote_saldo_nao_negativo"),
         CheckConstraint("planta_fiscal IN ('ITU','RJ')", name="ck_lote_planta"),
         CheckConstraint("local_fisico IN ('ITU','RJ')", name="ck_lote_local"),
@@ -51,7 +53,8 @@ class Lote(Base):
 class Movimento(Base):
     """Movimento de estoque. IMUTÁVEL: correções são feitas por ESTORNO (UPDATE/DELETE bloqueados)."""
     __tablename__ = "movimento"
-    __table_args__ = (CheckConstraint("kg <> 0", name="ck_mov_kg_nao_zero"),)
+    __table_args__ = (CheckConstraint("kg <> 0", name="ck_mov_kg_nao_zero"),
+                      Index("ix_movimento_lote_criado", "lote_id", "criado_em"))      # 0005
 
     id: Mapped[int] = mapped_column(primary_key=True)
     lote_id: Mapped[int] = mapped_column(ForeignKey("lote.id"), index=True)

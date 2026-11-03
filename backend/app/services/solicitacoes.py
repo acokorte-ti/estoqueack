@@ -289,7 +289,7 @@ def _enviar(db: Session, sol: SolicitacaoCorte, usuario: Usuario) -> None:
 def obter(db: Session, sol_id: int, usuario: Usuario | None = None, *, travar: bool = False) -> SolicitacaoCorte:
     q = select(SolicitacaoCorte).where(SolicitacaoCorte.id == sol_id)
     if travar:
-        q = q.with_for_update()
+        q = q.with_for_update().execution_options(populate_existing=True)
     sol = db.scalar(q)
     if sol is None or (usuario is not None and so_rj_no_rio(usuario) and sol.situacao == "RASCUNHO"):
         raise NaoEncontrado("Solicitação não encontrada.")

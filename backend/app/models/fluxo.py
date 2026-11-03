@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -54,6 +54,8 @@ class SolicitacaoCorte(Base):
         CheckConstraint(_in("situacao", SITUACOES_SOLICITACAO), name="ck_sol_situacao"),
         CheckConstraint(_in("modo", MODOS), name="ck_sol_modo"),
         CheckConstraint("quantidade > 0", name="ck_sol_qtd"),
+        Index("ix_sol_situacao_prazo", "situacao", "prazo"),           # 0005: fila RJ / T08
+        Index("ix_sol_lote_situacao", "lote_id", "situacao"),          # 0005: reserva por lote
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -228,6 +230,7 @@ class CadastroSa(Base):
     __table_args__ = (
         CheckConstraint(_in("situacao", SITUACOES_SA), name="ck_sa_situacao"),
         CheckConstraint(_in("origem", ORIGENS_SA), name="ck_sa_origem"),
+        Index("ix_sa_item_situacao_data", "item_codigo", "situacao", "data"),   # 0005: sugestão do código
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

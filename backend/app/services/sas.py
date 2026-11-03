@@ -101,7 +101,7 @@ def criar_linha(db: Session, *, origem: str, lote: Lote, op: int, item_codigo: i
 def obter(db: Session, sa_id: int, *, travar: bool = False) -> CadastroSa:
     q = select(CadastroSa).where(CadastroSa.id == sa_id)
     if travar:
-        q = q.with_for_update()
+        q = q.with_for_update().execution_options(populate_existing=True)
     sa = db.scalar(q)
     if sa is None:
         raise NaoEncontrado("SA não encontrado.")

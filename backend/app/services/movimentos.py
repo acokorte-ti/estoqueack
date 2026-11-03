@@ -24,7 +24,9 @@ SITUACOES_COM_RESERVA = ("ENVIADA", "CORTADA_PARCIAL")
 def lote_ou_404(db: Session, lote_id: int, *, travar: bool = False) -> Lote:
     q = select(Lote).where(Lote.id == lote_id)
     if travar:
-        q = q.with_for_update()
+        # populate_existing: se o lote já estava na sessão (lido sem trava na validação), recarrega o saldo
+        # DEPOIS de obter a trava; sem isso, o 2º corte simultâneo usa o saldo velho (Parte B, 2026-11-03)
+        q = q.with_for_update().execution_options(populate_existing=True)
     lote = db.scalar(q)
     if lote is None:
         raise NaoEncontrado("Lote não encontrado.")

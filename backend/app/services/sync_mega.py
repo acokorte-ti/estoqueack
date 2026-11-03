@@ -94,7 +94,7 @@ def sincronizar_estoque(db: Session, *, gatilho: str = "AGENDADA", usuario_id: i
             continue
         db.add(MegaSaldo(codigo=s.codigo, descricao=s.descricao, saldo_kg=round(s.saldo_fisico, 3),
                          um=s.um, peso_especifico=s.peso_especifico,
-                         preco_medio=round(pm[0], 4) if pm else None, preco_medio_data=pm[1] if pm else None,
+                         preco_medio=round(pm[0], 6) if pm else None, preco_medio_data=pm[1] if pm else None,
                          atualizado_em=inicio))
         gravados += 1
 

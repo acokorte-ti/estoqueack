@@ -23,7 +23,7 @@ ESTOQUE_ITU = ("ESTOQUE",)
 def obter(db: Session, cop_id: int, *, travar: bool = False) -> Cop:
     q = select(Cop).where(Cop.id == cop_id)
     if travar:
-        q = q.with_for_update()
+        q = q.with_for_update().execution_options(populate_existing=True)
     cop = db.scalar(q)
     if cop is None:
         raise NaoEncontrado("COP não encontrado.")

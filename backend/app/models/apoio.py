@@ -5,7 +5,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, Date, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import (BigInteger, Boolean, CheckConstraint, Date, ForeignKey, Index, Integer, Numeric, String,
+                        UniqueConstraint)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -27,6 +28,7 @@ class Parametro(Base):
 class Notificacao(Base):
     """Aviso no sino do sistema (sem e-mail nesta versão [P05])."""
     __tablename__ = "notificacao"
+    __table_args__ = (Index("ix_notificacao_usuario_lida", "usuario_id", "lida_em"),)   # 0005: contador do sino
 
     id: Mapped[int] = mapped_column(primary_key=True)
     usuario_id: Mapped[int] = mapped_column(ForeignKey("usuario.id", ondelete="CASCADE"), index=True)
@@ -59,7 +61,7 @@ class MegaSaldo(Base):
     codigo: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
     descricao: Mapped[str | None] = mapped_column(String(200))
     saldo_kg: Mapped[float] = mapped_column(Kg)
-    preco_medio: Mapped[float | None] = mapped_column(Kg)          # R$/kg, custo médio diário (EST_SALDOFIN tipo 1)
+    preco_medio: Mapped[float | None] = mapped_column(Numeric(14, 6, asdecimal=False))  # R$/kg (0005: 6 casas)
     preco_medio_data: Mapped[date | None] = mapped_column(Date)     # 0004
     um: Mapped[str | None] = mapped_column(String(8))               # 0004
     peso_especifico: Mapped[float | None] = mapped_column(Kg)       # 0004 (PRO_RE_PESOESPECIFICO)

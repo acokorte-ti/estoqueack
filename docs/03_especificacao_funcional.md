@@ -1,6 +1,6 @@
 # EstoqueACK — Especificação Funcional Completa
 
-Versão 3.1, 03/11/2026. A 3.1 registra as leituras do Mega confirmadas no R026 (situação da OP, SA pela estrutura da OP, confirmação do SA, NCM/IPI). A v3 incorpora as **respostas do Eduardo às perguntas P01–P18** (arquivo "Questões IA.xlsx", 2026-11-03) e as respostas do FUNCIONAL aos pedidos R003–R009, R014 e R017. A v2 tinha incorporado a conferência com as planilhas (`04_conferencia_planilhas_x_fluxo.md`) e as regras do Matheus. **Data alvo de implantação: 13/11/2026 [P08].** Este documento descreve o sistema **como se ele já estivesse funcionando**: o que cada tela faz, quais botões existem, de onde vem cada informação e o que acontece no banco de dados a cada ação. Ele complementa `02_proposta_arquitetura.md`, que trata da parte técnica.
+Versão 3.2, 04/11/2026. A 3.2 registra as decisões do Eduardo de 04/11 (T16 mínima e impressão da Fila RJ na F1; depois da implantação, planilhas só para conferência semanal, §10.6; sem data de implantação), as colunas da lista de corte impressa (R037), as interpretações da carga (R032, §10.7) e os pontos do R024 já decididos. A 3.1 registra as leituras do Mega confirmadas no R026 (situação da OP, SA pela estrutura da OP, confirmação do SA, NCM/IPI). A v3 incorpora as **respostas do Eduardo às perguntas P01–P18** (arquivo "Questões IA.xlsx", 2026-11-03) e as respostas do FUNCIONAL aos pedidos R003–R009, R014 e R017. A v2 tinha incorporado a conferência com as planilhas (`04_conferencia_planilhas_x_fluxo.md`) e as regras do Matheus. **Sem data fixa de implantação [P08]:** o sistema entra quando os critérios de go/no-go forem atendidos e o Eduardo liberar. Este documento descreve o sistema **como se ele já estivesse funcionando**: o que cada tela faz, quais botões existem, de onde vem cada informação e o que acontece no banco de dados a cada ação. Ele complementa `02_proposta_arquitetura.md`, que trata da parte técnica.
 
 As decisões estão marcadas como **[P01]**, **[P02]** etc. e reunidas no fim (§12), já com a resposta.
 
@@ -158,7 +158,7 @@ stateDiagram-v2
 | Enviada | Estoque Itu | **Reserva** o peso previsto no lote: ele aparece como "reservado" e não está mais disponível para outras solicitações |
 | Material insuficiente | Operação RJ (T09), com observação | Libera a reserva do que não foi cortado. O Fabiano decide em T08: **"Trocar lote"** (a mesma solicitação volta para *Enviada* com o novo lote e nova reserva) ou **"Cancelar"** **[R003]** |
 | Cortada / parcial | Operação RJ | Baixa o **peso real** do lote (ou dos lotes, se dividiu) e libera a reserva do que foi cortado. A parcial continua na Fila RJ com o restante |
-| Encerrada com saldo pendente | Estoque Itu (T08, botão "Encerrar com saldo pendente", justificativa) | Libera a reserva do restante. O que foi cortado segue normalmente para COP **[R004]** |
+| Encerrada com saldo pendente | Estoque Itu (T08, botão "Encerrar com saldo pendente", justificativa) | Libera a reserva do restante. O que foi cortado segue normalmente para COP **[R004]**. No sistema não é uma situação à parte: a solicitação fica **Cortada** com a marca "encerrada com saldo pendente" e segue o fluxo normal **[R024]** |
 | Em COP | Operação RJ, ao fechar o COP | Nenhuma. Entra na fila de SA |
 | SA pronto | Estoque Itu, ao informar o código do SA (confirmado no Mega) | Nenhuma. Quando todos os itens do COP estão assim, o COP pode ser enviado |
 | Em trânsito | Operação RJ, ao enviar o COP com a NF | Nenhuma mudança de saldo. O material fica "em trânsito" |
@@ -448,7 +448,7 @@ Botões:
 
 - **"Registrar corte"**: abre T10.
 - **"Material insuficiente"**: marca a solicitação, notifica o Fabiano e exige observação (caso "MAT. INSUFICIENTE" da planilha).
-- **"Imprimir lista de corte do dia"**: PDF para levar à máquina.
+- **"Imprimir lista de corte"** (**F1**, decisão de 04/11: o RJ trabalha com a lista impressa) **[R037]**: folha A4 deitada, sem menu, na mesma ordem da tela (por prazo). Colunas: **OP**; **material e contêiner**; **instrução de corte** (com a instrução de processo e a marca "peça inteira"); **quantidade** (ou "faltam X de Y" na parcial); **prazo**; **dias em aberto** (com "!" se atrasada); **item e cliente**; e duas colunas **em branco, "Peças cortadas" e "Peso real (kg)"**, para o operador anotar à mão na máquina. Depois, o Marcelo passa as anotações para o T10.
 
 ### T10. Registrar corte (RJ)
 
@@ -524,11 +524,12 @@ Quem usa: Fabiano e Matheus. Vale para lotes **RJ em Itu** (peças inteiras e so
 | OP | [DIGITADO] → item e cliente [MEGA] | Mesmas validações de T07 |
 | Lote | [DIGITADO] ou [SUGERIDO] (peça inteira recebida para a OP) | — |
 | Peso do lote antes | [CALC] saldo atual | — |
+| Peso do material usado | [DIGITADO], **opcional**; padrão = saldo do lote **[R024]** | Para lote grande (ex.: 5 t de um código Mega), informa só o peso da barra ou pedaço que foi para a serra, senão a perda não fecha |
 | Peças produzidas | [DIGITADO] | — |
 | Consumo da OP (kg) | [DIGITADO], balança | Regra dos 5 % sobre o peso previsto da solicitação (bitola + sobremetal). Acima → justificativa (ex.: desvio de serra) |
 | Sobra (kg) | [DIGITADO], balança | 0 se não houver |
 | A sobra mantém a bitola original? | [DIGITADO] Sim / Não | Não → cria lote RETO |
-| Perda de corte | [CALC] antes − consumo − sobra | Amarelo se passar da perda esperada (§9) |
+| Perda de corte | [CALC] material usado − consumo − sobra | Amarelo ("estou ciente") se passar da perda esperada (§9). **A tolerância está em aberto [R024]:** a regra atual (serra 3 mm × seção + 50 %) dá ≈ 1,5 kg num 70×610, e o Eduardo/Matheus vão informar quantos kg são normais |
 | Reservas/restrições do lote | [LOTE] | Amarelo, exige "estou ciente" |
 
 O sistema mostra o resultado antes de gravar. Exemplo: "Lote L-000451 passa de 1.288,0 kg para 0 kg. Novo lote RETO L-000452 com 446,0 kg, origem H13 70×610 / CH25K."
@@ -540,7 +541,7 @@ Botões:
 
 Para lote **fiscal RJ** (RJ em Itu, inclusive RETO), ao confirmar, o sistema cria a linha na **fila de SA** com o consumo, a bitola (ou "RETO") e o contêiner de origem (Caminho B2, §2.2b). Se o lote veio de uma peça inteira cujo SA já foi feito com o previsto, o sistema liga o consumo a esse SA em vez de criar outro.
 
-Para lote Mega, depois de confirmar, aparece um quadro **"Fazer no Mega"** com a baixa na OP e a transferência para RETO já descritas, e o botão **"Copiar instrução"**.
+Para lote Mega, depois de confirmar, aparece um quadro **"Fazer no Mega"** com a baixa na OP (**consumo + perda de corte**, para o saldo do Mega bater com o lote **[R024]**) e a transferência para RETO já descritas, e o botão **"Copiar instrução"**.
 
 ### T14. SA
 
@@ -606,6 +607,8 @@ Botões:
 - **"Não é entrada"** (exige motivo; ex.: estorno de baixa no Mega). A diferença vai para a conciliação.
 
 ### T16. Conciliação com o Mega
+
+**Na F1 entra a versão mínima (decisão de 04/11):** só leitura, com código Mega × soma dos lotes Estoque Mega e destaque quando a diferença passa de `DIVERGENCIA_MEGA_KG` (T23, 5 kg). Os botões "Ver movimentos", "Ajustar lote" e "Marcar como explicada" ficam para a F1.1; na F1, a correção é feita pelo T18 a partir do T05.
 
 Só para lotes **ITU/ITU**, porque o material RJ não tem saldo por código no Mega de Itu.
 
@@ -770,6 +773,11 @@ Se o Mega estiver fora do ar, o sistema continua funcionando. Os campos [MEGA] p
 | PERDA_CORTE_ALTA | T13 | Justificativa | Perda maior que a perda esperada de serra (3 mm × seção × densidade) mais a margem |
 | DIVERGENCIA_TRANSPORTE | T12 | Justificativa | Peso conferido em Itu diferente do enviado em mais de 2 % |
 | NF_DUPLICADA | T06 | Bloqueia | NF + fornecedor já lançados |
+| LIGA_DIFERENTE | T07, T10 | T07: "Estou ciente"; T10: Bloqueia | Lote de outra liga que não é equivalente à pedida **[R024]** |
+| LOTE_TROCADO | T10 | Justificativa | O RJ usou outro lote ou dividiu ("Usar outro lote / dividir") **[R024]** |
+| MODO_INCOMPATIVEL | T07 | Bloqueia | Lote em Itu com modo "Cortar no RJ" ou "Trazer peça inteira": a tela oferece "Registrar corte em Itu agora" (R005) **[R024]** |
+| OP_SITUACAO_DESCONHECIDA, OP_NAO_CONFIRMADA | T07, T13 | Aviso | Situação da OP fora do domínio conhecido, ou OP digitada à mão com o Mega fora do ar **[R024]** |
+| DATA_CORTE_INVALIDA | T10, T13 | Bloqueia | A data do corte precisa estar entre hoje e 7 dias atrás **[R024]** |
 
 Toda justificativa precisa ter pelo menos 10 caracteres e fica gravada com o movimento.
 
@@ -851,9 +859,30 @@ O SA histórico com status "Confirmado" é ligado à solicitação de corte da m
 
 1. Prévia da carga e lista de pendências (catálogo, totais e comentários sem OP), revisadas com o Fabiano.
 2. Carga em homologação e conferência dos totais por estoque contra as planilhas.
-3. **Data alvo de implantação: 13/11/2026 [P08].** Proposta do FUNCIONAL: o sistema passa a valer em 13/11 e as planilhas continuam sendo atualizadas em paralelo por 2 semanas (até 27/11), só para conferência.
-4. Dia da virada: nova carga só do que mudou, planilhas viram só leitura e o sistema passa a valer.
+3. **Sem data fixa [P08]:** a implantação acontece quando o go/no-go estiver atendido e o Eduardo liberar.
+4. Dia da virada: carga final, as planilhas param de receber lançamentos e o sistema passa a ser a **fonte da verdade**. Daí em diante vale a conferência semanal (§10.6).
 5. Recomendado: **inventário físico** do RJ em Itu e dos RETO para atribuir a origem onde for possível.
+
+### 10.6 Depois da implantação: planilhas só para conferência semanal (decisão de 04/11)
+
+Ninguém lança mais nada nas planilhas no dia a dia; tudo é lançado no sistema (assim não há digitação dupla). Durante as **2 primeiras semanas** depois da implantação, **uma vez por semana** cada dono confere o sistema contra o que ele acompanhava na planilha e contra o físico:
+
+| Quem | Confere | Onde no sistema |
+|---|---|---|
+| **Marcelo** (RJ) | Saldo por contêiner e bitola do RJ no Rio (o que era a ESTOQUE 2026) e as solicitações e COPs da semana (o que era o Controle de Corte) | T04 (exportar), T09, T11 |
+| **Fabiano / Matheus** (Itu) | RJ em Itu e RETO por material (colunas "RJ em Itu" do Estoque Geral), Estoque Mega × saldo do Mega e os SAs da semana (o que era a planilha de SA) | T04 agrupado (exportar), T16, T14 (exportar) |
+| **Renato** (análise) | Visão por item para compras (o que era o Estoque Geral) | T04 agrupado (exportar) |
+| **Eduardo** | Junta os pontos da semana e decide o que vira correção | — |
+
+Divergência encontrada: corrige-se **no sistema** (T18 ajuste ou estorno, com justificativa) e nunca na planilha. Passadas as 2 semanas sem divergência aberta, as planilhas são arquivadas.
+
+### 10.7 Interpretações usadas na carga (R032, confirmadas pelo FUNCIONAL em 04/11)
+
+1. **Família de liga na paridade RJ ↔ código Mega:** 1.2344 → H13, 1.2379 → D2 e **A8 MOD → A8** (o Estoque Geral cadastra o A8 MOD do RJ como "IMP-A8"). Isso vale **só para ligar o material ao código Mega na carga**. Na T07, **A8 MOD e A8 não são equivalentes**, porque a fábrica distingue os dois (ex.: "99588 deveria ter pedido material A8 comum"); 1.2344 ≈ H13 continua equivalente com "estou ciente" (P18).
+2. **Contêiner que saiu da ESTOQUE 2026** vira **lote esgotado** com as entradas do HISTORICO: só consulta, não entra em nenhuma lista de saldo.
+3. **Data de consumo sem ano** no comentário ("OP 100397 15/10"): usa-se o ano que dá a data **mais recente que não passe da data da carga**.
+4. **Estoque Mega só com MP de aço:** vira lote o código que está no Estoque Geral ou cuja descrição traz liga de aço do catálogo. Inox, não ferrosos, metal duro, peças compradas, microfundidos, calços e fitas ficam fora. Os aços com liga fora do catálogo (VC-131, S-390, S600, K-720, S1, SAE-4130/5160/1060, N2360 etc.) dependem da decisão do Fabiano na revisão do BLOCO 1.
+5. **Revisão antes da implantação (BLOCO 1):** paridade (27), códigos fora do catálogo (123), ligas novas (30), restrições (15) e solicitações ativas (18), em `carga/revisao_bloco1_fabiano.xlsx`. **Depois da implantação (BLOCO 2):** OPs mal digitadas, SEM OP, cortes sem peso e solicitações sem lote.
 
 ---
 
@@ -904,7 +933,7 @@ Todo registro importado guarda **arquivo, aba e linha** de origem. Assim, qualqu
 | **P05** | Quer **notificação por e-mail**, além do aviso dentro do sistema? Se sim, qual conta envia (SMTP do Microsoft 365)? | **Por enquanto não.** Avisos só no sistema |
 | **P06** | A ESTOQUE 2026 soma cerca de 245 t e a coluna "RJ no Rio" cerca de 240 t. Qual vale na carga? | **Os dois estoques valem** (RJ por contêiner, planilha; Itu por CM, ERP). A carga **mescla** e monta a **paridade** material RJ ↔ CM (§10.2) |
 | **P07** | Os 28 t de "RJ em Itu" de hoje: o Fabiano sabe a origem de parte deles? | **Aceita:** "origem não identificada"; os contêineres vão sendo amarrados com as novas entradas |
-| **P08** | Período em paralelo de 1 a 2 semanas antes da virada? Qual data alvo? | **Data alvo de implantação: 13/11/2026.** Proposta do FUNCIONAL: paralelo das planilhas por 2 semanas depois (até 27/11), só para conferência |
+| **P08** | Período em paralelo de 1 a 2 semanas antes da virada? Qual data alvo? | **Sem data fixa** (Eduardo, 04/11): implanta quando o go/no-go for atendido. Depois da implantação, planilhas só para conferência semanal por 2 semanas (§10.6) |
 | **P09** | Para o material Mega, quer usar o sistema para **todo** consumo de MP em Itu, ou só quando houver sobra ou RETO? | **Aceita:** todo consumo de MP em Itu passa pelo sistema |
 | **P10** | O Marcelo também precisa ver o estoque RJ em Itu e o Estoque Mega, ou só o RJ no Rio? | **Marcelo vê somente o estoque dele (RJ no Rio)** |
 | **P11** | As "peças" (QUANTIDADE CHAPA/BARRA) devem ser controladas desde já junto com o kg, ou só como informação? | **Aceita:** peças só como informação; controle em kg por lote |

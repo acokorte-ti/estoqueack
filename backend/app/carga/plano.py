@@ -469,7 +469,8 @@ def _estoque_mega(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
         lote = LoteP(ch, "ITU", "ITU", None, kg, tipo="RETO" if it.formato == "RETO" else "ORIGINAL",
                      origem_identificada=False, conferencia_kg=kg, estoque="ESTOQUE_MEGA",
                      origem={"arquivo": "Mega (mega_saldo)", "aba": ctx.data_mega, "linha": cod})
-        lote.movimentos.append(MovP("SALDO_INICIAL", kg, documento=f"Carga saldo Mega {ctx.data_mega or ''}".strip()))
+        lote.movimentos.append(MovP("SALDO_INICIAL", kg, documento=f"Carga saldo Mega {ctx.data_mega or ''}".strip(),
+                                    origem=lote.origem))   # com origem: movimento da carga, não estornável
         pl.lotes.append(lote)
     pl.contagens["mega_codigos_fora"] = len(fora)
     pl.contagens["mega_kg_fora"] = round(sum(k for _, _, k in fora), 3)

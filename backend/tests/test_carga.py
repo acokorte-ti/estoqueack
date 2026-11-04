@@ -182,6 +182,8 @@ def test_r036_ordem_estorno_nf_do_cop(base, tmp_path):
         assert movs[0]["tipo"] == "SALDO_INICIAL" and movs[0]["data"] == "2025-01-10"   # entrada do HISTORICO
         assert all(m["saldo_apos_kg"] >= 0 for m in movs)
         assert not any(m["estornavel"] for m in movs) and all(m["da_carga"] for m in movs)
+        for l in db.scalars(select(Lote)):                       # nenhum movimento da carga é estornável
+            assert not any(m["estornavel"] for m in estoque.movimentos(db, l.id)), l.codigo
         mov_id = db.scalar(select(Movimento.id).where(Movimento.lote_id == lote.id, Movimento.tipo == "SAIDA_CORTE_RJ"))
         item = db.scalar(select(CopItem).join(Cop).where(Cop.numero == 600))
         sa = db.scalar(select(CadastroSa))

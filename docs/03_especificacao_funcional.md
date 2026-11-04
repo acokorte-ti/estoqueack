@@ -888,7 +888,7 @@ Divergência encontrada: corrige-se **no sistema** (T18 ajuste ou estorno, com j
    - **Total diferente entre a ESTOQUE 2026 e o Estoque Geral:** vale a **ESTOQUE 2026**. O código é o mesmo, e a diferença foi erro de atualização da planilha de Itu.
    - O prefixo "IMP" na descrição só indica material importado e não entra na comparação.
    - **Ligas novas:** valem as densidades propostas na revisão. "?", "DESCONHECIDA", "OH" e "ASTM" não são liga: a descrição é corrigida na carga.
-   - **Restrições:** "não usar para guilhotinas" e "MAT P/ DESFOLHADEIRAS" viram **restrição com "estou ciente"**. "RESERVADO CPR" ninguém soube explicar: entra como restrição com o texto original, para o Renato confirmar ou encerrar.
+   - **Restrições:** "não usar para guilhotinas" e "MAT P/ DESFOLHADEIRAS" viram **restrição com "estou ciente"**. "RESERVADO CPR" era só uma observação antiga da planilha: **não entra** no sistema (decisão do Eduardo, 04/11).
    - **Solicitações ativas:** as 4 cortadas (OPs 94394, 94429, 94528 e 94529) já foram enviadas e entram como concluídas. As 8 com material insuficiente ou mais de 1 ano (92756, 93620, 94356, 94646, 96111, 96674, 96772 e 97662) entram canceladas. As outras 6 continuam na Fila RJ.
 6. **Depois da implantação (BLOCO 2):** OPs mal digitadas, SEM OP, cortes sem peso e solicitações sem lote.
 

@@ -87,6 +87,7 @@ curl -s http://127.0.0.1:8090/api/saude               # saúde da API
 | O Git no Windows não grava o "+x" dos scripts | `git update-index --chmod=+x <arquivo>` |
 | O Desktop Commander bloqueia comandos com certas palavras (sudo etc.) e o PowerShell quebra aspas no ssh | Usar `cmd.exe` e mandar scripts por arquivo/stdin |
 | Na sessão SSH do Desktop Commander, `git log` (e outros com paginador) abre o `less` e a sessão parece travada | Sempre `git --no-pager …`. Saída com atraso: ler com `read_process_output` (offset negativo), não abrir outra sessão |
+| `sleep` longo dentro da sessão SSH do Desktop Commander faz a saída chegar muito atrasada e a sessão parecer travada | Esperar fora (no sandbox ou no PowerShell) e mandar só comandos curtos na sessão |
 | Consultas ao Mega para diagnóstico | `~/estoqueack-mapeamento/q.sh sql/<arquivo>.sql [max]` no system-lab (container de mapeamento, só leitura; `W=<largura>` para colunas longas). Depois do REVOKE (02_grants_restritos.sql) o dicionário deixa de ser visível |
 | **`git add -A` publicou uma senha** (§8) | Fazer commit só de arquivos explícitos e conferir `git status` antes. O CI tem gitleaks |
 
@@ -121,6 +122,14 @@ curl -s http://127.0.0.1:8090/api/saude               # saúde da API
 - **Sincronização no ar:** migração **0004**, `app/services/sync_mega.py`, `app/jobs/agendador.py`, cron `deploy/cron/estoqueack-agendador.sh` (a cada 5 min, instalado no `crontab` do ubuntu em 2026-11-03), `POST /api/mega/sincronizar`. 1ª carga feita (107.840 movimentos).
 - **GRANTs:** `scripts/mega/02_grants_restritos.sql`, para o Eduardo rodar como DBA.
 - **Próximo:** Parte B (PostgreSQL de verdade: trigger, FOR UPDATE, migração sobe/desce, índices) e Parte C (testes).
+
+## 7.4 Situação em 2026-11-04 (chat BANCO E TESTES, rodada 1 da COORDENAÇÃO)
+
+- **Testes no PostgreSQL:** `TEST_DATABASE_URL=postgresql+psycopg://… pytest` (o banco indicado é APAGADO; esquema pelas migrações). O CI roda SQLite e PostgreSQL. `tests/test_postgres.py`: models = migrações, trigger de imutabilidade, 2 cortes simultâneos.
+- **Regra de concorrência:** travar sempre com `lote_ou_404(travar=True)` / `obter(travar=True)` (FOR UPDATE + `populate_existing`); sem o `populate_existing` o 2º corte usava o saldo velho (bug achado e corrigido em `7790bfd`).
+- **Migração 0005** (índices das telas; `mega_saldo.preco_medio` 6 casas). A próxima é a **0006**.
+- **Ponta a ponta:** `deploy/e2e/rodar_e2e.sh` no system-lab copia o banco para `estoqueack_e2e`, roda os 5 caminhos (`app/jobs/e2e_caminhos.py`) com o Mega real e apaga a cópia. 1º ensaio em 04/11 com a carga: 5 caminhos OK, saldo = soma dos movimentos em todos os lotes.
+- **Aceite:** `docs/tecnico/03_roteiro_aceite.md`. **Volume:** `VOLUME=1 … pytest tests/test_volume.py -s`.
 
 ## 8. Registro de incidentes
 

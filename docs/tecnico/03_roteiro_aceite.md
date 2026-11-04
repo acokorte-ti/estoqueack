@@ -9,7 +9,7 @@ Escrito em 2026-11-03 pelo chat BANCO E TESTES. Usado no aceite com **Fabiano, M
 | 0.1 | Carga T25 feita na homologação e conferida pelo Fabiano (soma dos lotes por código = saldo Mega ± 5 kg; total RJ = ESTOQUE 2026) | TÉCNICO + Fabiano | ☐ |
 | 0.2 | Usuários reais criados (T21): `fabiano.camargo`, `matheus.almeida`, `marcello.teixeira`, `renato.pinto`, cada um com e-mail e perfil certo (Estoque Itu, Estoque Itu, Operação RJ, Análise) | Eduardo | ☐ |
 | 0.3 | Cada um entrou uma vez e trocou a senha temporária | cada um | ☐ |
-| 0.4 | Ponta a ponta automático dos 5 caminhos rodado sem erro (qua 11/11) | BANCO E TESTES | ☐ |
+| 0.4 | Ponta a ponta automático dos 5 caminhos rodado sem erro (`deploy/e2e/rodar_e2e.sh`; 1º ensaio OK em 04/11; repetir qua 11/11) | BANCO E TESTES | ☐ |
 | 0.5 | "Mega atualizado em …" de hoje no Painel (sincronização das 06h OK) | — | ☐ |
 | 0.6 | Escolher **OPs reais abertas** para o aceite (uma por caminho) e os lotes da carga que vão ser usados. Ficam anotadas na tabela do §6 | Fabiano + BANCO E TESTES | ☐ |
 

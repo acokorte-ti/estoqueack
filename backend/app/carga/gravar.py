@@ -45,6 +45,9 @@ def limpar(db: Session) -> None:
     else:
         for t in TABELAS_OPERACIONAIS:
             db.execute(text(f"DELETE FROM {t}"))  # noqa: S608 — nomes fixos da lista acima
+    # ligas criadas por carga anterior saem (a nova carga recria as que ainda forem usadas)
+    db.execute(text("DELETE FROM liga WHERE nome LIKE '%(criada na carga)' AND id NOT IN "
+                    "(SELECT liga_a_id FROM liga_equivalente UNION SELECT liga_b_id FROM liga_equivalente)"))
     db.flush()
 
 

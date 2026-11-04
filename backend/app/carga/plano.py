@@ -180,7 +180,10 @@ class Plano:
 
 def medida(desc: str):
     d = (desc or "").strip()
-    return interpretar(DESCRICAO_CORRIGIDA.get(d, d))
+    d = DESCRICAO_CORRIGIDA.get(d, d)
+    d = re.sub(r"^01\s+", "O1 Ø", d)                     # "01 126" = O1 Ø126 (zero no lugar da letra O)
+    d = re.sub(r"^OH\s*25[15]\s+", "", d)                # "OH 251  1.2721 STEEL BARS …" = 1.2721
+    return interpretar(d)
 
 
 def chave_item(liga: str | None, m) -> tuple:
@@ -216,7 +219,7 @@ class Contexto:
 
 def _liga(plano: Plano, ctx: Contexto, codigo: str | None, origem, densidade: float | None = None) -> str:
     if not codigo:
-        codigo = "DESCONHECIDA"
+        codigo = "NAO-INFORMADA"                 # §10.7: "DESCONHECIDA"/"?" não são liga
     codigo = ALIAS_LIGA.get(codigo, codigo)
     if codigo not in ctx.ligas and codigo not in plano.ligas_novas:
         if codigo in DENSIDADES_REVISADAS:
@@ -575,7 +578,7 @@ def _restricoes_e_avisos(pl: Plano, geral: list[P.LinhaGeral]) -> None:
                 alvos = [l for l in por_item.get(ch, []) if l.estoque == estoque] or por_item.get(ch, [])
                 for l in alvos:
                     l.destinacoes.append(("RESTRICAO", texto[:300]))
-                pl.pend("RESTRICAO_A_REVISAR", "REVISAR", f"{g.descricao}: \"{texto}\" vira restrição em "
+                pl.pend("RESTRICAO_A_REVISAR", "INFO", f"{g.descricao}: \"{texto}\" vira restrição em "
                         f"{len(alvos)} lote(s).", g.origem, "Conferir se é reserva (com kg) ou restrição")
         for c in g.comentarios:
             if re.search(r"PEDID|COMPRA|PRAZO|EMBARC|CHEGA", c, re.I):
@@ -750,9 +753,9 @@ def _conferencias(pl: Plano, estoque, geral, corte, sas) -> None:
     add("(c) Total RJ em Itu × Materia Prima Geral (coluna RJ em Itu)", round(sum(g.rj_em_itu for g in geral), 3),
         round(sum(l.saldo for l in itu), 3))
     mega = [l for l in pl.lotes if l.estoque == "ESTOQUE_MEGA"]
-    add("(a) Total Estoque Mega × saldo do Mega (MP de aço, filial 3)", None if not mega else
+    add("(a) Total Estoque Mega × saldo do Mega (filial 3)", None if not mega else
         round(sum(l.conferencia_kg or 0 for l in mega), 3), round(sum(l.saldo for l in mega), 3),
-        obs=(f"Saldo do Mega de {pl.data_mega}. Fora do catálogo (não é aço): "
+        obs=(f"Saldo do Mega de {pl.data_mega}. Fora (sem movimento no kardex em 2 anos): "
              f"{pl.contagens.get('mega_codigos_fora', 0)} códigos, {pl.contagens.get('mega_kg_fora', 0):.1f} kg")
         if pl.data_mega else "Sem saldo do Mega")
     add("(a) Estoque Geral (ESTOQUE MEGA de 20/10) × saldo do Mega hoje",

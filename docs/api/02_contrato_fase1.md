@@ -204,6 +204,59 @@ Ocorrências: `NF_DUPLICADA`, `SEM_ITENS`, `LIGA_DESCONHECIDA#n`, `BITOLA_INCOMP
 - `GET /api/mega/sincronizacoes?limite=20` → `{ ultima_ok, itens[] }` (para "Mega atualizado em …").
 - `GET /api/mega/op/{n}`: também `pedido`, `cliente_codigo`, `tipo`, `estrutura[]` (R027).
 
-## 11. Ainda não implementado (próximos)
+## 11. T03 Painel com pendências ✅ (2026-11-04)
 
-📋 Painel com pendências por perfil (T03), T25 carga inicial, exportações em Excel, impressões em PDF (lista de corte, romaneio, ficha do lote).
+`GET /api/painel/pendencias` (todos os perfis; o Admin recebe os três grupos). A barra de estoque continua em `GET /api/painel/resumo`.
+
+```json
+{ "perfil": "ESTOQUE",
+  "grupos": { "ESTOQUE": [ { "codigo": "SA_SEGURANDO_COP", "titulo": "SAs pendentes segurando COP no RJ",
+                             "quantidade": 1, "nivel": "ALERTA", "link": "/sa", "itens": [ { ... } ] } ] },
+  "atrasos": { "NORMAL": 5, "ATENCAO": 1, "ATRASADO": 1 },
+  "divergencias_mega": { "quantidade": 3, "limite_kg": 5 },
+  "ultima_sincronizacao": { "terminado_em": "2026-11-04T13:00:41-03:00", "situacao_ultima_tentativa": "OK" } }
+```
+
+- `nivel`: `ALERTA` (destacar) ou `NORMAL`; com `quantidade` 0 vem sempre `NORMAL`. `itens` traz no máximo 10 (o `link` abre a lista completa). A ordem dos grupos é a ordem de exibição.
+- **ESTOQUE** (Fabiano, Matheus): `SA_SEGURANDO_COP` (itens `{cop_id, cop, sas_pendentes, itens, fechado_em}`, sempre no topo), `COP_EM_TRANSITO` (COPs no formato da lista do §4), `PECA_INTEIRA_AGUARDANDO_CORTE` e `MATERIAL_INSUFICIENTE` (solicitações `{id, numero, op, cliente, quantidade, prazo, situacao, atraso, dias_em_aberto, material, conteiner}`), `SA_SEM_CONFIRMACAO` (`{id, op, situacao, sa_codigo, criado_em}`, passou do prazo de 48 h).
+- **OPERACAO_RJ** (Marcelo): `FILA_CORTE` (por prazo), `FILA_CORTE_ATRASADA`, `CORTES_FORA_DE_COP` (formato de `cortes-prontos`), `COP_ABERTO`, `COP_AGUARDANDO_SA`, `COP_AGUARDANDO_NF`.
+- **ANALISE** (Renato): `RESERVA_VENCENDO` (`{destinacao_id, lote_id, lote, tipo, descricao, kg, validade}`, próximos 7 dias), `DIVERGENCIA_MEGA` (itens da T16), `EXCECOES_SEMANA` (`{movimento_id, lote_id, tipo, kg, op, codigos, justificativa, usuario, criado_em}`).
+- `atrasos`: solicitações Enviadas, Parciais e com Material insuficiente por faixa (7 / 15 dias). `divergencias_mega.quantidade` vem `null` para a Operação RJ (não enxerga o Estoque Mega).
+- **Entradas Mega a classificar (T15)** ainda não existem (F1.1): o grupo não aparece.
+
+## 12. T16 Conciliação com o Mega, versão mínima ✅ (2026-11-04, só leitura)
+
+`GET /api/conciliacao?somente_divergentes=false` (Estoque Itu, Análise, Admin):
+
+```json
+{ "limite_kg": 5, "ultima_sincronizacao": "2026-11-04T13:00:41-03:00",
+  "totais": { "codigos": 403, "ok": 400, "mega_maior": 2, "mega_menor": 1, "saldo_mega_kg": 219453.8,
+              "soma_lotes_kg": 219441.3 },
+  "itens": [ { "codigo": 78290, "descricao": "IMP-H13 24X62MM", "saldo_mega_kg": 5210.0, "soma_lotes_kg": 5198.0,
+               "diferenca_kg": 12.0, "status": "MEGA_MAIOR", "lotes": 1 } ] }
+```
+
+- Só códigos do catálogo (`item_mp` com código Mega) e só lotes do **Estoque Mega** (ITU/ITU). `diferenca_kg` = Mega − lotes. `status`: `OK` (|diferença| ≤ `DIVERGENCIA_MEGA_KG`), `MEGA_MAIOR`, `MEGA_MENOR`. Ordem: divergentes primeiro, maior diferença primeiro.
+- O saldo do Mega é o da última sincronização (06h, 13h ou "Sincronizar agora"); mostrar `ultima_sincronizacao` no topo.
+- 📋 F1.1: "Ver movimentos", "Ajustar lote" e "Marcar como explicada".
+
+## 13. Exportações em Excel ✅ (2026-11-04)
+
+Respondem um arquivo `.xlsx` (download direto; `Content-Disposition: attachment`). Mesmos filtros e mesma visibilidade das telas.
+
+| Botão | Endpoint | Filtros |
+|---|---|---|
+| T04 "Exportar para Excel" (por lote) | `GET /api/exportar/lotes.xlsx` | os de `GET /api/lotes` |
+| T04 (agrupado por item) | `GET /api/exportar/lotes-agrupado.xlsx` | os de `GET /api/lotes` |
+| T08 "Exportar" | `GET /api/exportar/solicitacoes.xlsx` | os de `GET /api/solicitacoes` |
+| T14 "Exportar pedidos selecionados" | `GET /api/exportar/sas.xlsx?ids=3&ids=4` | `ids`, ou os de `GET /api/sas` |
+
+O de SA sai no **layout da planilha de SA** (DATA, OP, CLIENTE, COD. ITEM, MATERIAL, DIMENSÃO, ORIGEM, QTDE, PESO, VALOR PRECIFICADOR, COD.MEGA SEMI ACAB., DESCRIÇÃO, NCM, ICMS, IPI, PEDIDO, NF) mais COP e situação. 📋 F1.1: "Exportar SAs novos para o Renato" com a marca de exportado.
+
+## 14. Avisos automáticos do sino ✅ (2026-11-04)
+
+Gerados pelo agendador (a cada 5 min), **uma vez por documento**, e lidos em `GET /api/notificacoes`. Tipos novos: `SA_SEM_CONFIRMACAO` (Estoque Itu e Admin, passou de 48 h), `SOLICITACAO_ATRASADA` (Estoque Itu e Operação RJ, passou de 15 dias), `RESERVA_VENCENDO` (quem criou a reserva, 7 dias antes; `link` = `/lotes/{id}?destinacao={id}`) e `RESUMO_EXCECOES` (Admin, a partir das 07h, exceções do dia anterior; `link` = `/relatorios/excecoes?dia=AAAA-MM-DD`).
+
+## 15. Ainda não implementado
+
+📋 F1.1: T15 Entradas Mega a classificar, tratamento da T16, T19 Relatórios, T26, exportação para o Renato com marca, PDFs (romaneio do COP, ficha do lote). A **impressão da Fila RJ (T09)** usa `GET /api/fila-rj`; se faltar campo, o FUNCIONAL indica e eu acrescento.

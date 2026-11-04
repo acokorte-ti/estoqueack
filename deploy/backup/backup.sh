@@ -31,7 +31,11 @@ chmod 600 "$ARQ"
 echo "$(date -Is) backup gerado: $ARQ ($(du -h "$ARQ" | cut -f1))"
 
 if [ -n "${BACKUP_COPIA_EXTERNA:-}" ]; then
-  $BACKUP_COPIA_EXTERNA "$ARQ" && echo "$(date -Is) cópia externa enviada"
+  # o backup local já está gravado; falha na cópia externa fica registrada e o script termina com erro (código 3)
+  if ! "$BACKUP_COPIA_EXTERNA" "$ARQ"; then
+    echo "$(date -Is) ERRO: cópia externa FALHOU para $ARQ (o backup local está OK)"
+    FALHA_EXTERNA=1
+  fi
 fi
 
 # Retenção: diários por $RETENCAO_DIAS dias; no dia 1º, uma cópia vai para mensal/ (guardada 12 meses)
@@ -40,3 +44,4 @@ if [ "$(date +%d)" = "01" ]; then
 fi
 find "$DESTINO" -maxdepth 1 -name 'estoqueack_*.sql.gz.gpg' -mtime +"$RETENCAO_DIAS" -delete
 find "$DESTINO/mensal" -name 'estoqueack_*.sql.gz.gpg' -mtime +366 -delete 2>/dev/null || true
+[ -z "${FALHA_EXTERNA:-}" ] || exit 3

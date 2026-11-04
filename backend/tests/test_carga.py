@@ -165,3 +165,28 @@ def test_carga_nao_conta_como_excecao(base, tmp_path):
     _rodar(tmp_path)
     with SessionLocal() as db:
         assert painel.excecoes_da_semana(db) == []
+
+
+def test_r036_ordem_estorno_nf_do_cop(base, tmp_path):
+    from sqlalchemy import select
+
+    from app.core.db import SessionLocal
+    from app.models import CadastroSa, Cop, CopItem, Lote, Movimento
+    from app.services import estoque
+    from tests.conftest import preparar_admin
+    _planilhas(tmp_path)
+    _rodar(tmp_path)
+    with SessionLocal() as db:
+        lote = db.scalar(select(Lote).where(Lote.peso_inicial_kg == 1000, Lote.planta_fiscal == "RJ"))
+        movs = estoque.movimentos(db, lote.id)
+        assert movs[0]["tipo"] == "SALDO_INICIAL" and movs[0]["data"] == "2025-01-10"   # entrada do HISTORICO
+        assert all(m["saldo_apos_kg"] >= 0 for m in movs)
+        assert not any(m["estornavel"] for m in movs) and all(m["da_carga"] for m in movs)
+        mov_id = db.scalar(select(Movimento.id).where(Movimento.lote_id == lote.id, Movimento.tipo == "SAIDA_CORTE_RJ"))
+        item = db.scalar(select(CopItem).join(Cop).where(Cop.numero == 600))
+        sa = db.scalar(select(CadastroSa))
+        assert item.nf is not None and item.nf.numero == "3215" and sa.nf_id == item.nf_id and sa.cop_item_id == item.id
+    h = preparar_admin(base)
+    r = base.post(f"/api/movimentos/{mov_id}/estorno", json={"justificativa": "Teste de estorno da carga"}, headers=h)
+    assert r.status_code == 400 and "ajuste" in r.json()["detail"]
+    assert base.get("/api/cops").json()[0]["nfs"]

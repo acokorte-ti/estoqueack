@@ -157,12 +157,20 @@ def movimentos(db: Session, lote_id: int) -> list[dict]:
                       .where(Movimento.lote_id == lote_id)
                       .order_by(func.coalesce(Movimento.data_referencia, func.date(Movimento.criado_em)),
                                 Movimento.id)).all()
+    from app.models import CopItem
+    estornados = set(db.scalars(select(Movimento.estorno_de_id).where(Movimento.lote_id == lote_id,
+                                                                      Movimento.estorno_de_id.is_not(None))))
+    em_cop = set(db.scalars(select(CopItem.liberacao_id)))
     saldo, out = 0.0, []
     for m, nome in movs:
         saldo = round(saldo + m.kg, 3)
+        estornavel = (m.tipo != "ESTORNO" and m.estorno_de_id is None and m.id not in estornados
+                      and m.origem_ref is None                       # movimento da carga: corrigir por ajuste (T18)
+                      and not (m.tipo == "SAIDA_CORTE_RJ" and m.liberacao_id in em_cop))
         out.append({"id": m.id, "data": (m.data_referencia or m.criado_em.date()).isoformat(), "tipo": m.tipo,
                     "tipo_descricao": TIPO_MOV_DESCRICAO.get(m.tipo, m.tipo), "kg": round(m.kg, 3),
                     "saldo_apos_kg": saldo, "op": m.op, "cop": m.cop_numero, "sa": m.sa_codigo,
                     "documento": m.documento, "usuario": nome, "justificativa": m.justificativa,
-                    "estorno_de": m.estorno_de_id})
+                    "estorno_de": m.estorno_de_id, "estornavel": estornavel,
+                    "da_carga": m.origem_ref is not None})
     return out

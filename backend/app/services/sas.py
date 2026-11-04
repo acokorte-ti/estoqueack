@@ -324,7 +324,12 @@ def listar(db: Session, f: dict[str, Any]) -> list[CadastroSa]:
             Cop.numero == f["cop"])
     if f.get("nao_exportados"):
         q = q.where(CadastroSa.exportado_renato_em.is_(None))
-    return list(db.scalars(q.order_by(CadastroSa.situacao == "CONFIRMADO", CadastroSa.data, CadastroSa.id)))
+    # pendentes primeiro (do mais antigo, para fazer na ordem); confirmados depois, do mais novo para o mais antigo
+    linhas = list(db.scalars(q))
+    linhas.sort(key=lambda s: (s.situacao == "CONFIRMADO",
+                               -s.data.toordinal() if s.situacao == "CONFIRMADO" else s.data.toordinal(),
+                               -s.id if s.situacao == "CONFIRMADO" else s.id))
+    return linhas
 
 
 def para_dict(db: Session, sa: CadastroSa) -> dict[str, Any]:

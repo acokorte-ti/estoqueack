@@ -19,7 +19,7 @@ import re
 from collections import Counter, defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from app.domain.medidas import interpretar
@@ -202,7 +202,7 @@ def montar(ctx: Contexto, estoque: list[P.LinhaEstoque2026], historico: list[dic
            corte: list[P.LinhaCorte], sas: list[P.LinhaSa]) -> Plano:
     pl = Plano(data_mega=ctx.data_mega)
     _catalogo_geral(pl, ctx, geral)
-    lotes_rj = _lotes_rj_no_rio(pl, ctx, estoque)
+    lotes_rj = _lotes_rj_no_rio(pl, ctx, estoque, historico)
     _paridade(pl, estoque, geral)
     _esgotados_historico(pl, ctx, estoque, historico, lotes_rj)
     _rj_em_itu(pl, geral)
@@ -266,8 +266,14 @@ def _data_consumo(dm: tuple[int, int] | None, hoje: date) -> date | None:
     return None
 
 
-def _lotes_rj_no_rio(pl: Plano, ctx: Contexto, estoque: list[P.LinhaEstoque2026]) -> dict[tuple, list[LoteP]]:
+def _lotes_rj_no_rio(pl: Plano, ctx: Contexto, estoque: list[P.LinhaEstoque2026],
+                     historico: list[dict] | None = None) -> dict[tuple, list[LoteP]]:
     idx: dict[tuple, list[LoteP]] = defaultdict(list)
+    entrada: dict[tuple, date] = {}
+    for h in historico or []:
+        if h["data"]:
+            k = (h["conteiner"], chave_familia(h["descricao"]))
+            entrada[k] = min(entrada.get(k, h["data"]), h["data"])
     for e in estoque:
         item = _item_rj(pl, ctx, e.material, e.origem)
         lote = LoteP(item, "RJ", "RJ", e.conteiner, e.peso_inicial, pecas=e.pecas, custo_kg=e.valor_unitario,
@@ -276,7 +282,13 @@ def _lotes_rj_no_rio(pl: Plano, ctx: Contexto, estoque: list[P.LinhaEstoque2026]
         if e.comentario_pecas:
             lote.notas.append(f"Peças (comentário da planilha): {e.comentario_pecas}")
         if e.peso_inicial > 0:
-            lote.movimentos.append(MovP("SALDO_INICIAL", e.peso_inicial, documento="Carga ESTOQUE 2026",
+            # R036: o saldo inicial vem antes do 1º consumo, para o saldo acumulado nunca ficar negativo no histórico:
+            # data de entrada do contêiner (HISTORICO) ou, se não houver ou for depois, a véspera do 1º consumo.
+            datas = [d for c in e.consumos if (d := _data_consumo(c.dia_mes, ctx.hoje))]
+            d0 = entrada.get((e.conteiner, chave_familia(e.material)))
+            if datas and (d0 is None or d0 > min(datas)):
+                d0 = min(datas) - timedelta(days=1)
+            lote.movimentos.append(MovP("SALDO_INICIAL", e.peso_inicial, data=d0, documento="Carga ESTOQUE 2026",
                                         origem=e.origem))
         for c in e.consumos:
             if c.sem_op:

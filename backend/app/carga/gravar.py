@@ -13,7 +13,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.models import (CadastroSa, Conteiner, Cop, CopItem, Destinacao, ItemMP, LiberacaoCorte, Liga, Lote,
-                        MegaSaldo, Movimento, Nota, ParidadeRj, SolicitacaoCorte)
+                        MegaSaldo, Movimento, NfTransferencia, Nota, ParidadeRj, SolicitacaoCorte)
 from app.services import auditoria
 
 from .plano import LibP, Plano
@@ -23,6 +23,10 @@ TABELAS_OPERACIONAIS = ("notificacao", "divergencia_recebimento", "cadastro_sa",
                         "nf_transferencia", "corte_itu", "liberacao_corte", "solicitacao_corte", "entrada_nf_item",
                         "entrada_nf", "movimento", "destinacao", "nota", "pendencia_mega", "paridade_rj",
                         "pedido_a_chegar", "lote", "conteiner", "item_mp")
+
+
+# A planilha de SA não diz qual das duas empresas do RJ emitiu a NF (Fio Certo ou Médio Vale)
+EMITENTE_CARGA = "FIO_CERTO/MEDIO_VALE (planilha)"
 
 
 class CargaRecusada(Exception):
@@ -134,11 +138,14 @@ def gravar(db: Session, pl: Plano, *, usuario_id: int | None, arquivos: dict[str
             db.add(lib)
             libs[id(lp)] = lib
     db.flush()
+    itens_cop: dict[int, CopItem] = {}
     for sp in pl.solicitacoes:
         for lp in sp.liberacoes:
             if lp.cop and lp.situacao_item:
-                db.add(CopItem(cop_id=cops[lp.cop].id, liberacao_id=libs[id(lp)].id, situacao=lp.situacao_item,
-                               recebido_em=_ts(lp.data) if lp.situacao_item == "RECEBIDO" else None))
+                itens_cop[id(lp)] = CopItem(cop_id=cops[lp.cop].id, liberacao_id=libs[id(lp)].id,
+                                            situacao=lp.situacao_item,
+                                            recebido_em=_ts(lp.data) if lp.situacao_item == "RECEBIDO" else None)
+                db.add(itens_cop[id(lp)])
     db.flush()
 
     # movimentos (imutáveis) e saldo
@@ -178,7 +185,21 @@ def gravar(db: Session, pl: Plano, *, usuario_id: int | None, arquivos: dict[str
         db.add(ParidadeRj(descricao_rj=d, item_mp_id=itens[p["item_mp"]].id if p["item_mp"] in itens else None,
                           confirmada=False))
 
-    # SAs históricos
+    # SAs históricos. R036 (4): a NF de transferência da planilha de SA vai para o SA e, quando o SA é da mesma
+    # OP + contêiner de um corte com COP, também para o item do COP (e o SA fica ligado a esse item).
+    nfs: dict[str, NfTransferencia] = {}
+    usados: set[int] = set()
+
+    def _nf(extras: dict) -> NfTransferencia | None:
+        for k, v in extras.items():
+            ku = str(k).upper()
+            if ("FIOCERTO" in ku or "MEDIO VALE" in ku) and "TRANSF" not in ku and v not in (None, "", "-"):
+                num = str(int(v)) if isinstance(v, int | float) else str(v).strip()[:20]
+                if num not in nfs:
+                    nfs[num] = NfTransferencia(numero=num, emitente=EMITENTE_CARGA)
+                    db.add(nfs[num])
+                return nfs[num]
+        return None
     for sp in pl.sas:
         x = sp.linha
         dt = x.data if x.data and x.data.year >= 2010 else date(int(x.origem["aba"]), 1, 1)
@@ -187,7 +208,20 @@ def gravar(db: Session, pl: Plano, *, usuario_id: int | None, arquivos: dict[str
             extra["sa_codigo_texto"] = x.sa_codigo_texto
             if "INAT" in x.sa_codigo_texto.upper():
                 extra["inativo_na_planilha"] = True
+        nf = _nf(x.extras)
+        item_cop = None
+        if sp.solicitacao is not None:
+            cand = [itens_cop[id(lp)] for lp in sp.solicitacao.liberacoes if id(lp) in itens_cop]
+            if len(cand) == 1 and id(cand[0]) not in usados:
+                item_cop = cand[0]
+                usados.add(id(item_cop))
+        if nf is not None:
+            db.flush()
+            if item_cop is not None and item_cop.nf_id is None:
+                item_cop.nf_id = nf.id
         db.add(CadastroSa(origem="CARGA", situacao="CONFIRMADO", data=dt, op=x.op, item_codigo=x.item,
+                          nf_id=nf.id if nf is not None else None,
+                          cop_item_id=item_cop.id if item_cop is not None else None,
                           cliente=x.cliente, pedido=(x.pedido or None) and str(x.pedido)[:40],
                           material=(x.material or "")[:60] or None, dimensao=(x.dimensao or "")[:60] or None,
                           conteiner=(x.origem_ct or "")[:30] or None, quantidade=x.qtde, peso_kg=x.peso,

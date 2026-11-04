@@ -204,6 +204,9 @@ def estornar(db: Session, mov_id: int, justificativa: str, *, usuario: Usuario, 
         raise NaoEncontrado("Movimento não encontrado.")
     if m.tipo == "ESTORNO" or m.estorno_de_id:
         raise ErroNegocio("Um estorno não pode ser estornado.")
+    if m.origem_ref is not None:
+        raise ErroNegocio("Movimento da carga inicial não é estornável: se estiver errado, corrija com um ajuste "
+                          "de inventário (T18).")
     if db.scalar(select(Movimento.id).where(Movimento.estorno_de_id == m.id)):
         raise ErroNegocio("Este movimento já foi estornado.")
     if so_rj_no_rio(usuario) and m.usuario_id != usuario.id:

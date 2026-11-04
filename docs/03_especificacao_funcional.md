@@ -1,6 +1,6 @@
 # EstoqueACK — Especificação Funcional Completa
 
-Versão 3.3, 04/11/2026. A 3.3 registra as respostas do Fabiano ao BLOCO 1 da carga (§10.7: paridade sem múltiplo, material só do RJ sem código, kardex de 2 anos para códigos fora do catálogo). A 3.2 registra as decisões do Eduardo de 04/11 (T16 mínima e impressão da Fila RJ na F1; depois da implantação, planilhas só para conferência semanal, §10.6; sem data de implantação), as colunas da lista de corte impressa (R037), as interpretações da carga (R032, §10.7) e os pontos do R024 já decididos. A 3.1 registra as leituras do Mega confirmadas no R026 (situação da OP, SA pela estrutura da OP, confirmação do SA, NCM/IPI). A v3 incorpora as **respostas do Eduardo às perguntas P01–P18** (arquivo "Questões IA.xlsx", 2026-11-03) e as respostas do FUNCIONAL aos pedidos R003–R009, R014 e R017. A v2 tinha incorporado a conferência com as planilhas (`04_conferencia_planilhas_x_fluxo.md`) e as regras do Matheus. **Sem data fixa de implantação [P08]:** o sistema entra quando os critérios de go/no-go forem atendidos e o Eduardo liberar. Este documento descreve o sistema **como se ele já estivesse funcionando**: o que cada tela faz, quais botões existem, de onde vem cada informação e o que acontece no banco de dados a cada ação. Ele complementa `02_proposta_arquitetura.md`, que trata da parte técnica.
+Versão 3.3, 04/11/2026. A 3.3 registra as respostas do Fabiano ao BLOCO 1 da carga (§10.7: paridade sem múltiplo, material só do RJ sem código, kardex de 2 anos para códigos fora do catálogo). A 3.2 registra as decisões do Eduardo de 04/11 (T16 mínima e impressão da Fila RJ na F1; depois da implantação, planilhas só para conferência semanal, §10.6; sem data de implantação), as colunas da lista de corte impressa (R037), as interpretações da carga (R032, §10.7) e o R024 completo (perda de corte normal: até 6 % do material usado). A 3.1 registra as leituras do Mega confirmadas no R026 (situação da OP, SA pela estrutura da OP, confirmação do SA, NCM/IPI). A v3 incorpora as **respostas do Eduardo às perguntas P01–P18** (arquivo "Questões IA.xlsx", 2026-11-03) e as respostas do FUNCIONAL aos pedidos R003–R009, R014 e R017. A v2 tinha incorporado a conferência com as planilhas (`04_conferencia_planilhas_x_fluxo.md`) e as regras do Matheus. **Sem data fixa de implantação [P08]:** o sistema entra quando os critérios de go/no-go forem atendidos e o Eduardo liberar. Este documento descreve o sistema **como se ele já estivesse funcionando**: o que cada tela faz, quais botões existem, de onde vem cada informação e o que acontece no banco de dados a cada ação. Ele complementa `02_proposta_arquitetura.md`, que trata da parte técnica.
 
 As decisões estão marcadas como **[P01]**, **[P02]** etc. e reunidas no fim (§12), já com a resposta.
 
@@ -529,7 +529,7 @@ Quem usa: Fabiano e Matheus. Vale para lotes **RJ em Itu** (peças inteiras e so
 | Consumo da OP (kg) | [DIGITADO], balança | Regra dos 5 % sobre o peso previsto da solicitação (bitola + sobremetal). Acima → justificativa (ex.: desvio de serra) |
 | Sobra (kg) | [DIGITADO], balança | 0 se não houver |
 | A sobra mantém a bitola original? | [DIGITADO] Sim / Não | Não → cria lote RETO |
-| Perda de corte | [CALC] material usado − consumo − sobra | Amarelo ("estou ciente") se passar da perda esperada (§9). **A tolerância está em aberto [R024]:** a regra atual (serra 3 mm × seção + 50 %) dá ≈ 1,5 kg num 70×610, e o Eduardo/Matheus vão informar quantos kg são normais |
+| Perda de corte | [CALC] material usado − consumo − sobra | Amarelo ("estou ciente" com justificativa) se passar de **6 % do peso do material usado** (`PERDA_CORTE_MAX_PCT`, T23). Decisão do Eduardo, 2026-11-04 **[R024]**. Ex.: barra de 1.288 kg → até 77,3 kg de perda é normal |
 | Reservas/restrições do lote | [LOTE] | Amarelo, exige "estou ciente" |
 
 O sistema mostra o resultado antes de gravar. Exemplo: "Lote L-000451 passa de 1.288,0 kg para 0 kg. Novo lote RETO L-000452 com 446,0 kg, origem H13 70×610 / CH25K."
@@ -681,7 +681,7 @@ Já existe. Formato (retangular / redondo / anel), liga, medidas e quantidade d�
   | Horários da sincronização Mega | 6h e 13h **[P04]** |
   | Limite de divergência Mega (T03, T16) | 5 kg por código **[R008]** |
   | Lote sem movimento (giro, T19) | 180 dias **[R008]** |
-  | Margem da perda de corte (PERDA_CORTE_ALTA) | 50 % acima da perda esperada de serra **[R008]** |
+  | Perda de corte máxima normal (`PERDA_CORTE_MAX_PCT`) | 6 % do peso do material usado (substitui a "margem de 50 % sobre a serra" do R008) **[R024]** |
   | Intervalo de verificação de SA aguardando Mega | 30 min **[R008]** |
   | Aviso de reserva vencendo | 7 dias antes **[R008]** |
 
@@ -770,7 +770,7 @@ Se o Mega estiver fora do ar, o sistema continua funcionando. Os campos [MEGA] p
 | SA_CODIGO_TROCADO | T14 | Justificativa | Código de SA diferente do já usado para o item da peça acabada |
 | ABAIXO_PREVISTO | T10, T13 | Aviso | Peso real mais de 20 % abaixo do previsto |
 | SOMA_MAIOR_QUE_LOTE | T13 | Bloqueia | Consumo + sobra maior que o peso do lote |
-| PERDA_CORTE_ALTA | T13 | Justificativa | Perda maior que a perda esperada de serra (3 mm × seção × densidade) mais a margem |
+| PERDA_CORTE_ALTA | T13 | Justificativa | Perda (material usado − consumo − sobra) maior que **6 %** do peso do material usado (`PERDA_CORTE_MAX_PCT`) **[R024]** |
 | DIVERGENCIA_TRANSPORTE | T12 | Justificativa | Peso conferido em Itu diferente do enviado em mais de 2 % |
 | NF_DUPLICADA | T06 | Bloqueia | NF + fornecedor já lançados |
 | LIGA_DIFERENTE | T07, T10 | T07: "Estou ciente"; T10: Bloqueia | Lote de outra liga que não é equivalente à pedida **[R024]** |

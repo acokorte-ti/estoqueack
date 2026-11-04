@@ -7,8 +7,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from app.api.routes import (auth, calculadora, cops, ligas, lotes, mega, notificacoes, operacoes, painel, saude,
-                            solicitacoes, usuarios)
+from app.api.routes import (auth, calculadora, cops, exportar, ligas, lotes, mega, notificacoes, operacoes, painel,
+                            saude, solicitacoes, usuarios)
 from app.core.config import get_config
 from app.core.db import SessionLocal
 from app.services.auth import garantir_admin_inicial
@@ -38,7 +38,7 @@ def criar_app() -> FastAPI:
     )
     for r in (saude.router, auth.router, usuarios.router, ligas.router, calculadora.router, painel.router,
               lotes.router, mega.router, solicitacoes.router, notificacoes.router, cops.router,
-              operacoes.router):
+              operacoes.router, painel.router_conciliacao, exportar.router):
         app.include_router(r, prefix="/api")
 
     @app.exception_handler(ErroNegocio)

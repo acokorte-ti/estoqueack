@@ -79,6 +79,9 @@ export default function Sas() {
 
   const itens = lista?.itens ?? [];
   const selecionados = itens.filter((i) => sel.includes(i.id));
+  const fAtual = FILTROS.find((x) => x.chave === filtro)!;
+  const exportarHref = `/api/exportar/sas.xlsx${qs(sel.length ? { ids: sel } : { situacao: fAtual.situacao, op: num(opFiltro), cop: copFiltro ?? undefined,
+    origem: historico ? ["COP", "CORTE_ITU", "CARGA"] : undefined })}`;
   const alternar = (id: number) => setSel(sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]);
 
   async function acao(fn: () => Promise<string>) {
@@ -153,9 +156,16 @@ export default function Sas() {
         {copFiltro && <span className="etiqueta info">Só o COP {copFiltro}</span>}
       </div>
 
+      {!altera && (
+        <div className="barra-acoes">
+          <span className="contagem">{lista?.total ?? 0} pedido(s)</span>
+          <a className="secundario" href={exportarHref} download>Exportar para Excel</a>
+        </div>
+      )}
       {altera && (
         <div className="barra-acoes">
           <span className="contagem">{sel.length ? `${sel.length} selecionado(s)` : `${lista?.total ?? 0} pedido(s)`}</span>
+          <a className="secundario" href={exportarHref} download>{sel.length ? "Exportar pedidos selecionados" : "Exportar para Excel"}</a>
           <button className="secundario" disabled={!sel.length || ocupado} onClick={() => void preparar()}>Marcar como preparado</button>
           <button className="secundario" disabled={!selB2.length || ocupado} onClick={() => setNfAberta(true)} title="Só para linhas de corte em Itu (B2)">
             Informar NF (corte em Itu)

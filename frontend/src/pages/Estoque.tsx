@@ -29,12 +29,14 @@ export default function Estoque() {
   const [grupos, setGrupos] = useState<Pagina<Agrupado> | null>(null);
   const [erro, setErro] = useState("");
 
-  const filtros = useCallback(() => qs({
+  const base = useCallback(() => ({
     estoque: estoque || undefined, liga: f.liga.trim(), formato: f.formato, conteiner: f.conteiner.trim(), codigo_mega: num(f.codigo_mega),
     busca: f.busca.trim(), espessura_de: num(f.esp_de), espessura_ate: num(f.esp_ate), largura_de: num(f.lar_de), largura_ate: num(f.lar_ate),
     diametro_de: num(f.dia_de), diametro_ate: num(f.dia_ate), com_saldo: f.com_saldo, com_destinacao: f.com_destinacao || undefined,
-    origem_nao_identificada: f.origem_nao_identificada || undefined, pagina: pag, por_pagina: 50,
-  }), [estoque, f, pag]);
+    origem_nao_identificada: f.origem_nao_identificada || undefined,
+  }), [estoque, f]);
+  const filtros = useCallback(() => qs({ ...base(), pagina: pag, por_pagina: 50 }), [base, pag]);
+  const exportar = `/api/exportar/${visao === "lote" ? "lotes" : "lotes-agrupado"}.xlsx${qs(base())}`;
 
   useEffect(() => {
     const t = window.setTimeout(async () => {
@@ -106,6 +108,7 @@ export default function Estoque() {
           <button type="button" className="chip" aria-pressed={visao === "lote"} onClick={() => { setVisao("lote"); setPag(1); }}>Por lote</button>
           <button type="button" className="chip" aria-pressed={visao === "item"} onClick={() => { setVisao("item"); setPag(1); }}>Agrupado por item</button>
         </div>
+        <a className="secundario" href={exportar} download>Exportar para Excel</a>
       </div>
 
       {erro && <p className="erro" role="alert">{erro}</p>}

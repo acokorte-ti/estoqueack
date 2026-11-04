@@ -28,12 +28,15 @@ export default function Solicitacoes() {
   const [r, setR] = useState<Pagina | null>(null);
   const [erro, setErro] = useState("");
 
+  const g = GRUPOS.find((x) => x.chave === grupo)!;
+  const base = { situacao: g.situacao, op: f.op.trim(), cliente: f.cliente.trim(), liga: f.liga.trim(),
+    conteiner: f.conteiner.trim(), de: f.de, ate: f.ate, somente_atrasadas: f.somente_atrasadas || undefined };
+  const exportar = `/api/exportar/solicitacoes.xlsx${qs(base)}`;
+
   const carregar = useCallback(async () => {
     setErro("");
-    const g = GRUPOS.find((x) => x.chave === grupo)!;
     try {
-      setR(await api.get<Pagina>(`/solicitacoes${qs({ situacao: g.situacao, op: f.op.trim(), cliente: f.cliente.trim(), liga: f.liga.trim(),
-        conteiner: f.conteiner.trim(), de: f.de, ate: f.ate, somente_atrasadas: f.somente_atrasadas || undefined, pagina: pag, por_pagina: 50 })}`));
+      setR(await api.get<Pagina>(`/solicitacoes${qs({ ...base, pagina: pag, por_pagina: 50 })}`));
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível carregar as solicitações.");
     }
@@ -54,7 +57,10 @@ export default function Solicitacoes() {
           <h1>Solicitações de corte</h1>
           <p>Todas as solicitações, do rascunho até a conclusão. Clique numa linha para ver o detalhe e as ações.</p>
         </div>
-        {podeCriar && <Link className="primario" to="/solicitacoes/nova">Nova solicitação</Link>}
+        <div className="botoes">
+          <a className="secundario" href={exportar} download>Exportar para Excel</a>
+          {podeCriar && <Link className="primario" to="/solicitacoes/nova">Nova solicitação</Link>}
+        </div>
       </header>
 
       <div className="chips" role="group" aria-label="Situação" style={{ marginBottom: "var(--esp-4)" }}>

@@ -315,6 +315,20 @@ tr.linha-aviso .validacao { margin: 0 0 var(--esp-2); font-size: var(--t-pequeno
 .fazer-mega { border-left: 5px solid var(--estoque-mega); }
 .validacao.ok > span + span { margin-top: 4px; }
 
+/* Painel: pendências */
+.pendencias { display: flex; flex-direction: column; gap: var(--esp-4); margin-bottom: var(--esp-4); }
+.pendencias-resumo { display: flex; flex-wrap: wrap; gap: var(--esp-2); align-items: center; }
+.pendencias-resumo a.etiqueta { text-decoration: none; }
+.pendencias-grupo h2 { margin-bottom: var(--esp-3); }
+.cartoes-pendencia { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); gap: var(--esp-3); }
+.pendencia { background: var(--branco); border: 1px solid var(--aco-linha); border-left: 5px solid var(--aco-grafite); border-radius: var(--raio-painel); padding: var(--esp-4); display: flex; flex-direction: column; gap: var(--esp-2); }
+.pendencia.alerta { border-left-color: var(--ack-vermelho); }
+.pendencia-topo { display: flex; align-items: baseline; gap: var(--esp-3); color: var(--aco-preto); font-weight: 700; }
+.pendencia-topo .numero { font-size: 2rem; line-height: 1; }
+.pendencia.alerta .pendencia-topo .numero { color: var(--ack-vermelho-escuro); }
+.pendencia-itens { list-style: none; margin: 0; padding: 0; font-size: var(--t-pequeno); display: flex; flex-direction: column; gap: 2px; }
+.pendencia .secundario { align-self: flex-start; margin-top: auto; }
+
 /* ===================== Impressão (A4, sem menu) ===================== */
 .so-impressao { display: none; }
 @media print {

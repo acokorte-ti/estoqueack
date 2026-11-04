@@ -23,6 +23,7 @@ const OPERACAO: Item[] = [
   { para: "/recebimentos", rotulo: "Receber COP", pronto: true, perfis: ACESSO.receberCop },
   { para: "/corte-itu", rotulo: "Corte em Itu", pronto: true, perfis: ACESSO.corteItu },
   { para: "/sa", rotulo: "SA", pronto: true, perfis: ACESSO.sa },
+  { para: "/conciliacao", rotulo: "Conciliação com o Mega", pronto: true, perfis: ACESSO.conciliacao },
   { para: "/relatorios", rotulo: "Relatórios" },
   { para: "/calculadora", rotulo: "Calculadora de peso", pronto: true },
 ];

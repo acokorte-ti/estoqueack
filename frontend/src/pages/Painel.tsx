@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api, kg } from "../api/cliente";
 import { useSessao } from "../api/sessao";
 import SyncMega from "../components/SyncMega";
+import Pendencias from "../components/Pendencias";
 
 interface Resumo {
   baldes: Record<"ESTOQUE_MEGA" | "RJ_NO_RIO" | "RJ_EM_ITU", { lotes: number; kg: number }>;
@@ -34,8 +35,10 @@ export default function Painel() {
       </header>
 
       <SyncMega />
+      <Pendencias />
 
       {erro && <p className="erro">{erro}</p>}
+      <h2 style={{ margin: "var(--esp-6) 0 var(--esp-3)" }}>Estoque</h2>
 
       <section className="barra-estoque" aria-label="Distribuição do estoque">
         <div className="barra-total">

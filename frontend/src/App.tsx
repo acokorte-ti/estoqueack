@@ -25,6 +25,7 @@ import Estoque from "./pages/Estoque";
 import LoteDetalhe from "./pages/LoteDetalhe";
 import EntradasNf from "./pages/EntradasNf";
 import Parametros from "./pages/Parametros";
+import Conciliacao from "./pages/Conciliacao";
 
 /** Links antigos/notificações no formato /lotes/:id abrem o detalhe do lote. */
 function RedirecionaLote() {
@@ -74,7 +75,8 @@ export default function App() {
         <Route path="recebimentos/:id" element={<Protegido perfis={ACESSO.receberCop}><ReceberCop /></Protegido>} />
         <Route path="sa" element={<Protegido perfis={ACESSO.sa}><Sas /></Protegido>} />
         <Route path="consumo" element={<EmBreve titulo="Consumo, sobra e RETO" fase="Fase 2" />} />
-        <Route path="relatorios" element={<EmBreve titulo="Relatórios" fase="Fase 4" />} />
+        <Route path="relatorios/*" element={<EmBreve titulo="Relatórios" fase="F1.1 (o resumo de exceções aparece no Painel do Renato e no sino)" />} />
+        <Route path="conciliacao" element={<Protegido perfis={ACESSO.conciliacao}><Conciliacao /></Protegido>} />
         <Route path="admin/usuarios" element={<Protegido admin><Usuarios /></Protegido>} />
         <Route path="admin/ligas" element={<Protegido admin><Ligas /></Protegido>} />
       </Route>

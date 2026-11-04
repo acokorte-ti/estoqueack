@@ -70,7 +70,8 @@ def rodar(db: Session, agora_local: datetime | None = None) -> dict[str, int]:
             ini = datetime(ontem.year, ontem.month, ontem.day, tzinfo=TZ).astimezone(timezone.utc)
             fim = ini + timedelta(days=1)
             qtd = sum(1 for m in db.scalars(select(Movimento).where(Movimento.criado_em >= ini,
-                                                                    Movimento.criado_em < fim))
+                                                                    Movimento.criado_em < fim,
+                                                                    Movimento.origem_ref.is_(None)))  # fora a carga
                       if m.confirmacoes or m.tipo in ("AJUSTE_INVENTARIO", "ESTORNO"))
             if qtd:
                 notificar(db, perfis=("ADMIN",), tipo="RESUMO_EXCECOES", link=link,

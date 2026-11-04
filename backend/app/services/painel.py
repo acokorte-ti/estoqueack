@@ -158,7 +158,7 @@ def excecoes_da_semana(db: Session, dias: int = 7) -> list[dict]:
     desde = agora() - timedelta(days=dias)
     out = []
     for m, nome in db.execute(select(Movimento, Usuario.nome).outerjoin(Usuario, Movimento.usuario_id == Usuario.id)
-                              .where(Movimento.criado_em >= desde,
+                              .where(Movimento.criado_em >= desde, Movimento.origem_ref.is_(None),  # fora a carga
                                      or_(Movimento.confirmacoes.is_not(None),
                                          Movimento.tipo.in_(("AJUSTE_INVENTARIO", "ESTORNO"))))
                               .order_by(Movimento.id.desc())):

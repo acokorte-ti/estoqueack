@@ -157,3 +157,11 @@ def test_fila_e_cortes_prontos_depois_da_carga(base, tmp_path):
     fila = base.get("/api/fila-rj").json()
     assert [f["op"] for f in fila] == [100664] and fila[0]["reserva_kg"] > 0
     assert base.get("/api/cops/cortes-prontos").json() == []          # o corte histórico já está no COP 600
+
+def test_carga_nao_conta_como_excecao(base, tmp_path):
+    from app.core.db import SessionLocal
+    from app.services import painel
+    _planilhas(tmp_path)
+    _rodar(tmp_path)
+    with SessionLocal() as db:
+        assert painel.excecoes_da_semana(db) == []

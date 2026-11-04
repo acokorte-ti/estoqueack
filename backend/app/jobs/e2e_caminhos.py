@@ -156,24 +156,38 @@ def escolher_lote(db, pf: str, lf: str, minimo: float, exceto: set[int], *, reta
 
 
 def escolher_ops(db, gateway, n: int, informadas: list[int]) -> list[int]:
-    """OPs reais abertas (AB). Primeiro as informadas; senão, as mais recentes da carga."""
+    """OPs reais abertas (AB) para A, B, B2 (estrutura com SA = material RJ) e C (estrutura com MP = material Itu).
+    Primeiro as informadas; senão, as mais recentes da carga. Ensaio de 04/11: a 1ª versão pegou para o B2 uma OP de
+    material Itu (sem SA na estrutura nem no histórico) e o caminho parou no código do SA."""
+    if informadas:
+        return informadas[:n]
+    com_sa: list[int] = []
+    com_mp: list[int] = []
+    for op in _candidatas(db):
+        o = gateway.ordem_producao(op)
+        if o is None or o.situacao != "AB" or not o.item_codigo:
+            continue
+        tipos = {c.tipo for c in gateway.estrutura_op(op)}
+        if "SA" in tipos and len(com_sa) < n - 1:
+            com_sa.append(op)
+        elif "MP" in tipos and not com_mp:
+            com_mp.append(op)
+        if len(com_sa) == n - 1 and com_mp:
+            return com_sa + com_mp
+    raise Falha(f"OPs abertas insuficientes: {len(com_sa)} de material RJ e {len(com_mp)} de material Itu")
+
+
+def _candidatas(db) -> list[int]:
     from sqlalchemy import select
 
     from app.models import CadastroSa, SolicitacaoCorte
-    candidatas = list(informadas) + [o for (o,) in db.execute(
-        select(SolicitacaoCorte.op).distinct().order_by(SolicitacaoCorte.op.desc()).limit(300))] + [
-        o for (o,) in db.execute(select(CadastroSa.op).where(CadastroSa.op.is_not(None)).distinct()
-                                 .order_by(CadastroSa.op.desc()).limit(300))]
-    escolhidas: list[int] = []
-    for op in candidatas:
-        if op in escolhidas:
-            continue
-        o = gateway.ordem_producao(op)
-        if o is not None and o.situacao == "AB" and o.item_codigo:
-            escolhidas.append(op)
-        if len(escolhidas) == n:
-            return escolhidas
-    raise Falha(f"só {len(escolhidas)} OPs abertas encontradas para o teste")
+    vistas: list[int] = []
+    for (op,) in list(db.execute(select(SolicitacaoCorte.op).distinct().order_by(SolicitacaoCorte.op.desc())
+                                 .limit(300))) + list(db.execute(select(CadastroSa.op).where(CadastroSa.op.is_not(None))
+                                                                 .distinct().order_by(CadastroSa.op.desc()).limit(300))):
+        if op not in vistas:
+            vistas.append(op)
+    return vistas
 
 
 def medida_para(lote) -> dict:

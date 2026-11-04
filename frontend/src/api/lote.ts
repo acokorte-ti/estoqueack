@@ -19,6 +19,8 @@ export interface Movimento {
   id: number; data: string; tipo: string; tipo_descricao: string; kg: number; saldo_apos_kg: number;
   op: number | null; cop: number | null; sa: number | null; documento: string | null; usuario: string | null;
   justificativa: string | null; estorno_de: number | null;
+  /** R036: a API diz se aceita estorno (carga, corte RJ já em COP e já estornado = false). */
+  estornavel?: boolean; da_carga?: boolean;
 }
 
 export interface Destinacao { id: number; tipo: "RESERVA" | "RESTRICAO"; descricao: string; kg: number | null; validade: string | null; criado_por: string | null; criado_em: string }

@@ -155,13 +155,13 @@ export default function LoteDetalhe() {
                 {movs.itens.map((m) => (
                   <tr key={m.id}>
                     <td>{data(m.data)}</td>
-                    <td>{m.tipo_descricao}{m.estorno_de && <><br /><span className="etiqueta">estorno do mov. {m.estorno_de}</span></>}</td>
+                    <td>{m.tipo_descricao}{m.da_carga && <> <span className="etiqueta" title="Veio da carga das planilhas. Para corrigir, use Ajustar saldo.">da carga</span></>}{m.estorno_de && <><br /><span className="etiqueta">estorno do mov. {m.estorno_de}</span></>}</td>
                     <td className={`num ${m.kg < 0 ? "negativo" : "positivo"}`}>{m.kg > 0 ? "+" : ""}{kg(m.kg)}</td>
                     <td className="num">{kg(m.saldo_apos_kg)}</td>
                     <td>{[m.op && `OP ${m.op}`, m.cop && `COP ${m.cop}`, m.sa && `SA ${m.sa}`].filter(Boolean).join(" · ") || "—"}</td>
                     <td className="desc">{m.documento ?? "—"}</td>
                     <td>{m.usuario ?? "—"}{m.justificativa && <><br /><span className="desc">{m.justificativa}</span></>}</td>
-                    <td className="acoes">{pode.estorno && !m.estorno_de && m.tipo !== "SALDO_INICIAL" && <button className="link" onClick={() => setAcao({ estornar: m })}>Estornar</button>}</td>
+                    <td className="acoes">{pode.estorno && (m.estornavel ?? (!m.estorno_de && m.tipo !== "SALDO_INICIAL")) && <button className="link" onClick={() => setAcao({ estornar: m })}>Estornar</button>}</td>
                   </tr>
                 ))}
               </tbody>

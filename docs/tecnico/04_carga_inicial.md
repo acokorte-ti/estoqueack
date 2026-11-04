@@ -28,7 +28,7 @@ docker compose exec -T api python -m app.carga --pasta /tmp/carga/planilhas --sa
 docker cp estoqueack-api-1:/tmp/carga/relatorios/. ~/estoqueack-carga/relatorios/
 ```
 
-- **Produção (13/11):** mesma sequência com as planilhas congeladas e o saldo do Mega do dia. Com `APP_ENV=prod`, a limpeza exige também `--confirmo-producao`. Faça um backup manual antes (`deploy/backup/backup.sh`).
+- **Produção (dia da implantação):** mesma sequência com as planilhas congeladas e o saldo do Mega do dia. Com `APP_ENV=prod`, a limpeza exige também `--confirmo-producao`. Faça um backup manual antes (`deploy/backup/backup.sh`).
 - **Estrutura mudou:** se alguma aba ou coluna não estiver onde estava em 28/10–03/11, a carga **para** (código de saída 2) e diz o que mudou. Não adaptar sem falar com a COORDENAÇÃO.
 - **Limpeza:** `TRUNCATE` das tabelas operacionais (lotes, movimentos, solicitações, cortes, COPs, NFs, SAs, entradas, reservas, notas, paridade, notificações, catálogo de itens e contêineres). Ficam: usuários, auditoria, ligas, equivalências, parâmetros e o cache do Mega. Tudo numa transação: se der erro, nada muda. Cada carga grava um registro `CARGA_INICIAL` na auditoria.
 

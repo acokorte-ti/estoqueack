@@ -2,6 +2,8 @@ import type { Perfil } from "./cliente";
 
 /** Matriz perfil × tela (especificação §4.1). A API aplica a mesma regra; aqui serve para o menu e as rotas. */
 export const ACESSO = {
+  estoque: ["ESTOQUE", "OPERACAO_RJ", "ANALISE", "ADMIN"],      // T04/T05 (RJ só RJ no Rio, a API filtra)
+  entradaNf: ["OPERACAO_RJ", "ESTOQUE", "ANALISE", "ADMIN"],    // T06 (só RJ e Admin lançam)
   novaSolicitacao: ["ESTOQUE", "ADMIN"],                        // T07
   solicitacoes: ["ESTOQUE", "OPERACAO_RJ", "ANALISE", "ADMIN"], // T08 (RJ e Análise só consultam)
   filaRj: ["OPERACAO_RJ", "ESTOQUE", "ADMIN"],                  // T09 (Itu só consulta)

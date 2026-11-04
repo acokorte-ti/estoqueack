@@ -294,9 +294,45 @@ tr.selecionada td { background: #f4f4f4; }
 .tabela-clicavel tbody tr { cursor: pointer; }
 .janela.larga { width: min(46rem, calc(100vw - 2rem)); }
 .cartao.inativo { opacity: 0.7; }
+tr.com-aviso td { border-bottom: none; }
+tr.linha-aviso td { padding-top: 0; height: auto; }
+tr.linha-aviso .validacao { margin: 0 0 var(--esp-2); font-size: var(--t-pequeno); }
 .cartoes-lista { grid-template-columns: 1fr; }
+.secao { margin-top: var(--esp-6); }
+.secao > h2 { margin-bottom: var(--esp-3); }
+.saldos { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: var(--esp-4); margin-bottom: var(--esp-4); }
+.saldos > div { display: flex; flex-direction: column; }
+.saldos .numero { font-size: 1.75rem; }
+.lista-simples { list-style: none; margin: 0 0 var(--esp-3); padding: 0; display: flex; flex-direction: column; gap: var(--esp-2); }
+.lista-simples li { background: var(--branco); border: 1px solid var(--aco-linha); border-radius: var(--raio); padding: var(--esp-2) var(--esp-3); }
+.arvore, .arvore ul { list-style: none; margin: 0; padding-left: var(--esp-5); }
+.arvore { padding-left: 0; }
+.arvore li { margin: var(--esp-1) 0; }
+.arvore ul { border-left: 2px solid var(--aco-linha); margin-left: var(--esp-2); }
+.arvore .no.atual { background: #ececec; padding: 2px 6px; border-radius: 3px; }
+.tabela td.negativo { color: var(--bloqueio); }
+.tabela td.positivo { color: var(--sucesso); }
 .fazer-mega { border-left: 5px solid var(--estoque-mega); }
 .validacao.ok > span + span { margin-top: 4px; }
+
+/* ===================== Impressão (A4, sem menu) ===================== */
+.so-impressao { display: none; }
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  :root, body { background: #fff; font-size: 10pt; }
+  .topo, .lateral, .fundo-menu, .nao-imprimir, .rodape-acao, .sino, dialog { display: none !important; }
+  .moldura { display: block; min-height: 0; }
+  .conteudo { padding: 0; max-width: none; }
+  .so-impressao { display: block; }
+  .lista-corte-cabeca { display: flex; gap: 6mm; align-items: center; border-bottom: 2px solid #000; padding-bottom: 3mm; margin-bottom: 3mm; }
+  .lista-corte-cabeca h1 { font-size: 16pt; }
+  .lista-corte table { width: 100%; border-collapse: collapse; }
+  .lista-corte th, .lista-corte td { border: 1px solid #555; padding: 1.5mm 2mm; text-align: left; vertical-align: top; color: #000; }
+  .lista-corte th { background: #e6e6e6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size: 9pt; }
+  .lista-corte tr { break-inside: avoid; }
+  .lista-corte thead { display: table-header-group; }
+  .lista-corte td.em-branco { width: 22mm; }
+}
 
 /* Sincronização com o Mega */
 .sync-mega { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-3); margin-bottom: var(--esp-5); }

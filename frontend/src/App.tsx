@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { useSessao } from "./api/sessao";
 import type { Perfil } from "./api/cliente";
 import Layout from "./components/Layout";
@@ -21,6 +21,16 @@ import Cops from "./pages/Cops";
 import CopDetalhe from "./pages/CopDetalhe";
 import { Recebimentos, ReceberCop } from "./pages/Recebimentos";
 import CorteItu from "./pages/CorteItu";
+import Estoque from "./pages/Estoque";
+import LoteDetalhe from "./pages/LoteDetalhe";
+import EntradasNf from "./pages/EntradasNf";
+import Parametros from "./pages/Parametros";
+
+/** Links antigos/notificações no formato /lotes/:id abrem o detalhe do lote. */
+function RedirecionaLote() {
+  const { id } = useParams();
+  return <Navigate to={`/estoque/${id}`} replace />;
+}
 
 import { ACESSO } from "./api/acesso";
 
@@ -45,7 +55,11 @@ export default function App() {
       <Route element={<Protegido><Layout /></Protegido>}>
         <Route index element={<Painel />} />
         <Route path="calculadora" element={<Calculadora />} />
-        <Route path="estoque" element={<EmBreve titulo="Consulta de estoque" fase="Fase 1" />} />
+        <Route path="estoque" element={<Protegido perfis={ACESSO.estoque}><Estoque /></Protegido>} />
+        <Route path="estoque/:id" element={<Protegido perfis={ACESSO.estoque}><LoteDetalhe /></Protegido>} />
+        <Route path="lotes/:id" element={<RedirecionaLote />} />
+        <Route path="entradas-nf" element={<Protegido perfis={ACESSO.entradaNf}><EntradasNf /></Protegido>} />
+        <Route path="admin/parametros" element={<Protegido admin><Parametros /></Protegido>} />
         <Route path="solicitacoes" element={<Protegido perfis={ACESSO.solicitacoes}><Solicitacoes /></Protegido>} />
         <Route path="solicitacoes/nova" element={<Protegido perfis={ACESSO.novaSolicitacao}><NovaSolicitacao /></Protegido>} />
         <Route path="solicitacoes/:id" element={<Protegido perfis={ACESSO.solicitacoes}><SolicitacaoDetalhe /></Protegido>} />

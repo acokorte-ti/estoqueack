@@ -14,7 +14,8 @@ interface Item {
 
 const OPERACAO: Item[] = [
   { para: "/", rotulo: "Painel", pronto: true },
-  { para: "/estoque", rotulo: "Estoque por lote" },
+  { para: "/estoque", rotulo: "Consulta de estoque", pronto: true, perfis: ACESSO.estoque },
+  { para: "/entradas-nf", rotulo: "Entrada por NF", pronto: true, perfis: ACESSO.entradaNf },
   { para: "/solicitacoes/nova", rotulo: "Nova solicitação de corte", pronto: true, perfis: ACESSO.novaSolicitacao },
   { para: "/solicitacoes", rotulo: "Solicitações de corte", pronto: true, perfis: ACESSO.solicitacoes },
   { para: "/fila-rj", rotulo: "Fila RJ", pronto: true, perfis: ACESSO.filaRj },
@@ -29,6 +30,7 @@ const OPERACAO: Item[] = [
 const ADMIN: Item[] = [
   { para: "/admin/usuarios", rotulo: "Usuários", pronto: true },
   { para: "/admin/ligas", rotulo: "Ligas e densidades", pronto: true },
+  { para: "/admin/parametros", rotulo: "Parâmetros", pronto: true },
 ];
 
 function Lista({ itens }: { itens: Item[] }) {

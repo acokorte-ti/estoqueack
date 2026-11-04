@@ -32,10 +32,45 @@ export default function FilaRj() {
 
   return (
     <>
-      <header className="cabecalho">
-        <h1>Fila RJ</h1>
-        <p>Solicitações enviadas e parciais, da mais urgente para a menos urgente.</p>
+      <header className="cabecalho cabecalho-acao nao-imprimir">
+        <div>
+          <h1>Fila RJ</h1>
+          <p>Solicitações enviadas e parciais, da mais urgente para a menos urgente.</p>
+        </div>
+        {!!fila?.length && <button className="secundario" onClick={() => window.print()}>Imprimir lista de corte</button>}
       </header>
+
+      {/* Versão impressa (A4, sem menu): só aparece no papel */}
+      {fila && (
+        <section className="so-impressao lista-corte">
+          <div className="lista-corte-cabeca">
+            <img src="/logo-acokorte.png" alt="AçoKorte" width={150} height={30} />
+            <div>
+              <h1>Lista de corte · RJ</h1>
+              <p>Impressa em {new Date().toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })} · {fila.length} solicitação(ões), por prazo</p>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr><th>OP</th><th>Material · contêiner</th><th>Instrução de corte</th><th>Qtd</th><th>Prazo</th><th>Dias</th><th>Item · cliente</th><th>Peças cortadas</th><th>Peso real (kg)</th></tr>
+            </thead>
+            <tbody>
+              {fila.map((s) => (
+                <tr key={s.id}>
+                  <td><strong>{s.op}</strong></td>
+                  <td>{material(s.lote)}<br />{s.lote.conteiner ?? "—"}</td>
+                  <td><strong>{s.instrucao ?? `${s.quantidade} peça(s)`}</strong>{s.instrucao_processo && <><br />{s.instrucao_processo}</>}{s.modo === "TRAZER_INTEIRA" && <><br />(peça inteira)</>}</td>
+                  <td>{s.pecas_cortadas ? `${s.quantidade - s.pecas_cortadas} de ${s.quantidade}` : s.quantidade}</td>
+                  <td>{data(s.prazo)}</td>
+                  <td>{s.dias_em_aberto ?? "—"}{s.atraso === "ATRASADO" ? " !" : ""}</td>
+                  <td>{s.item_descricao ?? "—"}<br />{s.cliente ?? "—"}</td>
+                  <td className="em-branco" /><td className="em-branco" />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
       {erro && <p className="erro" role="alert">{erro}</p>}
       {aviso && <p className="validacao ok" role="status">{aviso}</p>}
 
@@ -43,7 +78,7 @@ export default function FilaRj() {
         <div className="estado-vazio"><strong>Fila vazia</strong>Nenhuma solicitação esperando corte no RJ.</div>
       )}
 
-      <ul className="cartoes">
+      <ul className="cartoes nao-imprimir">
         {fila?.map((s) => {
           const faltam = s.quantidade - s.pecas_cortadas;
           return (

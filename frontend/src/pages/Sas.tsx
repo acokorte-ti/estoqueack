@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, data, kg, num, qs, validacaoDoErro, type Validacao } from "../api/cliente";
 import { useSessao } from "../api/sessao";
@@ -15,6 +15,7 @@ interface Sa {
   sa_descricao: string | null; ncm: string | null; icms: string | null; ipi: string | null;
   nf: { numero: string; emitente: string } | null; cop: { id: number; numero: number; situacao: string } | null;
   exportado_renato_em: string | null; alterado_apos_exportar: boolean; atrasado: boolean;
+  avisos?: { codigo: string; nivel: string; mensagem: string }[];
 }
 interface CopResumo { id: number; numero: number; situacao: string; qtd_itens: number; peso_total_kg: number }
 interface Lista { itens: Sa[]; total: number; cops_aguardando_sa: CopResumo[] }
@@ -50,6 +51,8 @@ export default function Sas() {
   const copFiltro = params.get("cop");
   const [filtro, setFiltro] = useState("abertos");
   const [opFiltro, setOpFiltro] = useState("");
+  const [historico, setHistorico] = useState(false);
+  const [pag, setPag] = useState(1);
   const [lista, setLista] = useState<Lista | null>(null);
   const [sel, setSel] = useState<number[]>([]);
   const [erro, setErro] = useState("");
@@ -60,17 +63,19 @@ export default function Sas() {
     setErro("");
     const f = FILTROS.find((x) => x.chave === filtro)!;
     try {
-      const r = await api.get<Lista>(`/sas${qs({ situacao: f.situacao, op: num(opFiltro), cop: copFiltro ?? undefined })}`);
+      const r = await api.get<Lista>(`/sas${qs({ situacao: f.situacao, op: num(opFiltro), cop: copFiltro ?? undefined,
+        origem: historico ? ["COP", "CORTE_ITU", "CARGA"] : undefined, pagina: pag, por_pagina: 100 })}`);
       setLista(r);
       setSel((s) => s.filter((id) => r.itens.some((i) => i.id === id)));
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível carregar a fila de SA.");
     }
-  }, [filtro, opFiltro, copFiltro]);
+  }, [filtro, opFiltro, copFiltro, historico, pag]);
 
   useEffect(() => {
     void carregar();
   }, [carregar]);
+  useEffect(() => setPag(1), [filtro, opFiltro, historico]);
 
   const itens = lista?.itens ?? [];
   const selecionados = itens.filter((i) => sel.includes(i.id));
@@ -141,6 +146,10 @@ export default function Sas() {
           OP
           <input inputMode="numeric" value={opFiltro} onChange={(e) => setOpFiltro(e.target.value)} placeholder="todas" />
         </label>
+        <label className="marcar">
+          <input type="checkbox" checked={historico} onChange={(e) => setHistorico(e.target.checked)} />
+          <span>Incluir histórico da carga (planilha de SA)</span>
+        </label>
         {copFiltro && <span className="etiqueta info">Só o COP {copFiltro}</span>}
       </div>
 
@@ -174,7 +183,8 @@ export default function Sas() {
             </thead>
             <tbody>
               {itens.map((s) => (
-                <tr key={s.id} className={[s.atrasado ? "atrasado" : "", sel.includes(s.id) ? "selecionada" : ""].join(" ")}>
+                <Fragment key={s.id}>
+                <tr className={[s.atrasado ? "atrasado" : "", sel.includes(s.id) ? "selecionada" : "", s.avisos?.length ? "com-aviso" : ""].join(" ")}>
                   {altera && (
                     <td><input type="checkbox" aria-label={`Selecionar OP ${s.op}`} checked={sel.includes(s.id)} onChange={() => alternar(s.id)} /></td>
                   )}
@@ -202,9 +212,24 @@ export default function Sas() {
                     {editaRs && <button className="link" onClick={() => setEditarDe(s)}>{altera && s.situacao !== "CONFIRMADO" ? "Editar" : "R$/kg"}</button>}
                   </td>
                 </tr>
+                {!!s.avisos?.length && (
+                  <tr className="linha-aviso">
+                    <td colSpan={altera ? 12 : 11}>
+                      {s.avisos.map((a) => <p key={a.codigo} className="validacao alerta">{a.mensagem}</p>)}
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {lista && lista.total > 100 && (
+        <div className="paginacao">
+          <button className="secundario" disabled={pag <= 1} onClick={() => setPag(pag - 1)}>Anterior</button>
+          <span>Página {pag} de {Math.ceil(lista.total / 100)} · {lista.total.toLocaleString("pt-BR")} pedidos</span>
+          <button className="secundario" disabled={pag >= Math.ceil(lista.total / 100)} onClick={() => setPag(pag + 1)}>Próxima</button>
         </div>
       )}
 

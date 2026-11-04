@@ -13,7 +13,7 @@ import argparse
 import logging
 import sys
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy import func, select
@@ -55,7 +55,18 @@ def contexto(db, conferir_ops: bool) -> plano.Contexto:
             for m in db.scalars(select(MegaSaldo))}
     quando = db.scalar(select(func.max(MegaSaldo.atualizado_em)))
     return plano.Contexto(ligas, mega, quando.strftime("%Y-%m-%d %H:%M") if quando else None,
-                          _verificador_op() if conferir_ops else (lambda _op: None), date.today())
+                          _verificador_op() if conferir_ops else (lambda _op: None), date.today(), _kardex())
+
+
+def _kardex():
+    """§10.7 item 4: códigos com movimento no kardex do Mega nos últimos 2 anos (730 dias)."""
+    def consultar(codigos: list[int]) -> set[int] | None:
+        try:
+            return fabrica.obter().codigos_com_movimento(codigos, date.today() - timedelta(days=730))
+        except Exception as e:  # noqa: BLE001
+            log.error("kardex do Mega indisponível: %s", e)
+            return None
+    return consultar
 
 
 def main(argv: list[str] | None = None) -> int:

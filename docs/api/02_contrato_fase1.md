@@ -145,8 +145,8 @@ COP: `{ id, numero, situacao, data, fechado_em, enviado_em, qtd_itens, peso_tota
 
 - `peso_usado_kg`: peso do material antes do corte (barra/pedaço usado). Em branco = saldo do lote. **Perda = usado − consumo − sobra.**
 - `previsto_kg`: vem do T07 "Registrar corte em Itu agora". Para a peça inteira recebida, o sistema usa o previsto da solicitação.
-- No `resultado`: `perda_kg`, `perda_esperada_kg`, `previsto_kg`, `gera_sa` (lote fiscal RJ que não é o 1º corte da peça inteira da mesma OP), `instrucao_mega` (lote Mega: "Baixar 105,0 kg do código 78290 na OP 100508. Transferir 12,0 kg do código 78290 para o código 1698 (IMP-H13 RETO).").
-- Ocorrências: `OP_INEXISTENTE`, `OP_ENCERRADA`, `OP_NAO_CONFIRMADA`, `LOTE_FORA_DE_ITU`, `PESO_INVALIDO`, `SALDO_INSUFICIENTE`, `EXCESSO_TOLERANCIA`, `ABAIXO_PREVISTO`, `SOMA_MAIOR_QUE_LOTE`, `PERDA_CORTE_ALTA`, `USA_SALDO_RESERVADO`, `DESTINACAO_n`, `DATA_CORTE_INVALIDA`.
+- No `resultado`: `perda_kg`, **`perda_pct`** (% do material usado), **`perda_max_pct`** (parâmetro `PERDA_CORTE_MAX_PCT`, 6), **`perda_max_kg`**, **`peso_usado_kg`** (2026-11-04, R024; `perda_esperada_kg` saiu), `previsto_kg`, `gera_sa` (lote fiscal RJ que não é o 1º corte da peça inteira da mesma OP), `instrucao_mega` (lote Mega: "Baixar 105,0 kg do código 78290 na OP 100508. Transferir 12,0 kg do código 78290 para o código 1698 (IMP-H13 RETO).").
+- Ocorrências: `OP_INEXISTENTE`, `OP_ENCERRADA`, `OP_NAO_CONFIRMADA`, `LOTE_FORA_DE_ITU`, `PESO_INVALIDO`, `SALDO_INSUFICIENTE`, `EXCESSO_TOLERANCIA`, `ABAIXO_PREVISTO`, `SOMA_MAIOR_QUE_LOTE`, `PERDA_CORTE_ALTA` (CIENCIA quando a perda passa de `PERDA_CORTE_MAX_PCT` % do material usado; `dados`: `perda_kg`, `perda_pct`, `limite_kg`, `limite_pct`), `USA_SALDO_RESERVADO`, `DESTINACAO_n`, `DATA_CORTE_INVALIDA`.
 - Gravou: `201` com `{ id, op, lote, consumo_kg, sobra_kg, perda_kg, lote_reto: {id, codigo}|null, sa_id, instrucao_mega, ... }`.
 
 ## 7. T14 SA ✅ (Estoque Itu altera; Operação RJ e Análise consultam; Análise edita R$/kg)

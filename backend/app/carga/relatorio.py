@@ -70,6 +70,9 @@ def gerar(pl: Plano, destino: Path, *, titulo: str, conferencia_banco: list[dict
            len(s.liberacoes), round(sum(x.peso_kg for x in s.liberacoes), 3) or None,
            ", ".join(str(x.cop) for x in s.liberacoes if x.cop) or None, s.prazo, (s.origem or {}).get("linha")]
           for s in pl.solicitacoes], [10, 10, 18, 14, 15, 6, 12, 22, 7, 12, 10, 12, 8])
+    _aba(wb, "Kardex 2 anos", ["Código Mega", "Descrição no Mega", "Liga", "Densidade", "kg no Mega"],
+         [[k["codigo"], k["descricao"], k["liga"], k["densidade"], k["kg"]] for k in pl.kardex_entraram],
+         [12, 50, 16, 10, 12])
     _aba(wb, "Ligas novas", ["Liga", "Densidade usada"], [[k, v] for k, v in sorted(pl.ligas_novas.items())],
          [20, 16])
     destino.parent.mkdir(parents=True, exist_ok=True)

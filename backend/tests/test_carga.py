@@ -112,8 +112,8 @@ def test_carga_completa_e_reexecutavel(base, tmp_path):
     tipos = {p.tipo for p in pl.pendencias}
     assert {"SEM_OP", "SOLICITACAO_SEM_LOTE", "OP_MAL_DIGITADA", "RJ_EM_ITU_SEM_ORIGEM", "PARIDADE_SEM_CM",
             "RESTRICAO_A_REVISAR"} <= tipos
-    sem_cm = next(p for p in pl.pendencias if p.tipo == "PARIDADE_SEM_CM")
-    assert "4243" in (sem_cm.sugestao or "")                     # A8 MOD 21x204 → sugere A8 21X203 (bitola próxima)
+    par = {p["descricao_rj"]: p for p in pl.paridades}
+    assert par["A8 MOD 21x204x1110 Múltiplo"]["cm"] is None      # medidas não se juntam (§10.7): só no RJ
     c = {x["conferencia"][:3]: x for x in pl.conferencias}
     assert c["(b)"]["resultado"] == "OK" and c["(c)"]["resultado"] == "OK"
     assert conf[0]["resultado"] == "OK"                          # (a) lotes Mega = saldo Mega
@@ -192,3 +192,43 @@ def test_r036_ordem_estorno_nf_do_cop(base, tmp_path):
     r = base.post(f"/api/movimentos/{mov_id}/estorno", json={"justificativa": "Teste de estorno da carga"}, headers=h)
     assert r.status_code == 400 and "ajuste" in r.json()["detail"]
     assert base.get("/api/cops").json()[0]["nfs"]
+
+
+def test_r038_revisao_do_fabiano(base, tmp_path):
+    """Paridade sem múltiplo, kardex de 2 anos, densidades revistas, CPR fora, solicitações revistas."""
+    from app.carga import planilhas, plano
+    from app.core.db import SessionLocal
+    from app.models import Liga
+    _planilhas(tmp_path)
+    import openpyxl
+    from app.carga import planilhas as P
+    wb = openpyxl.load_workbook(tmp_path / P.ARQ_GERAL)
+    ws = wb.active
+    ws.append([4244, "IMP-A8 21X203MM", None, 0, "KG", 0, "RESERVADO CPR", 0, None, None, None])
+    wb.save(tmp_path / P.ARQ_GERAL)
+    wb = openpyxl.load_workbook(tmp_path / P.ARQ_ESTOQUE)
+    wb["ESTOQUE 2026"].append(["CH50XX", "A8 MOD 21x203", 9, 1, 300, 300, None, None, 300])
+    wb.save(tmp_path / P.ARQ_ESTOQUE)
+    with SessionLocal() as db:
+        ligas = {l.codigo: float(l.densidade) for l in db.query(Liga)}
+    mega = {78290: {"saldo_kg": 10.0, "descricao": "IMP-H13 24X62MM"},
+            90001: {"saldo_kg": 12.0, "descricao": "BRONZE TM23 RED 50MM"},
+            90002: {"saldo_kg": 30.0, "descricao": "SAE-4130 RED 457,2MM"},
+            90003: {"saldo_kg": 5.0, "descricao": "CANTONEIRA 2X2"}}
+    ctx = plano.Contexto(ligas, mega, "2026-11-04", lambda op: True, date(2026, 11, 4),
+                         lambda cods: {90001, 90003})                       # 90002 sem movimento em 2 anos
+    e, h = planilhas.ler_estoque_2026(tmp_path)
+    pl = plano.montar(ctx, e, h, planilhas.ler_geral(tmp_path), planilhas.ler_corte(tmp_path),
+                      planilhas.ler_sa(tmp_path))
+    par = {p["descricao_rj"]: p for p in pl.paridades}
+    assert par["A8 MOD 21x203"]["cm"] == 4244                              # comum → comum, nunca o múltiplo 4243
+    entraram = {k["codigo"]: k for k in pl.kardex_entraram}
+    assert set(entraram) == {90001, 90003}
+    assert entraram[90001]["liga"] == "BRONZE" and entraram[90001]["densidade"] == 8.8
+    assert entraram[90003]["liga"] == "NAO-INFORMADA"
+    assert any(p.tipo == "CM_FORA_SEM_MOVIMENTO" and "90002" in p.descricao for p in pl.pendencias)
+    assert not any("CPR" in d for l in pl.lotes for _, d in l.destinacoes)
+    sem_kardex = plano.Contexto(ligas, mega, "2026-11-04", lambda op: True, date(2026, 11, 4))
+    pl2 = plano.montar(sem_kardex, e, h, planilhas.ler_geral(tmp_path), planilhas.ler_corte(tmp_path),
+                       planilhas.ler_sa(tmp_path))
+    assert any(p.tipo == "SEM_KARDEX" and p.gravidade == "BLOQUEIA" for p in pl2.pendencias)

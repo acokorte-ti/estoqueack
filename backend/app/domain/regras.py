@@ -109,10 +109,11 @@ def validar_bitola(bitola_esp: float | None, bitola_larg: float | None, bitola_d
 
 
 def validar_perda_corte(peso_antes_kg: float, consumo_kg: float, sobra_kg: float,
-                        perda_esperada_kg: float, margem_pct: float = 50.0) -> Resultado:
-    """Peso antes = consumo + sobra + perda. Justificativa se a perda passar da esperada de serra + margem.
+                        max_pct: float = 6.0) -> Resultado:
+    """Material usado = consumo + sobra + perda. Justificativa se a perda passar de `max_pct` % do material usado.
 
-    Especificação v3 (T23, R008): margem = 50 % ACIMA da perda esperada (3 mm × seção × densidade × cortes).
+    Especificação v3.3 (T13, §9, T23 `PERDA_CORTE_MAX_PCT` = 6), decisão do Eduardo de 2026-11-04 [R024]:
+    substitui a regra antiga "serra 3 mm × seção + 50 %". Ex.: barra de 1.288 kg → até 77,3 kg é normal.
     """
     r = Resultado()
     if consumo_kg < 0 or sobra_kg < 0:
@@ -124,12 +125,13 @@ def validar_perda_corte(peso_antes_kg: float, consumo_kg: float, sobra_kg: float
                     f"({kg_br(peso_antes_kg)}).",
                     perda_real_kg=perda_real)
         return r
-    limite = perda_esperada_kg * (1 + margem_pct / 100)
+    limite = round(peso_antes_kg * max_pct / 100, 3)
+    pct = perda_real / peso_antes_kg * 100 if peso_antes_kg > 0 else 0.0
     if perda_real > limite + EPS:
         r.adicionar("PERDA_CORTE_ALTA", Nivel.CIENCIA,
-                    f"Diferença de {kg_br(perda_real)} entre o peso do lote e consumo + sobra. "
-                    f"Perda de corte esperada ≈ {kg_br(perda_esperada_kg, 2)}. Confirme a pesagem.",
-                    perda_real_kg=perda_real, perda_esperada_kg=perda_esperada_kg)
+                    f"Perda de corte de {kg_br(perda_real)} ({pct_br(pct, 1)} do material usado, "
+                    f"{kg_br(peso_antes_kg)}). Limite: {pct_br(max_pct)} ({kg_br(limite)}). Confirme a pesagem e "
+                    "justifique.", perda_kg=perda_real, perda_pct=round(pct, 2), limite_kg=limite, limite_pct=max_pct)
     return r
 
 

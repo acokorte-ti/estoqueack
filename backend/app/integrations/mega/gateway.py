@@ -160,6 +160,16 @@ class OracleMegaGateway:
                 self._consultar(consultas.MOVIMENTOS_JANELA, filial=consultas.FILIAL_ITU, desde=desde,
                                 alterado_desde=alterado_desde, ultimo_lancamento=ultimo_lancamento)]
 
+    def codigos_com_movimento(self, codigos: list[int], desde: date) -> set[int]:
+        """Kardex: quais códigos tiveram movimento na filial 3 desde a data (em lotes de 500 binds)."""
+        out: set[int] = set()
+        for i in range(0, len(codigos), 500):
+            parte = codigos[i:i + 500]
+            params = {f"c{j}": c for j, c in enumerate(parte)}
+            out |= {int(r[0]) for r in self._consultar(consultas.codigos_com_movimento(len(parte)),
+                                                         filial=consultas.FILIAL_ITU, desde=desde, **params)}
+        return out
+
     def ordem_producao(self, numero: int) -> OrdemProducao | None:
         linhas = self._consultar(consultas.ORDEM_PRODUCAO, numero=numero, filial=consultas.FILIAL_ITU)
         if not linhas:
@@ -209,6 +219,9 @@ class MegaFalso:
         self.precos: dict[int, tuple[float, date]] = dict(precos or {})
         self.movimentos: list[MovimentoMega] = list(movimentos or [])
         self.falhar = False                     # simula Mega fora do ar na sincronização
+
+    def codigos_com_movimento(self, codigos, desde):
+        return {m.codigo for m in self.movimentos if m.codigo in set(codigos) and m.data >= desde}
 
     def saldos_mp(self, data_corte=None):
         if self.falhar:

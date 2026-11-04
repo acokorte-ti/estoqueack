@@ -185,6 +185,13 @@ SELECT p.PRO_IN_CODIGO, p.PRO_ST_DESCRICAO, p.PRO_DT_INCLUSAO,
 """
 
 # Produtos SA (semiacabados) por texto da descrição.
+def codigos_com_movimento(n: int) -> str:
+    """Códigos (entre os n informados, binds :c0..:cN) com movimento na filial 3 desde :desde (kardex, R038)."""
+    binds = ", ".join(f":c{i}" for i in range(n))
+    return (f"SELECT DISTINCT m.PRO_IN_CODIGO FROM {ESQUEMA}.EST_VW_MOVIMENTOESTOQUE m "  # noqa: S608 — binds
+            f"WHERE m.FIL_IN_CODIGO = :filial AND m.MVT_DT_MOVIMENTO >= :desde AND m.PRO_IN_CODIGO IN ({binds})")
+
+
 BUSCAR_SA = f"""
 SELECT p.PRO_IN_CODIGO, p.PRO_ST_DESCRICAO, p.PRO_DT_INCLUSAO
   FROM {ESQUEMA}.EST_PRODUTOS p

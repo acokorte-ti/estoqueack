@@ -28,7 +28,30 @@ from . import planilhas as P
 
 FAMILIA = {"1.2344": "H13", "A8MOD": "A8", "1.2379": "D2"}
 TOL_KG = 5.0
-TERMOS_RESTRICAO = ("RESERVAD", "NAO USAR", "NÃO USAR", "SOMENTE", "DESTINA", "EXCLUSIV", "LIBERACAO DE VENDAS",
+# R038 / §10.7: densidades da revisão do BLOCO 1 (aba 3, "Densidade proposta") e das ligas que não são aço
+DENSIDADES_REVISADAS = {
+    "N2360M": 7.85, "K-100": 7.70, "D3": 7.70, "OH255": 7.85, "VF800": 7.80, "OH251": 7.85, "1.2721": 7.85,
+    "S1": 7.88, "45CRNI4MO": 7.85, "CPM10V": 7.41, "Z-WEAR": 7.75, "CPM-9V": 7.45, "M2": 8.16, "T1": 8.67,
+    "SAE-52100": 7.81, "TENAX300": 7.80, "HGNI06": 7.85, "W360": 7.80, "SAE-1020": 7.85, "SAE-1045": 7.85,
+    "SAE-4340": 7.85, "SAE-8620": 7.85, "HARDOX": 7.85, "1.2311": 7.85, "ASTM-A36": 7.85,
+    "INOX-304": 7.93, "INOX-316": 8.00, "BRONZE": 8.80, "LATAO": 8.50, "COBRE-BERILIO": 8.25,
+    "TITANIO-6AL4V": 4.43, "METAL-DURO": 14.50,
+}
+ALIAS_LIGA = {"AISI-M2": "M2", "Z.WER": "Z-WEAR"}
+# descrições que não traziam a liga (aba 3 da revisão): corrigidas só na carga
+DESCRICAO_CORRIGIDA = {"01 126": "O1 Ø126", "OH 251  1.2721 STEEL BARS 65X245X3555": "1.2721 65X245X3555",
+                       "ASTM A-36 CHP 6,30X2530MM": "ASTM-A36 6,30X2530MM"}
+# ligas que não são aço, pela descrição do Mega (decisão do Fabiano: entra quem teve movimento em 2 anos)
+LIGAS_POR_TEXTO = (("METAL DURO", "METAL-DURO"), ("INOX 316", "INOX-316"), ("INOX-316", "INOX-316"),
+                   ("316L", "INOX-316"), ("INOX", "INOX-304"), ("BRONZE", "BRONZE"), ("LATAO", "LATAO"),
+                   ("LATÃO", "LATAO"), ("BERILIO", "COBRE-BERILIO"), ("BERÍLIO", "COBRE-BERILIO"),
+                   ("TITANIO", "TITANIO-6AL4V"), ("TITÂNIO", "TITANIO-6AL4V"))
+# solicitações ativas revistas pelo Fabiano
+SITUACAO_REVISADA = {94394: "CONCLUIDA", 94429: "CONCLUIDA", 94528: "CONCLUIDA", 94529: "CONCLUIDA",
+                     92756: "CANCELADA", 93620: "CANCELADA", 94356: "CANCELADA", 94646: "CANCELADA",
+                     96111: "CANCELADA", 96674: "CANCELADA", 96772: "CANCELADA", 97662: "CANCELADA"}
+# "RESERVADO CPR" era só observação da planilha (decisão do Eduardo, 04/11): não entra
+TERMOS_RESTRICAO = ("NAO USAR", "NÃO USAR", "SOMENTE", "DESTINA", "EXCLUSIV", "LIBERACAO DE VENDAS",
                     "LIBERAÇÃO DE VENDAS", "SO PARA", "SÓ PARA", "P/ DESFOLHADEIRA", "CONTRATO")
 
 
@@ -143,6 +166,7 @@ class Plano:
     solicitacoes: list[SolP] = field(default_factory=list)
     cops: dict[int, dict[str, Any]] = field(default_factory=dict)
     sas: list[SaP] = field(default_factory=list)
+    kardex_entraram: list[dict[str, Any]] = field(default_factory=list)
     pendencias: list[Pendencia] = field(default_factory=list)
     conferencias: list[dict[str, Any]] = field(default_factory=list)
     contagens: dict[str, Any] = field(default_factory=dict)
@@ -155,8 +179,8 @@ class Plano:
 # ---------------- chaves de material ----------------
 
 def medida(desc: str):
-    m = interpretar(desc or "")
-    return m
+    d = (desc or "").strip()
+    return interpretar(DESCRICAO_CORRIGIDA.get(d, d))
 
 
 def chave_item(liga: str | None, m) -> tuple:
@@ -186,16 +210,45 @@ class Contexto:
     data_mega: str | None
     op_existe: Callable[[int], bool | None]     # None = não deu para verificar (Mega fora)
     hoje: date
+    # códigos (entre os pedidos) com movimento no kardex do Mega nos últimos 2 anos; None = não deu para consultar
+    kardex: Callable[[list[int]], set[int] | None] = lambda _codigos: None
 
 
 def _liga(plano: Plano, ctx: Contexto, codigo: str | None, origem, densidade: float | None = None) -> str:
     if not codigo:
         codigo = "DESCONHECIDA"
+    codigo = ALIAS_LIGA.get(codigo, codigo)
     if codigo not in ctx.ligas and codigo not in plano.ligas_novas:
-        plano.ligas_novas[codigo] = densidade if densidade and 6 < densidade < 10 else 7.85
-        plano.pend("LIGA_NOVA", "REVISAR", f"Liga \"{codigo}\" não está no catálogo: entra com densidade "
-                   f"{plano.ligas_novas[codigo]:g}. Conferir a densidade na T22.", origem)
+        if codigo in DENSIDADES_REVISADAS:
+            plano.ligas_novas[codigo] = DENSIDADES_REVISADAS[codigo]
+            plano.pend("LIGA_NOVA", "INFO", f"Liga \"{codigo}\" criada com a densidade da revisão "
+                       f"({plano.ligas_novas[codigo]:g}).", origem)
+        else:
+            plano.ligas_novas[codigo] = densidade if densidade and 1 < densidade < 25 else 7.85
+            plano.pend("LIGA_NOVA", "REVISAR", f"Liga \"{codigo}\" não está no catálogo nem na revisão: entra com "
+                       f"densidade {plano.ligas_novas[codigo]:g}. Conferir na T22.", origem)
     return codigo
+
+
+def _multiplo(desc: str) -> bool:
+    return bool(re.search(r"\bMULT|M[ÚU]LTIPLO", (desc or "").upper()))
+
+
+def _compr_multiplo(desc: str) -> float | None:
+    m = re.search(r"M[ÚU]LTIPLO DE\s*(\d+(?:[.,]\d+)?)", (desc or "").upper())
+    if m:
+        return float(m.group(1).replace(",", "."))
+    return medida(desc).comprimento
+
+
+def _mult_compativel(desc_rj: str, desc_geral: str) -> bool:
+    """§10.7: material comum só com código comum; múltiplo só com o MESMO múltiplo (mesmo comprimento)."""
+    if _multiplo(desc_rj) != _multiplo(desc_geral):
+        return False
+    if _multiplo(desc_rj):
+        a, b = _compr_multiplo(desc_rj), _compr_multiplo(desc_geral)
+        return a is None or b is None or abs(a - b) < 0.5
+    return True
 
 
 def montar(ctx: Contexto, estoque: list[P.LinhaEstoque2026], historico: list[dict], geral: list[P.LinhaGeral],
@@ -240,7 +293,8 @@ def _item_rj(pl: Plano, ctx: Contexto, desc: str, origem) -> tuple:
     m = medida(desc)
     liga = _liga(pl, ctx, m.liga, origem)
     alvo = chave_item(liga, m)[1:]
-    cands = [it for it in pl.itens.values() if (it.liga, it.formato, it.espessura, it.largura, it.diametro) == alvo]
+    cands = [it for it in pl.itens.values() if (it.liga, it.formato, it.espessura, it.largura, it.diametro) == alvo
+             and _mult_compativel(desc, it.descricao)]
     if cands:
         cands.sort(key=lambda it: (it.codigo_mega is None, it.chave[1] if it.chave[0] == "GERAL" else 0))
         return cands[0].chave
@@ -323,19 +377,17 @@ def _paridade(pl: Plano, estoque: list[P.LinhaEstoque2026], geral: list[P.LinhaG
         a["kg"] += e.total_estoque
     usados = set()
     for k, a in rj.items():
-        cands = geral_fam.get(k, [])
         desc_rj = a["descricoes"].most_common(1)[0][0]
+        cands = [g for g in geral_fam.get(k, []) if _mult_compativel(desc_rj, g.descricao)]
         if not cands:
             prox = _proximos(k, geral_fam)
             sug = "; ".join(f"{g.codigo or '-'} {g.descricao}" for g in prox[:3])
             pl.paridades.append({"descricao_rj": desc_rj, "chave": k, "item_mp": None, "cm": None,
-                                 "kg_rj_planilha": round(a["kg"], 3), "kg_rj_geral": None, "situacao": "SEM CM",
+                                 "kg_rj_planilha": round(a["kg"], 3), "kg_rj_geral": None, "situacao": "SÓ NO RJ",
                                  "outros_candidatos": [f"(bitola próxima) {x}" for x in sug.split("; ") if x]})
             if a["kg"] > 0:
-                pl.pend("PARIDADE_SEM_CM", "REVISAR", f"Material RJ \"{desc_rj}\" ({a['kg']:.1f} kg) sem linha "
-                        "de mesma bitola no Estoque Geral (sem código Mega).", a["origem"],
-                        f"Bitola próxima no Estoque Geral: {sug}" if sug else
-                        "Indicar o código Mega do material ou confirmar que é só do RJ")
+                pl.pend("PARIDADE_SEM_CM", "INFO", f"Material RJ \"{desc_rj}\" ({a['kg']:.1f} kg) sem igual em Itu: "
+                        "fica sem código Mega, só no RJ (revisão do Fabiano, §10.7).", a["origem"])
             continue
         cands = sorted(cands, key=lambda g: (-(g.rj_no_rio or 0), g.codigo is None))
         esc = cands[0]
@@ -348,11 +400,12 @@ def _paridade(pl: Plano, estoque: list[P.LinhaEstoque2026], geral: list[P.LinhaG
                              "kg_rj_geral": kg_geral, "situacao": sit,
                              "outros_candidatos": [f"{c.codigo or '-'} {c.descricao}" for c in cands[1:]]})
         if sit != "OK":
-            pl.pend("PARIDADE_TOTAL_DIFERENTE", "REVISAR",
+            pl.pend("PARIDADE_TOTAL_DIFERENTE", "INFO",
                     f"{desc_rj}: ESTOQUE 2026 soma {a['kg']:.1f} kg e o Estoque Geral (RJ no Rio) {kg_geral:.1f} kg "
-                    f"(diferença {a['kg'] - kg_geral:+.1f} kg).", a["origem"])
+                    f"(diferença {a['kg'] - kg_geral:+.1f} kg). Vale a ESTOQUE 2026, mesmo código (§10.7).",
+                    a["origem"])
         if len(cands) > 1:
-            pl.pend("PARIDADE_AMBIGUA", "REVISAR", f"{desc_rj}: {len(cands)} linhas do Estoque Geral com a mesma "
+            pl.pend("PARIDADE_AMBIGUA", "INFO", f"{desc_rj}: {len(cands)} linhas do Estoque Geral com a mesma "
                     f"bitola; escolhida {esc.codigo or '-'} {esc.descricao}.", a["origem"])
     for g in geral:
         if g.codigo and id(g) not in usados and g.rj_no_rio > TOL_KG:
@@ -385,6 +438,10 @@ def _esgotados_historico(pl: Plano, ctx: Contexto, estoque, historico: list[dict
                 "(lote sem documento de entrada).", None)
     grupos: dict[tuple, list[dict]] = defaultdict(list)
     for h in historico:
+        if h["descricao"].strip() in ("?", ""):
+            pl.pend("HISTORICO_SEM_DESCRICAO", "INFO", f"HISTORICO linha {h['linha']} ({h['conteiner']}) sem "
+                    "descrição do material: não entra.", h["origem"])
+            continue
         grupos[(h["conteiner"], chave_familia(h["descricao"]))].append(h)
     for (ct, k), hs in grupos.items():
         if (ct, k) in idx:
@@ -442,10 +499,16 @@ def _estoque_mega(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
         pl.pend("SEM_SALDO_MEGA", "BLOQUEIA", "Sem saldo do Mega (sincronização não rodou): os lotes do Estoque "
                 "Mega não podem ser criados.", None, "Rodar \"Sincronizar agora\" antes da carga")
         return
-    # Universo do Estoque Mega: códigos do Estoque Geral + códigos do Mega cuja descrição traz uma liga de aço
-    # conhecida. O resto (bronze, rolamento, fita, inox…) também é "MP" no Mega, mas não é matéria-prima de aço
-    # deste controle: fica de fora, listado nas pendências.
-    conhecidas = set(ctx.ligas) | {it.liga for it in pl.itens.values() if it.codigo_mega}
+    # §10.7 item 4 (decisão do Fabiano, 04/11): código do Mega fora do Estoque Geral entra se teve movimento no
+    # kardex nos últimos 2 anos (qualquer grupo: aço, inox, não ferrosos, metal duro, peças…); o resto fica fora.
+    fora_geral = [c for c, s in ctx.mega_saldo.items()
+                  if ("CM", c) not in pl.itens and float(s["saldo_kg"] or 0) > 0.0005]
+    com_mov = ctx.kardex(sorted(fora_geral)) if fora_geral else set()
+    if com_mov is None:
+        pl.pend("SEM_KARDEX", "BLOQUEIA", "Não deu para consultar o kardex do Mega: os códigos fora do Estoque Geral "
+                "não podem ser classificados.", None, "Rodar a carga com o Mega no ar")
+        com_mov = set()
+    conhecidas = set(ctx.ligas) | {it.liga for it in pl.itens.values() if it.codigo_mega} | set(DENSIDADES_REVISADAS)
     fora: list[tuple[int, str, float]] = []
     for cod, s in sorted(ctx.mega_saldo.items()):
         kg = round(float(s["saldo_kg"] or 0), 3)
@@ -456,15 +519,20 @@ def _estoque_mega(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
             continue
         ch = ("CM", cod)
         if ch not in pl.itens:
-            m = medida(s.get("descricao") or "")
-            if m.liga not in conhecidas:
-                fora.append((cod, s.get("descricao") or "", kg))
+            desc = s.get("descricao") or f"Código {cod}"
+            if cod not in com_mov:
+                fora.append((cod, desc, kg))
                 continue
-            liga = _liga(pl, ctx, m.liga, None, s.get("peso_especifico"))
-            pl.itens[ch] = ItemP(ch, (s.get("descricao") or f"Código {cod}")[:200], liga, _formato_valido(m),
-                                 m.espessura, m.largura, m.diametro, cod)
-            pl.pend("CM_FORA_DO_GERAL", "INFO", f"Código {cod} ({s.get('descricao')}) tem {kg:.1f} kg no Mega e não "
-                    "está no Estoque Geral: item criado pela descrição do Mega.", None)
+            m = medida(desc)
+            up = desc.upper()
+            liga = next((lg for txt, lg in LIGAS_POR_TEXTO if txt in up), None)
+            if liga is None:
+                liga = ALIAS_LIGA.get(m.liga, m.liga) if m.liga and ALIAS_LIGA.get(m.liga, m.liga) in conhecidas \
+                    else "NAO-INFORMADA"
+            liga = _liga(pl, ctx, liga, None, s.get("peso_especifico"))
+            pl.itens[ch] = ItemP(ch, desc[:200], liga, _formato_valido(m), m.espessura, m.largura, m.diametro, cod)
+            dens = ctx.ligas.get(liga) or pl.ligas_novas.get(liga) or 7.85
+            pl.kardex_entraram.append({"codigo": cod, "descricao": desc, "liga": liga, "densidade": dens, "kg": kg})
         it = pl.itens[ch]
         lote = LoteP(ch, "ITU", "ITU", None, kg, tipo="RETO" if it.formato == "RETO" else "ORIGINAL",
                      origem_identificada=False, conferencia_kg=kg, estoque="ESTOQUE_MEGA",
@@ -472,12 +540,12 @@ def _estoque_mega(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
         lote.movimentos.append(MovP("SALDO_INICIAL", kg, documento=f"Carga saldo Mega {ctx.data_mega or ''}".strip(),
                                     origem=lote.origem))   # com origem: movimento da carga, não estornável
         pl.lotes.append(lote)
+    pl.contagens["mega_codigos_kardex_2_anos"] = len(pl.kardex_entraram)
     pl.contagens["mega_codigos_fora"] = len(fora)
     pl.contagens["mega_kg_fora"] = round(sum(k for _, _, k in fora), 3)
     for cod, desc, kg in fora:
-        pl.pend("CM_FORA_DO_CATALOGO", "REVISAR", f"Código {cod} \"{desc}\": {kg:.1f} kg no Mega, não está no "
-                "Estoque Geral e a descrição não traz liga de aço conhecida. Não vira lote.", None,
-                "Confirmar que não é matéria-prima de aço; se for, incluir no Estoque Geral")
+        pl.pend("CM_FORA_SEM_MOVIMENTO", "INFO", f"Código {cod} \"{desc}\": {kg:.1f} kg no Mega, fora do Estoque "
+                "Geral e sem movimento no kardex nos últimos 2 anos. Não entra (§10.7).", None)
 
 
 def _restricoes_e_avisos(pl: Plano, geral: list[P.LinhaGeral]) -> None:
@@ -573,6 +641,8 @@ def _solicitacoes(pl: Plano, ctx: Contexto, corte: list[P.LinhaCorte], idx: dict
             sit = "CORTADA" if c.pecas_cortadas >= qtd else "CORTADA_PARCIAL"
         else:
             sit = "ENVIADA"
+        if c.op in SITUACAO_REVISADA and sit in ("ENVIADA", "CORTADA", "CORTADA_PARCIAL", "MATERIAL_INSUFICIENTE"):
+            sit = SITUACAO_REVISADA[c.op]          # revisão do Fabiano (§10.7)
         s = SolP(c.op, c.item, c.cliente, lote, modo, qtd, it.formato, _parse_medida(c.medida),
                  _previsto(lote, it, dens, c.instrucao, qtd, c.peso), (c.instrucao or "")[:300] or None,
                  (c.instrucao_processo or "")[:300] or None,

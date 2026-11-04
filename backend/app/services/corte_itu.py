@@ -10,9 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import Config
-from app.domain import peso as dpeso
 from app.domain import regras
-from app.domain.formato import kg_br, numero_br
+from app.domain.formato import kg_br, numero_br, pct_br
 from app.domain.validacao import Nivel
 from app.models import CopItem, CorteItu, Lote, SolicitacaoCorte, Usuario
 
@@ -75,14 +74,9 @@ def validar(db: Session, cfg: Config, e: CorteItuEntrada) -> tuple[Previa, ops.D
         r.juntar(regras.validar_peso_real(previsto, e.consumo_kg, parametro(db, "TOLERANCIA_EXCESSO_PCT", cfg),
                                           parametro(db, "TOLERANCIA_FALTA_PCT", cfg)))
     it = lote.item
-    esperada = 0.0
-    if it.formato != "RETO" and (it.diametro or (it.espessura and it.largura)):
-        sec = dpeso.Secao(it.espessura, it.largura, it.diametro)
-        esperada = dpeso.perda_corte_esperada(sec, parametro(db, "ESPESSURA_SERRA_MM", cfg), float(it.liga.densidade),
-                                              max(e.pecas or 1, 1))
+    max_pct = parametro(db, "PERDA_CORTE_MAX_PCT")
     if e.consumo_kg > 0 and e.sobra_kg >= 0:
-        r.juntar(regras.validar_perda_corte(usado, e.consumo_kg, e.sobra_kg, esperada,
-                                            parametro(db, "PERDA_CORTE_MARGEM_PCT")))
+        r.juntar(regras.validar_perda_corte(usado, e.consumo_kg, e.sobra_kg, max_pct))
     outros = movimentos.reservado(db, [lote.id], exceto_solicitacao=sol.id if sol else None).get(lote.id, 0.0)
     if e.consumo_kg > 0 and e.consumo_kg <= saldo:
         r.juntar(regras.validar_saldo(saldo, outros, e.consumo_kg))
@@ -99,12 +93,15 @@ def validar(db: Session, cfg: Config, e: CorteItuEntrada) -> tuple[Previa, ops.D
     p.frase = (f"Lote {lote.codigo} passa de {kg_br(saldo)} para {kg_br(max(depois, 0))}."
                + (f" Novo lote RETO com {kg_br(e.sobra_kg)}, origem {it.liga.codigo} {bitola(it)} / {ct}."
                   if reto else "")
-               + (f" Perda de corte {kg_br(perda)}." if perda > 0 else ""))
+               + (f" Perda de corte {kg_br(perda)} ({pct_br(perda / usado * 100, 1)} do material usado)."
+                  if perda > 0 and usado > 0 else ""))
     p.efeitos = [{"lote": lote.codigo, "antes_kg": round(saldo, 3), "depois_kg": max(depois, 0)}]
     if reto:
         p.efeitos.append({"lote": "(novo RETO)", "antes_kg": 0.0, "depois_kg": round(e.sobra_kg, 3)})
     gera_sa = lote.planta_fiscal == "RJ" and sol is None
-    p.extra.update({"perda_kg": perda, "perda_esperada_kg": esperada, "previsto_kg": previsto,
+    p.extra.update({"perda_kg": perda, "perda_pct": round(perda / usado * 100, 2) if usado > 0 else 0.0,
+                    "perda_max_pct": max_pct, "perda_max_kg": round(usado * max_pct / 100, 3),
+                    "peso_usado_kg": round(usado, 3), "previsto_kg": previsto,
                     "gera_sa": gera_sa, "liga_solicitacao_id": sol.id if sol else None,
                     "instrucao_mega": instrucao_mega(lote, e.op, e.consumo_kg + perda, e.sobra_kg if reto else 0, db)
                     if lote.planta_fiscal == "ITU" else None})

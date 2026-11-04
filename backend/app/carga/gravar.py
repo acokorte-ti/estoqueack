@@ -54,7 +54,7 @@ def _ts(d: date | None) -> datetime | None:
 
 def gravar(db: Session, pl: Plano, *, usuario_id: int | None, arquivos: dict[str, str]) -> dict[str, Any]:
     bloqueios = [p for p in pl.pendencias if p.gravidade == "BLOQUEIA" and p.tipo in ("SEM_SALDO_MEGA",
-                                                                                      "SALDO_NEGATIVO")]
+                                                                                      "SALDO_NEGATIVO", "SEM_KARDEX")]
     if bloqueios:
         raise CargaRecusada("; ".join(p.descricao for p in bloqueios))
 

@@ -12,7 +12,7 @@ from ._tipos import DataHora, Densidade, JsonDoc, Mm, agora
 
 class Liga(Base):
     __tablename__ = "liga"
-    __table_args__ = (CheckConstraint("densidade > 6 AND densidade < 10", name="ck_liga_densidade"),)
+    __table_args__ = (CheckConstraint("densidade > 1 AND densidade < 25", name="ck_liga_densidade"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     codigo: Mapped[str] = mapped_column(String(30), unique=True, index=True)   # H13, D2, CR12MOV…

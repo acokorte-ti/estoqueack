@@ -80,13 +80,13 @@ class TestBitola(unittest.TestCase):
 
 class TestPerdaCorte(unittest.TestCase):
     def test_normal(self):
-        self.assertEqual(codigos(regras.validar_perda_corte(1000, 400, 599.5, 0.5)), [])
+        self.assertEqual(codigos(regras.validar_perda_corte(1000, 400, 540, 6)), [])
 
     def test_soma_maior_que_lote(self):
-        self.assertEqual(codigos(regras.validar_perda_corte(1000, 600, 401, 0.5)), ["SOMA_MAIOR_QUE_LOTE"])
+        self.assertEqual(codigos(regras.validar_perda_corte(1000, 600, 401, 6)), ["SOMA_MAIOR_QUE_LOTE"])
 
     def test_perda_alta(self):
-        self.assertEqual(codigos(regras.validar_perda_corte(1000, 400, 300, 0.5)), ["PERDA_CORTE_ALTA"])
+        self.assertEqual(codigos(regras.validar_perda_corte(1000, 400, 539, 6)), ["PERDA_CORTE_ALTA"])
 
 
 class TestDestinacaoEOP(unittest.TestCase):

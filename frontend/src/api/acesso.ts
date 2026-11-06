@@ -12,5 +12,6 @@ export const ACESSO = {
   receberCop: ["ESTOQUE", "OPERACAO_RJ", "ADMIN"],              // T12 (RJ consulta)
   corteItu: ["ESTOQUE", "ADMIN"],                               // T13
   sa: ["ESTOQUE", "OPERACAO_RJ", "ANALISE", "ADMIN"],           // T14
+  entradasMega: ["ESTOQUE", "ANALISE", "ADMIN"],                // T15 (Estoque Itu e Admin alteram; Análise só vê; RJ não vê)
   conciliacao: ["ESTOQUE", "ANALISE", "ADMIN"],                 // T16 mínima (só leitura)
 } satisfies Record<string, Perfil[]>;

@@ -51,8 +51,8 @@ export default function SolicitacaoDetalhe() {
   const pode = {
     enviar: altera && s.situacao === "RASCUNHO",
     cancelar: altera && semCorte && ["RASCUNHO", "ENVIADA", "MATERIAL_INSUFICIENTE"].includes(s.situacao),
-    trocarLote: altera && s.situacao === "MATERIAL_INSUFICIENTE",
-    encerrar: altera && s.situacao === "CORTADA_PARCIAL",
+    trocarLote: altera && semCorte && s.situacao === "MATERIAL_INSUFICIENTE",
+    encerrar: altera && (s.situacao === "CORTADA_PARCIAL" || (s.situacao === "MATERIAL_INSUFICIENTE" && !semCorte)), // R043
     trocarOp: altera && !["CANCELADA", "RASCUNHO"].includes(s.situacao),
     duplicar: altera,
   };

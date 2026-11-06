@@ -6,11 +6,11 @@ import SyncMega from "../components/SyncMega";
 import Pendencias from "../components/Pendencias";
 
 interface Resumo {
-  baldes: Record<"ESTOQUE_MEGA" | "RJ_NO_RIO" | "RJ_EM_ITU", { lotes: number; kg: number }>;
+  baldes: Partial<Record<"ESTOQUE_MEGA" | "RJ_NO_RIO" | "RJ_EM_ITU", { lotes: number; kg: number }>>; // Operação RJ só recebe RJ_NO_RIO (P10)
   total_kg: number;
 }
 
-const BALDES = [
+const TODOS_BALDES = [
   { chave: "ESTOQUE_MEGA", nome: "Estoque Mega", desc: "fiscal Itu, físico Itu" },
   { chave: "RJ_NO_RIO", nome: "RJ no Rio", desc: "fiscal RJ, físico Barra Mansa" },
   { chave: "RJ_EM_ITU", nome: "RJ em Itu", desc: "fiscal RJ, físico Itu" },
@@ -26,6 +26,8 @@ export default function Painel() {
   }, []);
 
   const total = resumo?.total_kg ?? 0;
+  // só os baldes que a API mandou (Operação RJ não vê Mega nem RJ em Itu)
+  const BALDES = resumo ? TODOS_BALDES.filter((b) => resumo.baldes[b.chave]) : TODOS_BALDES;
 
   return (
     <>
@@ -47,7 +49,7 @@ export default function Painel() {
         </div>
         <div className="barra" role="img" aria-label="Proporção de cada estoque">
           {BALDES.map((b) => {
-            const v = resumo?.baldes[b.chave].kg ?? 0;
+            const v = resumo?.baldes[b.chave]?.kg ?? 0;
             const pct = total > 0 ? (v / total) * 100 : 0;
             return <span key={b.chave} className={`seg seg-${b.chave.toLowerCase()}`} style={{ flexBasis: `${pct}%` }} />;
           })}

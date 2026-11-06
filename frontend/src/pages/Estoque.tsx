@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, ESTOQUE_NOME, kg, num, qs } from "../api/cliente";
 import { useSessao } from "../api/sessao";
+import RetoPorOrigem from "./RetoPorOrigem";
 import { TIPO_LOTE, type Agrupado, type Lote } from "../api/lote";
 
 interface Pagina<T> { itens: T[]; total: number; pagina: number; por_pagina: number }
@@ -22,7 +23,7 @@ export default function Estoque() {
   const soRj = usuario?.perfil === "OPERACAO_RJ";
   const [params, setParams] = useSearchParams();
   const [estoque, setEstoque] = useState(soRj ? "RJ_NO_RIO" : params.get("estoque") ?? "");
-  const [visao, setVisao] = useState<"lote" | "item">("lote");
+  const [visao, setVisao] = useState<"lote" | "item" | "reto">("lote");
   const [f, setF] = useState(VAZIO);
   const [pag, setPag] = useState(1);
   const [lotes, setLotes] = useState<Pagina<Lote> | null>(null);
@@ -55,6 +56,8 @@ export default function Estoque() {
   const atual = visao === "lote" ? lotes : grupos;
   const paginas = atual ? Math.max(1, Math.ceil(atual.total / atual.por_pagina)) : 1;
   const somaSaldo = visao === "lote" ? lotes?.itens.reduce((a, l) => a + l.saldo_kg, 0) : grupos?.itens.reduce((a, g) => a + g.saldo_kg, 0);
+
+  if (visao === "reto") return <RetoPorOrigem soRj={soRj} estoqueInicial={estoque} aoVoltar={(v) => setVisao(v)} />;
 
   return (
     <>
@@ -107,6 +110,7 @@ export default function Estoque() {
         <div className="chips" role="group" aria-label="Visão">
           <button type="button" className="chip" aria-pressed={visao === "lote"} onClick={() => { setVisao("lote"); setPag(1); }}>Por lote</button>
           <button type="button" className="chip" aria-pressed={visao === "item"} onClick={() => { setVisao("item"); setPag(1); }}>Agrupado por item</button>
+          <button type="button" className="chip" aria-pressed={false} onClick={() => setVisao("reto")}>RETO por origem</button>
         </div>
         <a className="secundario" href={exportar} download>Exportar para Excel</a>
       </div>

@@ -9,6 +9,7 @@ interface Resposta {
   grupos: Record<string, Pendencia[]>;
   atrasos: { NORMAL: number; ATENCAO: number; ATRASADO: number };
   divergencias_mega: { quantidade: number | null; limite_kg: number };
+  entradas_mega_a_classificar?: { quantidade: number | null } | null; // null para Operação RJ (P10)
 }
 
 const NOME_GRUPO: Record<string, string> = { ESTOQUE: "Itu", OPERACAO_RJ: "Barra Mansa", ANALISE: "Análise" };
@@ -30,6 +31,8 @@ function resumo(codigo: string, i: Item): { texto: string; link?: string } {
       return { texto: `${s(i.lote)} · ${s(i.descricao)} · vence ${data(s(i.validade))}`, link: i.lote_id ? `/estoque/${s(i.lote_id)}` : undefined };
     case "DIVERGENCIA_MEGA":
       return { texto: `Código ${s(i.codigo)} · ${s(i.descricao)} · diferença ${typeof i.diferenca_kg === "number" ? `${kg(i.diferenca_kg)} kg` : ""}`, link: "/conciliacao" };
+    case "ENTRADA_MEGA_A_CLASSIFICAR":
+      return { texto: `Código ${s(i.codigo)} · ${s(i.descricao)} · diferença ${typeof i.diferenca_kg === "number" ? `${kg(i.diferenca_kg)} kg` : ""}`, link: "/entradas-mega" };
     case "EXCECOES_SEMANA":
       return { texto: `${s(i.tipo)} · ${typeof i.kg === "number" ? `${kg(i.kg)} kg` : ""}${i.op ? ` · OP ${s(i.op)}` : ""} · ${s(i.usuario)}`, link: i.lote_id ? `/estoque/${s(i.lote_id)}` : undefined };
     default: // solicitações (fila, peça inteira, material insuficiente…)
@@ -54,17 +57,21 @@ export default function Pendencias() {
 
   const grupos = Object.entries(r.grupos);
   const varios = grupos.length > 1;
+  const entradas = r.entradas_mega_a_classificar?.quantidade;
   const temAtraso = r.atrasos.ATENCAO + r.atrasos.ATRASADO > 0;
 
   return (
     <section className="pendencias" aria-label="Pendências">
-      {(temAtraso || (r.divergencias_mega.quantidade ?? 0) > 0) && (
+      {(temAtraso || (r.divergencias_mega.quantidade ?? 0) > 0 || (entradas ?? 0) > 0) && (
         <div className="pendencias-resumo">
           <span className="desc">Solicitações em aberto no RJ:</span>
           <span className="etiqueta ok">{r.atrasos.NORMAL} normal</span>
           <span className={`etiqueta ${r.atrasos.ATENCAO ? "atencao" : ""}`}>{r.atrasos.ATENCAO} atenção</span>
           <span className={`etiqueta ${r.atrasos.ATRASADO ? "ruim" : ""}`}>{r.atrasos.ATRASADO} atrasada(s)</span>
-          {r.divergencias_mega.quantidade !== null && (
+          {entradas !== null && entradas !== undefined && (
+            <Link to="/entradas-mega" className={`etiqueta ${entradas ? "atencao" : "ok"}`}>Entradas Mega a classificar: {entradas}</Link>
+          )}
+          {r.divergencias_mega.quantidade !== null && r.divergencias_mega.quantidade !== undefined && (
             <Link to="/conciliacao" className={`etiqueta ${r.divergencias_mega.quantidade ? "ruim" : "ok"}`}>
               {r.divergencias_mega.quantidade} divergência(s) com o Mega (&gt; {r.divergencias_mega.limite_kg} kg)
             </Link>

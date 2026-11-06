@@ -3,7 +3,9 @@ import { Link } from "react-router-dom";
 import { api, kg } from "../api/cliente";
 import SyncMega from "../components/SyncMega";
 
-interface Linha { codigo: number; descricao: string; saldo_mega_kg: number; soma_lotes_kg: number; diferenca_kg: number; status: "OK" | "MEGA_MAIOR" | "MEGA_MENOR"; lotes: number }
+interface Linha { codigo: number; descricao: string; saldo_mega_kg: number; soma_lotes_kg: number; diferenca_kg: number; status: "OK" | "MEGA_MAIOR" | "MEGA_MENOR"; lotes: number;
+  explicada_na_t15?: boolean; explicada_t15_kg?: number; diferenca_nao_explicada_kg?: number;
+  explicacoes?: { pendencia_id: number; kg: number; motivo: string; motivo_descricao: string; justificativa: string; usuario: string; em: string }[] }
 interface Resposta { limite_kg: number; ultima_sincronizacao: string | null;
   totais: { codigos: number; ok: number; mega_maior: number; mega_menor: number; saldo_mega_kg: number; soma_lotes_kg: number }; itens: Linha[] }
 
@@ -60,8 +62,16 @@ export default function Conciliacao() {
                   <td>{i.descricao}</td>
                   <td className="num">{kg(i.saldo_mega_kg)}</td>
                   <td className="num">{kg(i.soma_lotes_kg)}</td>
-                  <td className={`num ${i.status === "OK" ? "" : "negativo"}`}><strong>{i.diferenca_kg > 0 ? "+" : ""}{kg(i.diferenca_kg)}</strong></td>
-                  <td><span className={`etiqueta ${STATUS[i.status].classe}`}>{STATUS[i.status].nome}</span></td>
+                  <td className={`num ${i.status === "OK" ? "" : "negativo"}`}><strong>{i.diferenca_kg > 0 ? "+" : ""}{kg(i.diferenca_kg)}</strong>{i.explicada_na_t15 && i.diferenca_nao_explicada_kg !== undefined && <small className="desc" style={{ display: "block", fontWeight: 400 }}>sem explicação: {kg(i.diferenca_nao_explicada_kg)}</small>}</td>
+                  <td>
+                    <span className={`etiqueta ${STATUS[i.status].classe}`}>{STATUS[i.status].nome}</span>
+                    {i.explicada_na_t15 && (
+                      <span className="etiqueta info" title={(i.explicacoes ?? []).map((x) => `${kg(x.kg)} kg · ${x.motivo_descricao}: ${x.justificativa} (${x.usuario})`).join(" | ")}>
+                        explicada na T15{i.explicada_t15_kg ? ` · ${kg(i.explicada_t15_kg)} kg` : ""}
+                      </span>
+                    )}
+                    {i.explicada_na_t15 && i.explicacoes?.map((x) => <small key={x.pendencia_id} className="desc" style={{ display: "block" }}>{x.motivo_descricao}: {x.justificativa}</small>)}
+                  </td>
                   <td className="num">{i.lotes}</td>
                 </tr>
               ))}

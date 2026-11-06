@@ -46,3 +46,8 @@ pass_bkp/
 *senhas*
 *pass*.txt
 *.secret
+
+# Claude Code: configuracao pessoal e worktrees
+.claude/settings.local.json
+.claude/worktrees/
+*.tsbuildinfo

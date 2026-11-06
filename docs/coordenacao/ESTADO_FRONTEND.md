@@ -40,6 +40,11 @@ Com isso, **todas as telas da F1 estão no ar**, inclusive o painel com pendênc
 - **Achados de dado → R036 (TÉCNICO):** saldo acumulado negativo nos movimentos por causa da data do `SALDO_INICIAL`; "Estornar" aparece nos consumos da carga; ordem do histórico de SA; COPs da carga sem NF.
 - **Ainda não testados com dado real** (precisam de solicitação e corte novos, criados no ensaio ponta a ponta do BANCO E TESTES): T07 → T10 → T11 → T12 → T13 gravando. A lógica foi testada com respostas simuladas.
 
+## Rodada auditoria 06/11 (commit 343c4cd)
+
+- **T15** `/entradas-mega` (menu Itu, contador no Painel), **aba "RETO por origem"** na T04 com Excel, **R043** (Encerrar com saldo pendente em Material insuficiente com corte), **T16** com "explicada na T15", **P10** no Painel do RJ (só RJ no Rio). Menu sem "Carga inicial".
+- Validado com `tsc` + `build` (o front não tem lint nem testes). Conferência na homologação: pendente do deploy.
+
 ## Próximo
 
 1. **T16 vazia** (R036 item 5): conferir de novo quando o TÉCNICO corrigir o vínculo do código Mega.

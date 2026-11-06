@@ -229,3 +229,32 @@ def test_p10_painel_e_sa(amb):
     hi = entrar(client, us["itu"])
     assert client.get(f"/api/sas/{sa_id}", headers=hi).status_code == 200
     assert client.get("/api/sas?situacao=PENDENTE", headers=hi).json()["total"] == 1
+
+
+def test_modelo_diferenca_explicada_revisao_banco(amb):
+    """Revisão do BANCO E TESTES (R042): uma só pendência ABERTA por código, kg da explicada não se acumula em
+    duplicidade e a conciliação reage quando o Mega volta depois de uma explicação ("Não é entrada")."""
+    client, us, _, mega = amb
+    h = entrar(client, us["itu"])
+    pid = _pend(client, h, 78290)["id"]
+    client.post(f"/api/entradas-mega/{pid}/nao-e-entrada",
+                json={"motivo": "ESTORNO_BAIXA_MEGA", "justificativa": "Estorno de baixa feito no Mega"}, headers=h)
+    from sqlalchemy import func, select
+
+    from app.models import PendenciaMega
+    for _ in range(3):                                                      # sincronizar de novo não cria duplicata
+        _sync()
+    with _db() as db:
+        n_abertas = db.scalar(select(func.count(PendenciaMega.id)).where(
+            PendenciaMega.codigo == 78290, PendenciaMega.situacao == "ABERTA"))
+        assert n_abertas == 0
+        p = db.get(PendenciaMega, pid)
+        assert p.situacao == "DESCARTADA" and p.motivo == "ESTORNO_BAIXA_MEGA" and float(p.kg) == 1450
+        assert float(p.saldo_mega_kg) == 6648 and p.justificativa
+    # o Mega estorna a NF depois da explicação: a diferença explicada passa a ser maior que a real
+    mega.saldos[0] = replace(mega.saldos[0], saldo_fisico=5198.0)
+    _sync()
+    c = next(i for i in client.get("/api/conciliacao", headers=h).json()["itens"] if i["codigo"] == 78290)
+    assert c["diferenca_kg"] == 0 and c["explicada_t15_kg"] == 1450
+    assert c["diferenca_nao_explicada_kg"] == -1450       # explicação maior que a diferença real
+    assert c["status"] == "MEGA_MENOR"                    # a explicação órfã não esconde: vira alerta de Mega menor

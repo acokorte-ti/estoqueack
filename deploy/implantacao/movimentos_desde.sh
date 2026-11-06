@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # ROLLBACK (voltar às planilhas): lista tudo o que foi lançado NO SISTEMA desde a liberação, para o Fabiano e o
 # Marcelo repassarem às planilhas. Só leitura. Gera CSV (separador ;, decimal com vírgula) em ~/estoqueack-carga/rollback/.
-# Uso: deploy/implantacao/movimentos_desde.sh "2026-11-13 08:00"
+# Uso: deploy/implantacao/movimentos_desde.sh "AAAA-MM-DD HH:MM"
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-DESDE=${1:?informe a data/hora da liberação, ex. "2026-11-13 08:00"}
+DESDE=${1:?informe a data/hora da liberação, ex. "AAAA-MM-DD HH:MM"}
 [[ "$DESDE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}$ ]] || { echo "formato: AAAA-MM-DD HH:MM"; exit 2; }
 PSQL=${PSQL_CMD:-docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q -f -'}
 DIR=${ROLLBACK_DIR:-$HOME/estoqueack-carga/rollback}; mkdir -p "$DIR"; chmod 700 "$DIR"

@@ -1,4 +1,4 @@
-"""Ensaio do ponta a ponta (app/jobs/e2e_caminhos.py) com o Mega falso: garante que o roteiro de 11/11 roda
+"""Ensaio do ponta a ponta (app/jobs/e2e_caminhos.py) com o Mega falso: garante que o roteiro do ponta a ponta roda
 de ponta a ponta nos 5 caminhos antes de usá-lo na cópia da homologação."""
 from datetime import date
 

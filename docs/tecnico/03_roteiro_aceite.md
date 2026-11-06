@@ -1,15 +1,15 @@
-# Roteiro de aceite da Fase 1 (qui 12/11/2026, manhã)
+# Roteiro de aceite da Fase 1
 
-Escrito em 2026-11-03 pelo chat BANCO E TESTES. Usado no aceite com **Fabiano, Matheus, Marcelo e Renato**, antes do go/no-go de 12/11 (ver `coordenacao/ESTADO_COORDENACAO.md` §5). Cada pessoa usa o **próprio login**, no próprio computador ou tablet, em https://estoque.acokorte.com.br (só da rede da empresa).
+Escrito em 2026-11-03 pelo chat BANCO E TESTES. Usado no aceite com **Fabiano, Matheus, Marcelo e Renato**, antes do go/no-go (ver `coordenacao/ESTADO_COORDENACAO.md` §5). Cada pessoa usa o **próprio login**, no próprio computador ou tablet, em https://estoque.acokorte.com.br (só da rede da empresa).
 
-## 0. Antes do aceite (Eduardo + BANCO E TESTES, até qua 11/11)
+## 0. Antes do aceite (Eduardo + BANCO E TESTES, antes do aceite)
 
 | # | Item | Quem | Ok |
 |---|---|---|---|
 | 0.1 | Carga T25 feita na homologação e conferida pelo Fabiano (soma dos lotes por código = saldo Mega ± 5 kg; total RJ = ESTOQUE 2026) | TÉCNICO + Fabiano | ☐ |
 | 0.2 | Usuários reais criados (T21): `fabiano.camargo`, `matheus.almeida`, `marcello.teixeira`, `renato.pinto`, cada um com e-mail e perfil certo (Estoque Itu, Estoque Itu, Operação RJ, Análise) | Eduardo | ☐ |
 | 0.3 | Cada um entrou uma vez e trocou a senha temporária | cada um | ☐ |
-| 0.4 | Ponta a ponta automático dos 5 caminhos rodado sem erro (`deploy/e2e/rodar_e2e.sh`; 1º ensaio OK em 04/11; repetir qua 11/11) | BANCO E TESTES | ☐ |
+| 0.4 | Ponta a ponta automático dos 5 caminhos rodado sem erro (`deploy/e2e/rodar_e2e.sh`; 1º ensaio OK em 04/11; repetir antes do aceite) | BANCO E TESTES | ☐ |
 | 0.5 | "Mega atualizado em …" de hoje no Painel (sincronização das 06h OK) | — | ☐ |
 | 0.6 | Escolher **OPs reais abertas** para o aceite (uma por caminho) e os lotes da carga que vão ser usados. Ficam anotadas na tabela do §6 | Fabiano + BANCO E TESTES | ☐ |
 
@@ -110,12 +110,12 @@ Como registrar um problema: anote na tabela do §7 **a tela, o que fez, o que es
 
 ## 5. Depois do aceite (BANCO E TESTES)
 
-1. Estornar os movimentos criados só para teste (T18), com a justificativa "Teste de aceite 12/11".
+1. Estornar os movimentos criados só para teste (T18), com a justificativa "Teste de aceite".
 2. Cancelar as solicitações de teste que não foram usadas; os COPs/SAs de teste ficam marcados com "TESTE" na observação.
 3. Conferir de novo: soma dos lotes por código = saldo Mega ± 5 kg.
-4. Passar a lista do §7 para a COORDENAÇÃO (o que é bloqueio para 13/11 e o que vira ressalva).
+4. Passar a lista do §7 para a COORDENAÇÃO (o que é bloqueio para a implantação e o que vira ressalva).
 
-## 6. Dados do aceite (preencher até qua 11/11)
+## 6. Dados do aceite (preencher antes do aceite)
 
 | Caminho | OP real (aberta) | Item / cliente | Lote da carga | Quem |
 |---|---|---|---|---|
@@ -127,7 +127,7 @@ Como registrar um problema: anote na tabela do §7 **a tela, o que fez, o que es
 
 ## 7. Problemas encontrados
 
-| # | Quem | Tela | O que fez | Esperava | Aconteceu | Bloqueia 13/11? |
+| # | Quem | Tela | O que fez | Esperava | Aconteceu | Bloqueia a implantação? |
 |---|---|---|---|---|---|---|
 | | | | | | | |
 

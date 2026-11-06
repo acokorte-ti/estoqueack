@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Conferência independente do banco (implantação de 13/11 e qualquer recarga), só leitura.
+# Conferência independente do banco (implantação e qualquer recarga), só leitura.
 # Complementa a conferência (a)–(d) do relatório da carga com contas feitas direto no PostgreSQL:
 #   1. nenhum lote com saldo negativo
 #   2. em todo lote, saldo = soma dos movimentos

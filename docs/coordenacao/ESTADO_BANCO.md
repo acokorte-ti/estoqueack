@@ -1,12 +1,12 @@
 # Estado — BANCO E TESTES
 
-Chat **BANCO E TESTES**, braço do TÉCNICO (BACKEND 2). Escopo: fechar as definições de banco (Mega e PostgreSQL) e os testes que faltam para a implantação da Fase 1 em **13/11/2026**. Não mexe em fluxo de tela nem em regra de negócio; o que depende de outra frente vira pedido em `PEDIDOS.md`.
+Chat **BANCO E TESTES**, braço do TÉCNICO (BACKEND 2). Escopo: fechar as definições de banco (Mega e PostgreSQL) e os testes que faltam para a implantação da Fase 1 (sem data: vale a ordem das etapas e o go/no-go). Não mexe em fluxo de tela nem em regra de negócio; o que depende de outra frente vira pedido em `PEDIDOS.md`.
 
-Atualizado: 2026-11-04 pelo chat BANCO E TESTES (rodada 2 da COORDENAÇÃO, ver §5b).
+Atualizado: 2026-11-06 pelo chat BANCO E TESTES (rodada da auditoria de 06/11, ver §5c).
 
 ## Situação em uma frase
 
-**Parte A (Mega) e Parte B (PostgreSQL) concluídas; ponta a ponta dos 5 caminhos já rodou OK com os dados da carga e o Mega real (04/11, §5); roteiro de aceite de 12/11 pronto.** Critérios de go/no-go nº 2 (ensaio) e nº 3 (concorrência no PostgreSQL) atendidos; o nº 2 se repete na qua 11/11.
+**Parte A (Mega) e Parte B (PostgreSQL) concluídas; ponta a ponta dos 5 caminhos já rodou OK com os dados da carga e o Mega real (04/11, §5); roteiro de aceite pronto.** Critérios de go/no-go nº 2 (ensaio) e nº 3 (concorrência no PostgreSQL) atendidos; o nº 2 se repete antes do aceite e depois da recarga final.
 
 ## Resumo para cada chat
 
@@ -15,7 +15,7 @@ Atualizado: 2026-11-04 pelo chat BANCO E TESTES (rodada 2 da COORDENAÇÃO, ver 
 | **TÉCNICO (BACKEND 2)** | (1) A **0005 é minha** (índices + preço médio com 6 casas): migração da carga, se precisar, é a **0006** (R030). (2) **Bug de concorrência corrigido** (`7790bfd`): todo código que mexe em saldo pega o lote por `movimentos.lote_ou_404(db, id, travar=True)` e lança por `movimentos.lancar`. (3) O CI roda o pytest também no PostgreSQL (trigger real): `UPDATE`/`DELETE` em `movimento`/`auditoria` falham. (4) Mega: `docs/integracao_mega.md` |
 | **FRONTEND** | R031: `avisos[]` no SA (`NF_DIFERENTE_MEGA`, `IPI_DIFERENTE_MEGA`, avisos cinza) e os mesmos códigos como ALERTA em `/sas/{id}/codigo/validar` e `/cops/{id}/enviar/validar`. R027 e R028 já atendidos |
 | **FUNCIONAL** | Os dois avisos pedidos no R026 (NF e IPI) estão no ar. Nada pendente com o FUNCIONAL |
-| **COORDENAÇÃO** | Rodada 1 feita na ordem pedida: Parte B → avisos R026 → Parte C. **Ponta a ponta já OK em 04/11** com a carga (§5); repetir em 11/11. Para o aceite faltam: §6 do roteiro (OPs/lotes com o Fabiano) e os 4 usuários reais (Eduardo) |
+| **COORDENAÇÃO** | Rodada 1 feita na ordem pedida: Parte B → avisos R026 → Parte C. **Ponta a ponta já OK em 04/11** com a carga (§5); repetir depois da recarga final. Para o aceite faltam: §6 do roteiro (OPs/lotes com o Fabiano) e os 4 usuários reais (Eduardo) |
 
 ## 1. O que foi descoberto no Mega (validado com dados reais)
 
@@ -93,7 +93,7 @@ Migração sobe/desce/sobe (0001 → 0005) conferida no PostgreSQL 16 local e no
 | R028 | FRONTEND | "Sincronizar agora" e "Mega atualizado em …" | RESPONDIDO pelo FRONTEND (`21cdec9`, no topo do Painel) |
 | R029 | (FRONTEND → TÉCNICO) | CI vermelho desde `a253cfa` | RESPONDIDO: era o teste de horário deste chat; corrigido no `3f2b1ca` |
 
-## 5. Ponta a ponta com dados reais — **1º ensaio OK em 2026-11-04** (adiantado; o marco era qua 11/11)
+## 5. Ponta a ponta com dados reais — **1º ensaio OK em 2026-11-04** (sem data-alvo)
 
 A carga T25 já estava na homologação (1.137 lotes, 2.144 movimentos, 8.293 SAs). Rodei `deploy/e2e/rodar_e2e.sh`: copia o banco da homologação para `estoqueack_e2e`, roda os 5 caminhos pela API com o **Mega real** e apaga a cópia (o banco em uso não é tocado).
 
@@ -112,18 +112,28 @@ Os SAs das OPs 100592/100553/100550 foram confirmados **pelo Mega de verdade** (
 
 | Item | Situação |
 |---|---|
-| **Roteiro de implantação de 13/11** | Pronto: `estoqueack/docs/tecnico/06_implantacao_13_11.md` — congelamento das planilhas qui 12/11 18:00, congelamento de código qui 18:00–sex 18:00, sex 06:15 pausa dos crons → backup (local + externo) → versão/migrações → `APP_ENV=prod` → planilhas no servidor → Sincronizar agora → prévia → carga `--confirmo-producao` → conferência (a)–(d) + `deploy/implantacao/conferir.sh` + Fabiano confere 3 lotes → smoke test (inclui o ponta a ponta numa cópia do banco carregado) → liberação 08:00. **Rollback** em dois níveis (antes da liberação: não libera; depois: critérios objetivos e `deploy/implantacao/movimentos_desde.sh` gera o CSV do que foi lançado no sistema para voltar às planilhas congeladas). Divisão de tarefas proposta ao TÉCNICO no **R034** (`054e618`) |
+| **Roteiro de implantação** | Pronto: `estoqueack/docs/tecnico/06_implantacao.md` — congelamento das planilhas em D-1 18:00, congelamento de código de D-1 18:00 a D 18:00, em D 06:15 pausa dos crons → backup (local + externo) → versão/migrações → `APP_ENV=prod` → planilhas no servidor → Sincronizar agora → prévia → carga `--confirmo-producao` → conferência (a)–(d) + `deploy/implantacao/conferir.sh` + Fabiano confere 3 lotes → smoke test (inclui o ponta a ponta numa cópia do banco carregado) → liberação 08:00. **Rollback** em dois níveis (antes da liberação: não libera; depois: critérios objetivos e `deploy/implantacao/movimentos_desde.sh` gera o CSV do que foi lançado no sistema para voltar às planilhas congeladas). Divisão de tarefas proposta ao TÉCNICO no **R034** (`054e618`) |
 | **Backup fora do servidor (go/no-go nº 4)** | Scripts prontos e ensaiados com um Object Storage simulado (`803e1c9`): `copia_externa.sh` (PAR **só de escrita**, sha256 no objeto), `testar_restauracao_externa.sh` (baixa o mais recente do bucket, confere o sha256 e restaura num PostgreSQL temporário). **Falta o Eduardo no console da OCI** (≈ 15 min): bucket privado `estoqueack-backup`, política do ciclo de vida, regras de ciclo de vida (diário 40 dias, mensal 400), regra de retenção de 35 dias e os 2 PARs, e deixar as URLs em `Documents\projeto-controle_mp\segredos\par_backup.txt` (fora do repositório). Passo a passo: `estoqueack/docs/tecnico/05_backup_externo.md` §2. Depois eu instalo e testo (§3 do mesmo documento) |
 | **Testes da T16 mínima** | Aguardando a API do TÉCNICO (ainda não commitada) |
-| **E2E qua 11/11 e aceite qui 12/11** | Mantidos (§6) |
+| **E2E e aceite** | Sem data; ver §6 |
+
+## 5c. Rodada da auditoria de 06/11 (2026-11-06)
+
+| Item | Resultado |
+|---|---|
+| **Revisão da migração 0007** (R042) | Sobe/desce limpo; `movimento`/`auditoria` (trigger de imutabilidade) não são tocadas; `criado_pela_t15` tem `server_default false`. **Pontos para o TÉCNICO (pedido R044):** (1) não há índice único parcial em `pendencia_mega (codigo) WHERE tipo='ENTRADA' AND situacao='ABERTA'`: "uma ABERTA por código" depende só do código (duas sincronizações simultâneas poderiam criar duas); (2) `situacao`, `motivo` sem CHECK (só `tipo` tem); (3) `justificativa` obrigatória na DESCARTADA só na API; (4) a diferença explicada nunca vence: se o Mega estorna a NF depois do "Não é entrada", a conciliação mostra `MEGA_MENOR` com explicada 1.450 e diferença não explicada −1.450 (comportamento seguro, coberto por teste) |
+| **Bitola de origem** (`origem_ref["bitola_origem"]`) | Texto livre agrupado por igualdade exata no domínio (`reto_por_origem`): "IMP-D2 25X610MM" e "imp-d2 25x610mm" virariam duas linhas; o filtro da tela normaliza (`_norm_medida`), o agrupamento não. Sem índice (JSON): ok no volume atual |
+| **Testes novos** | `test_auditoria_0611_banco.py` (carga sintética: RETO do RJ em Itu D2 1.100 kg e DC53 1.022 kg quebrados em sub-lotes, soma = célula, tipo RETO, saldo = soma dos movimentos, aba por origem) e `test_modelo_diferenca_explicada_revisao_banco` em `test_t15_reto_origem_p10.py`. Já cobertos pelo TÉCNICO e conferidos: Ø/RED/ROUND N×M redondo, solicitação parcial em material insuficiente, T15 (criar lote, não é entrada, reabrir) e P10. suíte inteira verde no SQLite local (0 falhas, ruff limpo); PostgreSQL no CI |
+| **Datas-prazo** | Retiradas de `03_roteiro_aceite.md`, `06_implantacao.md` (renomeado de `06_implantacao_13_11.md`), `deploy/implantacao/` e deste arquivo. PARs de 13/11/2027 (`05_backup_externo.md`) mantidos |
+| **Recarga** | Não rodada (fica para depois da etapa de correção) |
 
 ## 6. Próximos passos deste chat
 
 1. **Backup externo:** assim que o Eduardo criar o bucket e os PARs, instalar, rodar o 1º envio, o teste de restauração a partir do bucket e a prova de que o PAR de escrita não apaga; marcar o go/no-go nº 4.
 2. **Testes da T16 mínima** quando a API sair (diferença por código Mega × soma dos lotes > 5 kg; perfis; volume).
-3. **Repetir o ponta a ponta na qua 11/11**, depois da recarga do R032: `deploy/e2e/rodar_e2e.sh` (≈ 1 min).
-4. **Aceite qui 12/11:** `estoqueack/docs/tecnico/03_roteiro_aceite.md`. Falta o §6 (OPs/lotes) com o Fabiano até 11/11 e os 4 usuários reais (Eduardo).
-5. **Implantação sex 13/11:** executar a minha parte do roteiro (06_implantacao_13_11.md) depois da resposta do TÉCNICO no R034.
+3. **Repetir o ponta a ponta** depois da recarga final: `deploy/e2e/rodar_e2e.sh` (≈ 1 min).
+4. **Aceite:** `estoqueack/docs/tecnico/03_roteiro_aceite.md`. Falta o §6 (OPs/lotes) com o Fabiano antes do aceite e os 4 usuários reais (Eduardo).
+5. **Implantação:** executar a minha parte do roteiro (06_implantacao.md) depois da resposta do TÉCNICO no R034.
 6. Acompanhar R030, R031 e R034.
 
 ## 7. Em andamento / fora do repositório (2026-11-05, migração para o Claude Code)
@@ -132,7 +142,7 @@ Os SAs das OPs 100592/100553/100550 foram confirmados **pelo Mega de verdade** (
 - **Em andamento (aguardando outros):** backup externo (Eduardo criar bucket + 2 PARs no console, `docs/tecnico/05_backup_externo.md` §2; depois instalar e testar, §3); testes da T16 mínima (API do TÉCNICO ainda não saiu); R034 (TÉCNICO confirmar divisão do roteiro de implantação); R030/R031 abertos; repetir ponta a ponta após a recarga do R032; aceite.
 - **Só no servidor (system-lab), fora do repo:** `~/estoqueack-mapeamento/q.py` + `q.sh` + `sql/*.sql` (runner de consultas ao Mega usado no mapeamento; com os GRANTs restritos o dicionário não é mais visível); crontab com `deploy/cron/estoqueack-agendador.sh` (a cada 5 min); relatórios `~/.local/state/estoqueack-e2e-*.json`.
 - **Só no sandbox (some ao reiniciar):** PostgreSQL 16 de teste via `pip install pgserver` em `/tmp/pgv` + `/tmp/bt/rodar_pg.sh`. No Claude Code, rodar os testes no PostgreSQL com `TEST_DATABASE_URL=postgresql+psycopg://… pytest` (banco apagado).
-- **Datas:** o alvo de 13/11 caiu (04/11). As datas dos roteiros (`03_roteiro_aceite.md`, `06_implantacao_13_11.md`) valem como **ordem de etapas e go/no-go**, não como prazo; ajustar quando houver nova data.
+- **Datas:** não há data-alvo. Os roteiros (`03_roteiro_aceite.md`, `06_implantacao.md`) usam D-1/D e valem como **ordem de etapas e go/no-go**; a data real entra só quando o Eduardo marcar.
 
 ## 8. Instruções permanentes desta frente
 

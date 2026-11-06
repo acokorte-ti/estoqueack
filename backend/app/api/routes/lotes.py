@@ -69,6 +69,32 @@ def listar_agrupado(f: dict = Depends(filtros), pagina: int = Query(1, ge=1),
     return paginar(estoque.agrupado(itens), pagina, por_pagina)
 
 
+def filtros_reto(estoque_: Estoque | None = Query(None, alias="estoque"), liga: list[str] = Query(default=[]),
+                 bitola_origem: str | None = Query(None, max_length=40), bitola_de: float | None = None,
+                 bitola_ate: float | None = None, conteiner: str | None = None, codigo_mega: int | None = None,
+                 com_saldo: bool = True, incluir_sobras: bool = False, criado_de: date | None = None,
+                 criado_ate: date | None = None) -> dict:
+    return {"estoque": estoque_, "ligas": liga, "bitola_origem": bitola_origem, "bitola_de": bitola_de,
+            "bitola_ate": bitola_ate, "conteiner": conteiner, "codigo_mega": codigo_mega, "com_saldo": com_saldo,
+            "incluir_sobras": incluir_sobras, "criado_de": criado_de, "criado_ate": criado_ate}
+
+
+def reto_visivel(f: dict, u: Usuario) -> dict:
+    """[P10] Operação RJ: estoque travado em RJ no Rio (onde não há lote RETO); nunca RETO de Itu."""
+    return {**f, "estoque": "RJ_NO_RIO"} if so_rj_no_rio(u) else f
+
+
+@router.get("/reto-por-origem")
+def reto_por_origem(f: dict = Depends(filtros_reto), db: Session = Depends(get_db),
+                    u: Usuario = Depends(deps.usuario_liberado)) -> dict:
+    """Aba "RETO por origem" da T04: quantos kg de RETO vieram de cada bitola e contêiner."""
+    r = estoque.reto_por_origem(db, reto_visivel(f, u))
+    r["estoque_travado"] = "RJ_NO_RIO" if so_rj_no_rio(u) else None
+    vazio = "Nenhum RETO no RJ no Rio" if so_rj_no_rio(u) else "Nenhum RETO nos filtros"
+    r["mensagem_vazio"] = vazio if r["vazio"] else None
+    return r
+
+
 @router.get("/compativeis")
 def compativeis(liga: str, formato: Literal["RETANGULAR", "REDONDO"] = "RETANGULAR",
                 espessura: float | None = Query(None, gt=0), largura: float | None = Query(None, gt=0),
@@ -126,7 +152,7 @@ def detalhe(lote_id: int, db: Session = Depends(get_db), u: Usuario = Depends(de
 
 @router.get("/{lote_id}/arvore")
 def arvore(lote_id: int, db: Session = Depends(get_db), u: Usuario = Depends(deps.usuario_liberado)) -> dict:
-    return estoque.arvore(db, _lote(db, lote_id, u))
+    return estoque.arvore(db, _lote(db, lote_id, u), u)
 
 
 @router.get("/{lote_id}/movimentos")

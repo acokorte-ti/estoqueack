@@ -39,6 +39,7 @@ class ItemMP(Base):
     observacao_uso: Mapped[str | None] = mapped_column(String(500))
     substituido_por_id: Mapped[int | None] = mapped_column(ForeignKey("item_mp.id"))   # "SUBSTITUÍDO POR …"
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
+    criado_pela_t15: Mapped[bool] = mapped_column(Boolean, default=False)   # 0007: "criado pela T15, revisar" (T22)
 
     liga: Mapped[Liga] = relationship()
 

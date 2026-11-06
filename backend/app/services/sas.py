@@ -98,12 +98,12 @@ def criar_linha(db: Session, *, origem: str, lote: Lote, op: int, item_codigo: i
     return sa
 
 
-def obter(db: Session, sa_id: int, *, travar: bool = False) -> CadastroSa:
+def obter(db: Session, sa_id: int, *, travar: bool = False, usuario: Usuario | None = None) -> CadastroSa:
     q = select(CadastroSa).where(CadastroSa.id == sa_id)
     if travar:
         q = q.with_for_update().execution_options(populate_existing=True)
     sa = db.scalar(q)
-    if sa is None:
+    if sa is None or not visivel(sa, usuario):
         raise NaoEncontrado("SA não encontrado.")
     return sa
 
@@ -310,8 +310,15 @@ def informar_nf_b2(db: Session, ids: list[int], numero: str, emitente: str, data
     return sas
 
 
-def listar(db: Session, f: dict[str, Any]) -> list[CadastroSa]:
+def visivel(sa: CadastroSa, usuario: Usuario | None) -> bool:
+    """[P10] Operação RJ vê só os SAs de itens de COP (RJ no Rio); SA de corte em Itu (B2) e sem item de COP não."""
+    return usuario is None or usuario.perfil != "OPERACAO_RJ" or sa.cop_item_id is not None
+
+
+def listar(db: Session, f: dict[str, Any], usuario: Usuario | None = None) -> list[CadastroSa]:
     q = select(CadastroSa)
+    if usuario is not None and usuario.perfil == "OPERACAO_RJ":
+        q = q.where(CadastroSa.cop_item_id.is_not(None))
     if f.get("situacao"):
         q = q.where(CadastroSa.situacao.in_(f["situacao"]))
     if f.get("origem"):

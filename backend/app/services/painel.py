@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.models import CadastroSa, Cop, Destinacao, ItemMP, Lote, MegaSaldo, Movimento, SolicitacaoCorte, Usuario
 
 from . import cops as svc_cops
+from . import entradas_mega
 from . import sas as svc_sas
 from . import solicitacoes as svc_sol
 from . import sync_mega
@@ -39,6 +40,7 @@ def conciliacao(db: Session, *, somente_divergentes: bool = False) -> dict[str, 
                                             .where(ItemMP.codigo_mega.is_not(None)))}
     mega = {m.codigo: m for m in db.scalars(select(MegaSaldo).where(MegaSaldo.codigo.in_(list(catalogo))))} \
         if catalogo else {}
+    explic = entradas_mega.explicacoes_por_codigo(db)
     itens = []
     for cod in sorted(set(catalogo) & (set(mega) | set(lotes))):
         sm = float(mega[cod].saldo_kg) if cod in mega else 0.0
@@ -46,12 +48,17 @@ def conciliacao(db: Session, *, somente_divergentes: bool = False) -> dict[str, 
         if abs(sm) < 0.0005 and abs(sl) < 0.0005:
             continue
         dif = round(sm - sl, 3)
-        status = "OK" if abs(dif) <= limite else ("MEGA_MAIOR" if dif > 0 else "MEGA_MENOR")
+        ex = explic.get(cod, [])
+        explicada = round(sum(e["kg"] for e in ex), 3)
+        nao_expl = round(dif - explicada, 3)          # vermelho só para a diferença NÃO explicada na T15
+        status = "OK" if abs(nao_expl) <= limite else ("MEGA_MAIOR" if nao_expl > 0 else "MEGA_MENOR")
         if somente_divergentes and status == "OK":
             continue
         itens.append({"codigo": cod, "descricao": (mega[cod].descricao if cod in mega else None) or catalogo[cod],
                       "saldo_mega_kg": round(sm, 3), "soma_lotes_kg": round(sl, 3), "diferenca_kg": dif,
-                      "status": status, "lotes": int(n_lotes.get(cod) or 0)})
+                      "status": status, "lotes": int(n_lotes.get(cod) or 0),
+                      "explicada_t15_kg": explicada, "diferenca_nao_explicada_kg": nao_expl,
+                      "explicada_na_t15": bool(ex), "explicacoes": ex})
     itens.sort(key=lambda x: (x["status"] == "OK", -abs(x["diferenca_kg"]), x["codigo"]))
     u = sync_mega.ultima(db, "ESTOQUE")
     cont = Counter(x["status"] for x in itens)
@@ -106,7 +113,10 @@ def pendencias_itu(db: Session) -> list[dict]:
                   "criado_em": s.criado_em.isoformat()} for s in abertos if svc_sas.atrasado(db, s)]
     insuf = [_sol_item(db, s) for s in db.scalars(select(SolicitacaoCorte).where(
         SolicitacaoCorte.situacao == "MATERIAL_INSUFICIENTE").order_by(SolicitacaoCorte.id))]
+    entradas = [{"id": p["id"], "codigo": p["codigo"], "descricao": p["descricao"], "diferenca_kg": p["diferenca_kg"]}
+                for p in entradas_mega.listar(db)["itens"]]
     return [
+        _p("ENTRADA_MEGA_A_CLASSIFICAR", "Entradas Mega a classificar", entradas, "/entradas-mega", nivel="ALERTA"),
         _p("SA_SEGURANDO_COP", "SAs pendentes segurando COP no RJ", segurando, "/sa", nivel="ALERTA"),
         _p("COP_EM_TRANSITO", "COPs em trânsito para receber", transito, "/recebimentos"),
         _p("PECA_INTEIRA_AGUARDANDO_CORTE", "Peças inteiras aguardando corte em Itu", inteiras, "/cortes-itu"),
@@ -189,10 +199,12 @@ def pendencias(db: Session, usuario: Usuario) -> dict[str, Any]:
         grupos["OPERACAO_RJ"] = pendencias_rj(db)
     if p in ("ANALISE", "ADMIN"):
         grupos["ANALISE"] = pendencias_analise(db)
-    u = sync_mega.ultima(db, "ESTOQUE", None)
-    ok = sync_mega.ultima(db, "ESTOQUE")
+    rj = p == "OPERACAO_RJ"
+    u = None if rj else sync_mega.ultima(db, "ESTOQUE", None)     # P10: o Marcelo não vê o Mega nem Itu
+    ok = None if rj else sync_mega.ultima(db, "ESTOQUE")
     return {"perfil": p, "grupos": grupos, "atrasos": atrasos(db),
-            "divergencias_mega": {"quantidade": divergencias_mega(db) if p != "OPERACAO_RJ" else None,
+            "divergencias_mega": {"quantidade": divergencias_mega(db) if not rj else None,
                                   "limite_kg": parametro(db, "DIVERGENCIA_MEGA_KG")},
+            "entradas_mega_a_classificar": {"quantidade": entradas_mega.contador(db) if not rj else None},
             "ultima_sincronizacao": {"terminado_em": ok.terminado_em.isoformat() if ok and ok.terminado_em else None,
                                      "situacao_ultima_tentativa": u.situacao if u else None}}

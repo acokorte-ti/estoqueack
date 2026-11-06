@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from app.integrations.mega import fabrica
 from app.models import CadastroSa, MegaMovimento, MegaSaldo, SyncMega
 
+from . import entradas_mega
 from . import sas as sas_srv
 from .base import agora, notificar, parametro, parametro_texto
 
@@ -122,6 +123,8 @@ def sincronizar_estoque(db: Session, *, gatilho: str = "AGENDADA", usuario_id: i
                            "alterados_desde": alterado_desde.isoformat(), "movimentos_antes": int(antes),
                            "movimentos_depois": int(depois), "primeira_carga": vazio})
     db.add(s)
+    db.flush()
+    s.detalhes = {**s.detalhes, "t15": entradas_mega.atualizar(db)}     # T15: pendências por código (spec v3.4)
     db.commit()
     return s
 

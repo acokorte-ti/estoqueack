@@ -14,7 +14,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api import deps
-from app.api.routes.lotes import _visivel, filtros
+from app.api.routes.lotes import _visivel, filtros, filtros_reto, reto_visivel
 from app.core.db import get_db
 from app.models import Usuario
 from app.services import estoque, sas, solicitacoes
@@ -107,10 +107,10 @@ def solicitacoes_xlsx(situacao: list[str] = Query(default=[]), op: int | None = 
 def sas_xlsx(ids: list[int] = Query(default=[]), situacao: list[str] = Query(default=[]),
              origem: list[str] = Query(default=[]), op: int | None = None, cop: int | None = None,
              nao_exportados: bool = False, db: Session = Depends(get_db),
-             _: Usuario = Depends(VER_SA)) -> StreamingResponse:
+             u: Usuario = Depends(VER_SA)) -> StreamingResponse:
     """Layout da planilha de SA ("Exportar pedidos selecionados"), para facilitar o lançamento no Mega."""
     if ids:
-        linhas_sa = [sas.obter(db, i) for i in ids]
+        linhas_sa = [sas.obter(db, i, usuario=u) for i in ids]
     else:
         if not situacao and not op and not cop:
             situacao = ["PENDENTE", "PREPARADO", "AGUARDANDO_MEGA"]
@@ -128,3 +128,69 @@ def sas_xlsx(ids: list[int] = Query(default=[]), situacao: list[str] = Query(def
                             "VALOR PRECIFICADOR POR KG/PÇ", "COD.MEGA SEMI ACAB.", "DESCRIÇÃO", "NCM", "ICMS", "IPI",
                             "PEDIDO", "NF FIOCERTO/MEDIO VALE", "COP", "SITUAÇÃO NO SISTEMA", "OBS"],
                      linhas, [11, 9, 18, 10, 10, 11, 10, 7, 9, 14, 12, 44, 11, 7, 7, 10, 12, 7, 16, 24])
+
+
+CLASSES_TXT = {"COMPLETA": "Origem completa", "SO_BITOLA": "Só a bitola", "SEM_ORIGEM": "Sem origem"}
+
+
+@router.get("/reto-por-origem.xlsx")
+def reto_por_origem_xlsx(f: dict = Depends(filtros_reto), db: Session = Depends(get_db),
+                         u: Usuario = Depends(deps.usuario_liberado)) -> StreamingResponse:
+    """Duas abas: "Resumo" (linhas agrupadas e totais) e "Lotes" (um lote por linha). Cabeçalho com filtros e data."""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill
+    f = reto_visivel(f, u)
+    r = estoque.reto_por_origem(db, f)
+    usados = "; ".join(f"{k}={v}" for k, v in f.items() if v not in (None, [], False)) or "(sem filtros)"
+    cab = [f"RETO por origem — gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')}", f"Filtros: {usados}"]
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Resumo"
+    for t in cab:
+        ws.append([t])
+    ws.append([])
+    cols = ["Liga", "Bitola de origem", "Contêiner de origem", "Classe", "Estoque", "Nº de lotes", "Saldo kg",
+            "Reservado kg", "Disponível kg"]
+    ws.append(cols)
+    topo = ws.max_row
+    for lg in r["ligas"]:
+        for b in lg["bitolas"]:
+            for c in b["conteineres"]:
+                ws.append([lg["liga"], b["bitola_origem"], c["conteiner_texto"], CLASSES_TXT[c["classe"]],
+                           ESTOQUES.get(c["estoque"], c["estoque"]), c["lotes"], c["saldo_kg"], c["reservado_kg"],
+                           c["disponivel_kg"]])
+        s = lg["sem_origem"]
+        if s:
+            ws.append([lg["liga"], "Sem origem identificada", None, CLASSES_TXT["SEM_ORIGEM"], None, s["lotes"],
+                       s["saldo_kg"], s["reservado_kg"], s["disponivel_kg"]])
+        t = lg["totais"]
+        ws.append([f"Total {lg['liga']}", f"Com origem {t['com_origem_kg']:.1f} kg · Só bitola {t['so_bitola_kg']:.1f}"
+                   f" kg · Sem origem {t['sem_origem_kg']:.1f} kg", None, None, None, t["lotes"], t["total_kg"],
+                   t["reservado_kg"], t["disponivel_kg"]])
+        ws.cell(ws.max_row, 1).font = Font(bold=True)
+    t = r["totais"]
+    ws.append(["TOTAL GERAL", f"Com origem {t['com_origem_kg']:.1f} kg · Só bitola {t['so_bitola_kg']:.1f} kg · "
+               f"Sem origem {t['sem_origem_kg']:.1f} kg · Total RETO {t['total_kg']:.1f} kg", None, None, None,
+               t["lotes"], t["total_kg"], t["reservado_kg"], t["disponivel_kg"]])
+    ws.cell(ws.max_row, 1).font = Font(bold=True)
+    wl = wb.create_sheet("Lotes")
+    for tx in cab:
+        wl.append([tx])
+    wl.append([])
+    wl.append(["Lote", "Estoque", "Liga", "Bitola de origem", "Contêiner de origem", "Classe de origem", "Saldo kg",
+               "Reservado kg", "Data de criação", "Nota"])
+    for x in r["lotes"]:
+        wl.append([x["lote"], ESTOQUES.get(x["estoque"], x["estoque"]), x["liga"], x["bitola_origem"],
+                   x["conteiner_origem"] or ("não informado" if x["classe"] == "SO_BITOLA" else None),
+                   CLASSES_TXT[x["classe"]], x["saldo_kg"], x["reservado_kg"], _d(x["criado_em"]), x["nota"]])
+    for folha, linha_cab in ((ws, topo), (wl, 4)):
+        for c in folha[linha_cab]:
+            c.font = Font(bold=True, color="FFFFFF")
+            c.fill = PatternFill("solid", fgColor="3A3F44")
+        for i, w in enumerate([12, 26, 20, 16, 14, 11, 12, 12, 13, 40], start=1):
+            folha.column_dimensions[folha.cell(1, i).column_letter].width = w
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    arquivo = f"reto_por_origem_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(buf, media_type=XLSX, headers={"Content-Disposition": f'attachment; filename="{arquivo}"'})

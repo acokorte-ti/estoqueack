@@ -170,11 +170,11 @@ OrigemSa = Literal["COP", "CORTE_ITU", "CARGA"]
 def listar_sas(situacao: list[SituacaoSa] = Query(default=[]), origem: list[OrigemSa] = Query(default=[]),
                op: int | None = None, cop: int | None = None, nao_exportados: bool = False,
                pagina: int = Query(1, ge=1), por_pagina: int = Query(100, ge=1, le=500),
-               db: Session = Depends(get_db), _: Usuario = Depends(VER_SA)) -> dict:
+               db: Session = Depends(get_db), u: Usuario = Depends(VER_SA)) -> dict:
     if not situacao and not op and not cop:
         situacao = ["PENDENTE", "PREPARADO", "AGUARDANDO_MEGA"]
     linhas = sas.listar(db, {"situacao": situacao, "origem": origem or ["COP", "CORTE_ITU"], "op": op, "cop": cop,
-                             "nao_exportados": nao_exportados})
+                             "nao_exportados": nao_exportados}, u)
     ini = (pagina - 1) * por_pagina
     segurando = [cops.cop_dict(db, c, com_itens=False) for c in cops.listar(db, ["FECHADO"])
                  if cops.situacao_exibida(db, c) == "FECHADO"]
@@ -183,8 +183,8 @@ def listar_sas(situacao: list[SituacaoSa] = Query(default=[]), origem: list[Orig
 
 
 @router.get("/sas/{sa_id}")
-def detalhe_sa(sa_id: int, db: Session = Depends(get_db), _: Usuario = Depends(VER_SA)) -> dict:
-    return sas.para_dict(db, sas.obter(db, sa_id))
+def detalhe_sa(sa_id: int, db: Session = Depends(get_db), u: Usuario = Depends(VER_SA)) -> dict:
+    return sas.para_dict(db, sas.obter(db, sa_id, usuario=u))
 
 
 class EdicaoSa(BaseModel):

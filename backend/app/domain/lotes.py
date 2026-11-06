@@ -53,6 +53,22 @@ def cadeia_origem(lote_id: int, lotes: dict[int, LoteInfo]) -> list[LoteInfo]:
     return cadeia
 
 
+COMPLETA, SO_BITOLA, SEM_ORIGEM = "COMPLETA", "SO_BITOLA", "SEM_ORIGEM"
+
+
+def origem_do_reto(lote_id: int, lotes: dict[int, LoteInfo]) -> tuple[str, str | None, str]:
+    """(bitola de origem, contêiner de origem, classe) de um lote RETO/SOBRA.
+
+    COMPLETA: a raiz da árvore tem bitola e contêiner. SO_BITOLA: só a bitola é conhecida (medida anotada na carga
+    ou raiz sem contêiner). SEM_ORIGEM: nada se sabe (RETO sem pai e sem medida anotada)."""
+    r = raiz(lote_id, lotes)
+    if r.tipo == "RETO" or r.bitola == "RETO":
+        return (r.bitola_origem, None, SO_BITOLA) if r.bitola_origem else ("", None, SEM_ORIGEM)
+    if r.conteiner:
+        return r.bitola, r.conteiner, COMPLETA
+    return r.bitola, None, SO_BITOLA
+
+
 def reto_por_origem(lotes: dict[int, LoteInfo], liga: str | None = None) -> dict[tuple[str, str, str], float]:
     """Saldo de RETO agrupado por (liga, bitola original, contêiner original)."""
     total: dict[tuple[str, str, str], float] = defaultdict(float)

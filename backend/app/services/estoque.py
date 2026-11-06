@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
@@ -11,6 +11,9 @@ from sqlalchemy.orm import Session, joinedload
 from app.models import Conteiner, Destinacao, ItemMP, Liga, Lote, Movimento, Nota, Usuario
 
 from . import movimentos as mov
+
+if TYPE_CHECKING:
+    from app.domain.lotes import LoteInfo
 
 BALDE = {("ITU", "ITU"): "ESTOQUE_MEGA", ("RJ", "RJ"): "RJ_NO_RIO", ("RJ", "ITU"): "RJ_EM_ITU"}
 BALDE_INV = {v: k for k, v in BALDE.items()}
@@ -131,15 +134,26 @@ def agrupado(itens: list[dict]) -> list[dict]:
     return list(g.values())
 
 
-def arvore(db: Session, lote: Lote) -> dict:
-    r = raiz(db, lote)
+def arvore(db: Session, lote: Lote, usuario: Usuario | None = None) -> dict:
+    """Árvore de origem. [P10] Para a Operação RJ, lotes que não são do RJ no Rio (filhos em Itu) não aparecem, nem
+    o saldo deles; a raiz passa a ser o ancestral mais alto ainda visível."""
+    from .base import lote_visivel
+    ver = (lambda l: True) if usuario is None else (lambda l: lote_visivel(usuario, l))
+    r = lote
+    vistos_: set[int] = set()
+    while r.lote_pai_id is not None and r.id not in vistos_:
+        vistos_.add(r.id)
+        pai = db.get(Lote, r.lote_pai_id)
+        if pai is None or not ver(pai):
+            break
+        r = pai
     filhos: dict[int | None, list[Lote]] = defaultdict(list)
     # carrega a família inteira (BFS a partir da raiz)
     fila, vistos = [r.id], {r.id}
     while fila:
         atual = fila.pop()
         for f in db.scalars(select(Lote).where(Lote.lote_pai_id == atual)):
-            if f.id not in vistos:
+            if f.id not in vistos and ver(f):
                 vistos.add(f.id)
                 filhos[atual].append(f)
                 fila.append(f.id)
@@ -174,3 +188,120 @@ def movimentos(db: Session, lote_id: int) -> list[dict]:
                     "estorno_de": m.estorno_de_id, "estornavel": estornavel,
                     "da_carga": m.origem_ref is not None})
     return out
+
+
+# ---------------- RETO por origem (aba da T04, spec v3.4) ----------------
+
+def lote_infos(db: Session) -> dict[int, LoteInfo]:
+    """Monta os `LoteInfo` do domínio (árvore pai → filhos) a partir do banco, todos os lotes (a raiz pode estar
+    fora do filtro). Bitola de origem anotada pela carga vem de `origem_ref["bitola_origem"]`."""
+    from app.domain.lotes import LoteInfo
+    q = (select(Lote).join(ItemMP, Lote.item_mp_id == ItemMP.id)
+         .options(joinedload(Lote.item), joinedload(Lote.conteiner)))
+    out = {}
+    for l in db.scalars(q).unique():
+        ref = l.origem_ref if isinstance(l.origem_ref, dict) else {}
+        out[l.id] = LoteInfo(id=l.id, conteiner=l.conteiner.codigo if l.conteiner else "", liga=l.item.liga.codigo,
+                             bitola=bitola(l.item), tipo=l.tipo, pai_id=l.lote_pai_id, saldo_kg=float(l.saldo_kg),
+                             bitola_origem=ref.get("bitola_origem"))
+    return out
+
+
+def _norm_medida(t: str) -> str:
+    return t.upper().replace("×", "X").replace(" ", "").replace("Ø", "")
+
+
+def _primeiro_numero(b: str) -> float | None:
+    import re
+    m = re.search(r"\d+(?:[.,]\d+)?", b or "")
+    return float(m.group().replace(",", ".")) if m else None
+
+
+CLASSES = ("COMPLETA", "SO_BITOLA", "SEM_ORIGEM")
+
+
+def reto_por_origem(db: Session, f: dict[str, Any]) -> dict[str, Any]:
+    """Liga → bitola de origem → contêiner de origem, 3 classes separadas ("sem origem" em linha própria por liga).
+
+    Filtros: estoque, ligas (lista), bitola_origem (texto), bitola_de/bitola_ate (1ª medida: espessura ou diâmetro),
+    conteiner, codigo_mega, com_saldo (padrão ligado), incluir_sobras, criado_de/criado_ate."""
+    from app.domain.lotes import origem_do_reto
+    infos = lote_infos(db)
+    tipos = ("RETO", "SOBRA") if f.get("incluir_sobras") else ("RETO",)
+    lotes = [l for l in consulta_lotes(db, {"estoque": f.get("estoque"), "com_saldo": f.get("com_saldo", True),
+                                            "codigo_mega": f.get("codigo_mega")})
+             if l.tipo in tipos]
+    ligas = {x.strip().upper() for x in (f.get("ligas") or []) if x.strip()}
+    cont = (f.get("conteiner") or "").strip().upper()
+    txt = _norm_medida(f.get("bitola_origem") or "")
+    reservado = mov.reservado(db, [l.id for l in lotes])
+    notas: dict[int, str] = {}
+    if lotes:
+        for eid, texto in db.execute(select(Nota.entidade_id, Nota.texto).where(
+                Nota.entidade == "LOTE", Nota.entidade_id.in_([l.id for l in lotes])).order_by(Nota.id)):
+            notas[eid] = f"{notas[eid]} | {texto}" if eid in notas else texto
+    linhas: list[dict] = []
+    for l in lotes:
+        if ligas and l.item.liga.codigo.upper() not in ligas:
+            continue
+        if f.get("criado_de") and l.criado_em.date() < f["criado_de"]:
+            continue
+        if f.get("criado_ate") and l.criado_em.date() > f["criado_ate"]:
+            continue
+        bit, ct, classe = origem_do_reto(l.id, infos)
+        if txt and txt not in _norm_medida(bit):
+            continue
+        n1 = _primeiro_numero(bit)
+        if (f.get("bitola_de") is not None or f.get("bitola_ate") is not None) and (
+                n1 is None or (f.get("bitola_de") is not None and n1 < f["bitola_de"])
+                or (f.get("bitola_ate") is not None and n1 > f["bitola_ate"])):
+            continue
+        if cont and (ct or "").upper() != cont:
+            continue
+        res = round(min(reservado.get(l.id, 0.0), l.saldo_kg), 3)
+        linhas.append({"lote_id": l.id, "lote": l.codigo, "estoque": BALDE.get((l.planta_fiscal, l.local_fisico)),
+                       "tipo": l.tipo, "liga": l.item.liga.codigo, "bitola_origem": bit or None, "conteiner_origem": ct,
+                       "classe": classe, "saldo_kg": round(float(l.saldo_kg), 3), "reservado_kg": res,
+                       "disponivel_kg": round(float(l.saldo_kg) - res, 3), "criado_em": l.criado_em.isoformat(),
+                       "nota": notas.get(l.id), "codigo_mega": l.item.codigo_mega})
+
+    def soma(ls: list[dict]) -> dict[str, Any]:
+        d = {"lotes": len(ls)}
+        for c in ("saldo_kg", "reservado_kg", "disponivel_kg"):
+            d[c] = round(sum(x[c] for x in ls), 3)
+        return d
+
+    def totais(ls: list[dict]) -> dict[str, Any]:
+        por = {c: round(sum(x["saldo_kg"] for x in ls if x["classe"] == c), 3) for c in CLASSES}
+        return {"com_origem_kg": por["COMPLETA"], "so_bitola_kg": por["SO_BITOLA"], "sem_origem_kg": por["SEM_ORIGEM"],
+                "total_kg": round(sum(por.values()), 3), "lotes": len(ls),
+                "reservado_kg": round(sum(x["reservado_kg"] for x in ls), 3),
+                "disponivel_kg": round(sum(x["disponivel_kg"] for x in ls), 3)}
+
+    saida_ligas = []
+    for liga in sorted({x["liga"] for x in linhas}):
+        da_liga = [x for x in linhas if x["liga"] == liga]
+        bitolas = []
+        com = [x for x in da_liga if x["classe"] != "SEM_ORIGEM"]
+        for bit in sorted({x["bitola_origem"] or "" for x in com}, key=lambda b: (_primeiro_numero(b) or 0, b)):
+            da_bit = [x for x in com if (x["bitola_origem"] or "") == bit]
+            conts = []
+            for ct, est in sorted({(x["conteiner_origem"], x["estoque"]) for x in da_bit},
+                                  key=lambda t: (t[0] is None, t[0] or "", t[1] or "")):
+                g = [x for x in da_bit if x["conteiner_origem"] == ct and x["estoque"] == est]
+                conts.append({"conteiner": ct, "conteiner_texto": ct or "não informado", "estoque": est,
+                              "classe": g[0]["classe"], **soma(g),
+                              "lotes_detalhe": [{"id": x["lote_id"], "codigo": x["lote"], "saldo_kg": x["saldo_kg"]}
+                                                for x in g]})
+            bitolas.append({"bitola_origem": bit, "total_kg": round(sum(x["saldo_kg"] for x in da_bit), 3),
+                            "conteineres": conts})
+        sem = [x for x in da_liga if x["classe"] == "SEM_ORIGEM"]
+        saida_ligas.append({
+            "liga": liga, "bitolas": bitolas,
+            "sem_origem": ({"texto": "Sem origem identificada", **soma(sem),
+                            "por_estoque": {e: round(sum(x["saldo_kg"] for x in sem if x["estoque"] == e), 3)
+                                            for e in sorted({x["estoque"] for x in sem})},
+                            "lotes_detalhe": [{"id": x["lote_id"], "codigo": x["lote"], "saldo_kg": x["saldo_kg"],
+                                               "estoque": x["estoque"]} for x in sem]} if sem else None),
+            "totais": totais(da_liga)})
+    return {"ligas": saida_ligas, "totais": totais(linhas), "lotes": linhas, "vazio": not linhas}

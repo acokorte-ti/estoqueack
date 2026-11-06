@@ -257,6 +257,46 @@ O de SA sai no **layout da planilha de SA** (DATA, OP, CLIENTE, COD. ITEM, MATER
 
 Gerados pelo agendador (a cada 5 min), **uma vez por documento**, e lidos em `GET /api/notificacoes`. Tipos novos: `SA_SEM_CONFIRMACAO` (Estoque Itu e Admin, passou de 48 h), `SOLICITACAO_ATRASADA` (Estoque Itu e Operação RJ, passou de 15 dias), `RESERVA_VENCENDO` (quem criou a reserva, 7 dias antes; `link` = `/lotes/{id}?destinacao={id}`) e `RESUMO_EXCECOES` (Admin, a partir das 07h, exceções do dia anterior; `link` = `/relatorios/excecoes?dia=AAAA-MM-DD`).
 
-## 15. Ainda não implementado
+## 15. T15 Entradas Mega a classificar (mínima) ✅ (2026-11-06, migração 0007)
 
-📋 F1.1: T15 Entradas Mega a classificar, tratamento da T16, T19 Relatórios, T26, exportação para o Renato com marca, PDFs (romaneio do COP, ficha do lote). A **impressão da Fila RJ (T09)** usa `GET /api/fila-rj`; se faltar campo, o FUNCIONAL indica e eu acrescento.
+Perfis: lista e detalhe = Estoque Itu, Análise, Admin; criar lote e "Não é entrada" = Estoque Itu e Admin; reabrir = só Admin; Operação RJ recebe 403 em tudo.
+
+A pendência é **por código Mega** e nasce/atualiza/fecha na sincronização (6h, 13h, "Sincronizar agora"): `diferença = saldo Mega − lotes ITU/ITU − explicadas`; acima de `DIVERGENCIA_MEGA_KG` há uma pendência ABERTA. Código que só o Mega tem ("Código novo") só entra se teve entrada (ED) na janela de 120 dias copiada do Mega.
+
+| Endpoint | O que faz |
+|---|---|
+| `GET /api/entradas-mega?situacao=ABERTA\|RESOLVIDA\|DESCARTADA\|ENCERRADA\|TODAS&busca=` | `{itens, total, limite_kg, abertas, mega_indisponivel, aviso, ultima_sincronizacao}`; ordem: mais antiga primeiro |
+| `GET /api/entradas-mega/{id}` | uma pendência |
+| `GET /api/entradas-mega/motivos` | `[{codigo, descricao}]` do "Não é entrada" |
+| `POST /api/entradas-mega/{id}/criar-lote/validar` e `POST .../criar-lote` | padrão prévia/gravação (§1.5) |
+| `POST /api/entradas-mega/{id}/nao-e-entrada` | `{motivo, justificativa}` |
+| `POST /api/entradas-mega/{id}/reabrir` | `{justificativa}` (Admin, só Descartada) |
+
+Item da lista: `id, codigo, descricao, situacao, saldo_mega_kg, soma_lotes_kg, diferenca_kg, criado_em` (1ª sincronização em que apareceu = "há quanto tempo"), `ultima_entrada {nf, data, kg, tpm}` (null se não houver), `etiquetas` (`CODIGO_NOVO`, `CODIGO_RETO`), `aviso` (só código RETO), `item {id, liga, formato, bitola, criado_pela_t15}` ou, no código novo, `item_sugerido {legivel, liga, formato, bitola, mensagem}` para o operador conferir, e nas tratadas `motivo`, `motivo_descricao`, `justificativa`, `tratada_por`, `tratada_em`.
+
+**criar-lote** (corpo): `peso_kg` (>0), `conteiner` **ou** `sem_conteiner: true`, `pecas?`, `data_entrada?` (padrão: data da NF no Mega; não pode ser futura), `nf?` (padrão: NF do Mega), `observacao?`, `confirmacoes`. Ocorrências: ERRO `PESO_ACIMA_DA_DIFERENCA` ("O lote não pode ter mais kg do que o Mega tem a mais (X kg). Informe um peso menor ou confira a diferença."), `CONTEINER_OBRIGATORIO`, `CONTEINER_FORMATO`, `DATA_FUTURA`, `ITEM_ILEGIVEL` ("Não consegui ler liga e bitola desta descrição. Peça ao Admin para cadastrar o item no Catálogo (T22)."), `PENDENCIA_TRATADA`; CIENCIA `CONTEINER_REPETIDO` (já existe lote ativo com o mesmo contêiner e material; exige justificativa em `confirmacoes`). A prévia traz em `resultado`: `diferenca_kg`, `diferenca_restante_kg`, `peso_sugerido_kg`, `nf`, `data_entrada` e, no código novo, `item_novo {liga, formato, bitola}`. Gravação: lote ITU/ITU, ATIVO, movimento `ENTRADA` (estornável), `origem_identificada = false` sem contêiner, tipo RETO se o item é RETO; código novo cria o item com `criado_pela_t15 = true`. Peso menor que a diferença mantém a pendência ABERTA com o resto; dentro de `DIVERGENCIA_MEGA_KG` vira RESOLVIDA. Resposta 201: `{lote {id, codigo, peso_kg}, pendencia, diferenca_restante_kg, mensagem}` (mensagem: "Lote L-000123 criado com 1.450,0 kg (código 78290). Diferença restante: 0,0 kg.").
+
+**nao-e-entrada**: `motivo` = `ESTORNO_BAIXA_MEGA | ACERTO_INVENTARIO_MEGA | TRANSFERENCIA_CODIGOS | OUTRO`; `justificativa` com 10+ caracteres (400 "Escreva pelo menos 10 caracteres."). A pendência vira DESCARTADA e os kg ficam como diferença explicada (não volta; só o aumento posterior gera nova pendência). Pendência já tratada: 400 "Esta pendência já foi tratada por NOME às HH:MM. Atualize a lista."
+
+Estados: `ABERTA`, `RESOLVIDA`, `DESCARTADA`, `ENCERRADA` (o Mega voltou à tolerância sem ação).
+
+**Painel e T16.** `GET /api/painel/pendencias` ganha `entradas_mega_a_classificar {quantidade}` (null para Operação RJ) e, no grupo ESTOQUE, a pendência `ENTRADA_MEGA_A_CLASSIFICAR` (link `/entradas-mega`). Cada item de `GET /api/conciliacao` ganha `explicada_na_t15` (bool), `explicada_t15_kg`, `diferenca_nao_explicada_kg` e `explicacoes [{pendencia_id, kg, motivo, motivo_descricao, justificativa, usuario, em}]`; `diferenca_kg` continua sendo a total e `status` (OK / MEGA_MAIOR / MEGA_MENOR) é calculado sobre a **não explicada**: vermelho só para ela.
+
+## 16. Aba "RETO por origem" da T04 ✅ (2026-11-06)
+
+`GET /api/lotes/reto-por-origem` (todos os perfis; Operação RJ com o estoque travado em `RJ_NO_RIO`). Filtros: `estoque`, `liga` (repetível), `bitola_origem` (texto, ex. `45x610`), `bitola_de`/`bitola_ate` (1ª medida da bitola de origem), `conteiner`, `codigo_mega`, `com_saldo` (padrão true), `incluir_sobras` (padrão false: só RETO), `criado_de`/`criado_ate`.
+
+Resposta: `{ligas [{liga, bitolas [{bitola_origem, total_kg, conteineres [{conteiner, conteiner_texto ("não informado" se só a bitola), estoque, classe, lotes, saldo_kg, reservado_kg, disponivel_kg, lotes_detalhe [{id, codigo, saldo_kg}]}]}], sem_origem {texto: "Sem origem identificada", lotes, saldo_kg, reservado_kg, disponivel_kg, por_estoque, lotes_detalhe} | null, totais}], totais, lotes [um por lote], vazio, mensagem_vazio, estoque_travado}`. `totais` = `{com_origem_kg, so_bitola_kg, sem_origem_kg, total_kg, lotes, reservado_kg, disponivel_kg}`; o `total_kg` geral é a soma dos saldos dos lotes RETO nos filtros (bate com a T04 filtrada por formato RETO). Classes: `COMPLETA` (bitola e contêiner da raiz da árvore), `SO_BITOLA` (medida anotada na carga, contêiner "não informado"), `SEM_ORIGEM` (linha própria por liga, nunca somada a uma bitola). Para Operação RJ: `mensagem_vazio = "Nenhum RETO no RJ no Rio"`.
+
+Excel: `GET /api/exportar/reto-por-origem.xlsx` (mesmos filtros), duas abas "Resumo" e "Lotes"; as 2 primeiras linhas trazem a data/hora e os filtros usados.
+
+## 16.1 Visibilidade da Operação RJ [P10] ✅ (2026-11-06)
+
+- `GET /api/painel/resumo`: para Operação RJ só vem `baldes.RJ_NO_RIO` (as chaves `ESTOQUE_MEGA` e `RJ_EM_ITU` não existem) e `total_kg` é só dele.
+- `GET /api/painel/pendencias`: para Operação RJ, `divergencias_mega.quantidade` e `entradas_mega_a_classificar.quantidade` = null, `ultima_sincronizacao` vem com valores null.
+- `GET /api/lotes/{id}/arvore`: filhos que não são do RJ no Rio (ex.: sobra e RETO em Itu) não aparecem, nem os saldos; a raiz é o ancestral mais alto ainda visível.
+- T14: `GET /api/sas`, `GET /api/sas/{id}` e `/api/exportar/sas.xlsx` só devolvem SAs de itens de COP; SA de corte em Itu (B2) dá 404 no detalhe.
+
+## 17. Ainda não implementado
+
+📋 F1.1: tratamento da T16 (ver movimentos, ajustar, marcar como explicada), T19 Relatórios, T26, exportação para o Renato com marca, PDFs (romaneio do COP, ficha do lote). A **impressão da Fila RJ (T09)** usa `GET /api/fila-rj`; se faltar campo, o FUNCIONAL indica e eu acrescento.

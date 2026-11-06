@@ -98,12 +98,18 @@ class PendenciaMega(Base):
     tipo: Mapped[str] = mapped_column(String(12))
     codigo: Mapped[int] = mapped_column(Integer, index=True)
     kg: Mapped[float] = mapped_column(Kg)
-    situacao: Mapped[str] = mapped_column(String(12), default="ABERTA", index=True)  # ABERTA | RESOLVIDA
+    situacao: Mapped[str] = mapped_column(String(12), default="ABERTA", index=True)  # ver estados abaixo
     nota: Mapped[str | None] = mapped_column(String(1000))
     lote_id: Mapped[int | None] = mapped_column(ForeignKey("lote.id"))
     criado_em: Mapped[datetime] = mapped_column(DataHora, default=agora)
     resolvido_em: Mapped[datetime | None] = mapped_column(DataHora)
     resolvido_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    # 0007 (T15 mínima): estados ABERTA | RESOLVIDA | DESCARTADA ("Não é entrada") | ENCERRADA (Mega voltou sozinho)
+    motivo: Mapped[str | None] = mapped_column(String(30))            # DESCARTADA: motivo da lista
+    justificativa: Mapped[str | None] = mapped_column(String(500))    # DESCARTADA e reabertura
+    saldo_mega_kg: Mapped[float | None] = mapped_column(Kg)           # última sincronização que tocou a pendência
+    soma_lotes_kg: Mapped[float | None] = mapped_column(Kg)
+    atualizado_em: Mapped[datetime | None] = mapped_column(DataHora)
 
 
 class LigaEquivalente(Base):

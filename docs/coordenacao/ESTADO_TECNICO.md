@@ -15,6 +15,13 @@ Atualizado: 2026-11-06 pelo TÉCNICO: correção da auditoria de 06/11 (commit l
 
 ## 2. Feito
 
+### Auditoria de 06/11, parte 2 (T15 mínima, RETO por origem, P10; migração 0007)
+
+- **T15** (`services/entradas_mega.py`, `api/routes/entradas_mega.py`): pendência por código atualizada ao fim de cada sincronização; criar-lote (prévia + gravação), "Não é entrada", reabrir (Admin). Migração **0007** (colunas em `pendencia_mega` e `item_mp.criado_pela_t15`), **para o BANCO E TESTES revisar (R042)**. Código novo só gera pendência com entrada (ED) nos últimos 120 dias no Mega (escolha minha, avisada no R040). T16 mínima mostra `explicada_na_t15`; Painel tem o contador.
+- **RETO por origem**: `estoque.lote_infos` (monta `LoteInfo` do banco), `domain.lotes.origem_do_reto` (3 classes), `GET /api/lotes/reto-por-origem` e Excel de 2 abas.
+- **P10**: `painel/resumo` e `painel/pendencias`, árvore do T05 e T14 (lista, detalhe, Excel) não mostram Itu ao Marcelo.
+- Contrato §15, §16, §16.1. Testes novos em `tests/test_t15_reto_origem_p10.py`. Não mexi no §9.1 nem recarreguei a homologação.
+
 ### Correção da auditoria de 06/11 (commit `591d583`; NÃO publicado: push negado; CI e prévia no servidor pendentes)
 
 - **RETO do RJ em Itu:** entra como tipo RETO e em sub-lotes pelas parcelas do comentário da célula ("381kg de sobra (MEDIDA ORIGINAL IMP-D2 25X610MM)"); o resto do saldo vira um lote "sem origem"; soma = saldo da célula. Dry-run local (planilhas de 03/11, sem Mega): 6 linhas RETO = 14 lotes, 10.836,8 kg. D2 = 6 parcelas + 73 kg sem origem; DC53 = 2 parcelas + 680 kg; A8, D6, H13 e 1.2767 = 1 lote cada (sem comentário; o 1.2767 é fórmula de 6 parcelas sem bitola).

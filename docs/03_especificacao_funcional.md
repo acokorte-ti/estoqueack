@@ -1,6 +1,6 @@
 # EstoqueACK — Especificação Funcional Completa
 
-Versão 3.3, 04/11/2026. A 3.3 registra as respostas do Fabiano ao BLOCO 1 da carga (§10.7: paridade sem múltiplo, material só do RJ sem código, kardex de 2 anos para códigos fora do catálogo). A 3.2 registra as decisões do Eduardo de 04/11 (T16 mínima e impressão da Fila RJ na F1; depois da implantação, planilhas só para conferência semanal, §10.6; sem data de implantação), as colunas da lista de corte impressa (R037), as interpretações da carga (R032, §10.7) e o R024 completo (perda de corte normal: até 6 % do material usado). A 3.1 registra as leituras do Mega confirmadas no R026 (situação da OP, SA pela estrutura da OP, confirmação do SA, NCM/IPI). A v3 incorpora as **respostas do Eduardo às perguntas P01–P18** (arquivo "Questões IA.xlsx", 2026-11-03) e as respostas do FUNCIONAL aos pedidos R003–R009, R014 e R017. A v2 tinha incorporado a conferência com as planilhas (`04_conferencia_planilhas_x_fluxo.md`) e as regras do Matheus. **Sem data fixa de implantação [P08]:** o sistema entra quando os critérios de go/no-go forem atendidos e o Eduardo liberar. Este documento descreve o sistema **como se ele já estivesse funcionando**: o que cada tela faz, quais botões existem, de onde vem cada informação e o que acontece no banco de dados a cada ação. Ele complementa `02_proposta_arquitetura.md`, que trata da parte técnica.
+Versão 3.4, 06/11/2026. A 3.4 registra a correção da auditoria de 06/11: T15 mínima e consulta "RETO por origem" entram na F1 (§4.2, T04, T15), a carga passa a quebrar o RETO do RJ em Itu por bitola de origem e a ler redondo com comprimento como redondo (§10.8), a T25 é linha de comando (não é tela), regras que só estavam no código ficam registradas como "a confirmar" (§9.1) e perguntas P19 a P25 (§12). A 3.3 registra as respostas do Fabiano ao BLOCO 1 da carga (§10.7: paridade sem múltiplo, material só do RJ sem código, kardex de 2 anos para códigos fora do catálogo). A 3.2 registra as decisões do Eduardo de 04/11 (T16 mínima e impressão da Fila RJ na F1; depois da implantação, planilhas só para conferência semanal, §10.6; sem data de implantação), as colunas da lista de corte impressa (R037), as interpretações da carga (R032, §10.7) e o R024 completo (perda de corte normal: até 6 % do material usado). A 3.1 registra as leituras do Mega confirmadas no R026 (situação da OP, SA pela estrutura da OP, confirmação do SA, NCM/IPI). A v3 incorpora as **respostas do Eduardo às perguntas P01–P18** (arquivo "Questões IA.xlsx", 2026-11-03) e as respostas do FUNCIONAL aos pedidos R003–R009, R014 e R017. A v2 tinha incorporado a conferência com as planilhas (`04_conferencia_planilhas_x_fluxo.md`) e as regras do Matheus. **Sem data fixa de implantação [P08]:** o sistema entra quando os critérios de go/no-go forem atendidos e o Eduardo liberar. Este documento descreve o sistema **como se ele já estivesse funcionando**: o que cada tela faz, quais botões existem, de onde vem cada informação e o que acontece no banco de dados a cada ação. Ele complementa `02_proposta_arquitetura.md`, que trata da parte técnica.
 
 As decisões estão marcadas como **[P01]**, **[P02]** etc. e reunidas no fim (§12), já com a resposta.
 
@@ -117,7 +117,7 @@ Nas planilhas, é **45 % de todos os SAs** desde maio/2025 (649 de 1.438), e ess
 
 ### 2.3 Caminho C: material Mega (fiscal e físico em Itu)
 
-1. **Entrada:** a NF é lançada no Mega, como hoje. Na sincronização, o sistema detecta saldo novo no código Mega e cria uma pendência em *Entradas Mega a classificar* (T15). Fabiano informa o contêiner e confirma, e o sistema cria o lote ITU/ITU **[P01]**.
+1. **Entrada:** a NF é lançada no Mega, como hoje. Na sincronização, o sistema detecta saldo novo no código Mega e cria uma pendência em *Entradas Mega a classificar* (T15, **versão mínima na F1**, decisão de 06/11). Fabiano informa o contêiner e escolhe **"Criar lote"** (o sistema cria o lote ITU/ITU **[P01]**) ou **"Não é entrada"** (com justificativa). Sem isso, a primeira NF de MP lançada no Mega depois da implantação deixaria o sistema diferente do Mega, e a única saída seria ajuste manual. A diferença que sobra aparece na T16 mínima.
 2. **Uso:** Fabiano lança em *Corte em Itu* (T13): OP, lote, consumo e sobra, dentro ou fora da bitola. O sistema baixa o lote e, se for o caso, cria o lote RETO com a origem.
 3. **ERP:** a baixa na OP e a transferência de saldo do código original para o código RETO continuam sendo feitas **no Mega**. O sistema mostra a instrução pronta, por exemplo: "Baixar 104,5 kg do código 78290 na OP 100508. Transferir 12,0 kg do código 78290 para o código 1698 (H13 RETO)". Depois, a *Conciliação* (T16) confere se o Mega bate.
 
@@ -190,7 +190,7 @@ Nasce em dois momentos: **COP fechado** pelo RJ (uma linha por item do COP, incl
 Menu lateral (aparece conforme o perfil)
 ├── Painel                                (todos)
 ├── Estoque
-│   ├── Consulta de estoque               (todos)
+│   ├── Consulta de estoque               (todos; abas: por lote, agrupado por item, RETO por origem)
 │   └── Detalhe do lote                   (todos, abre a partir da consulta)
 ├── Barra Mansa
 │   ├── Entrada por NF                    (Operação RJ)
@@ -212,9 +212,10 @@ Menu lateral (aparece conforme o perfil)
     ├── Usuários
     ├── Catálogo: ligas, densidades, itens de MP
     ├── Parâmetros (tolerâncias, prazos)
-    ├── Auditoria
-    └── Carga inicial das planilhas
+    └── Auditoria
 ```
+
+A **carga inicial (T25) não é tela**: é linha de comando rodada pelo TÉCNICO no servidor (`python -m app.carga`), com prévia em Excel, uma vez na virada (§10).
 
 ### 4.1 Matriz perfil × tela [R009]
 
@@ -224,7 +225,7 @@ Legenda: **A** = usa e altera; **V** = só consulta; **—** = não aparece no m
 |---|---|---|---|---|
 | T01, T01b, T02 Entrar / senha | A | A | A | A |
 | T03 Painel | A (pendências de Itu) | A (pendências do RJ) | A (pendências de análise) | A |
-| T04 Consulta de estoque | V | V (só RJ no Rio) | V | V |
+| T04 Consulta de estoque (inclui a aba "RETO por origem") | V | V (só RJ no Rio) | V | V |
 | T05 Detalhe do lote | A (notas, ajuste, atribuir origem) | V (só RJ no Rio) + notas | V + notas | A |
 | T06 Entrada por NF (RJ) | V | A | V | A |
 | T07 Nova solicitação | A | — | — | A |
@@ -235,17 +236,32 @@ Legenda: **A** = usa e altera; **V** = só consulta; **—** = não aparece no m
 | T12 Receber COP | A | V | — | A |
 | T13 Corte em Itu | A | — | — | A |
 | T14 SA | A | V (situação do SA dos itens do COP) | V + exportar + R$/kg | A |
-| T15 Entradas Mega a classificar | A | — | V | A |
+| T15 Entradas Mega a classificar (mínima, F1) | A | — | V | A |
 | T16 Conciliação Mega | A | — | V | A |
 | T17 Reservas e restrições | A | V (lotes RJ no Rio) | A | A |
 | T18 Ajuste / estorno | A | A (só estorno dos próprios lançamentos, antes do COP fechado) | — | A |
 | T19 Relatórios | V | V (só RJ no Rio) | V | V |
 | T20 Calculadora | A | A | A | A |
-| T21 Usuários, T23 Parâmetros, T24 Auditoria, T25 Carga | — | — | — | A |
+| T21 Usuários, T23 Parâmetros, T24 Auditoria | — | — | — | A |
 | T22 Catálogo | V | — | V | A |
 | T26 Material a chegar | V | — | A | A |
 
+**Operação RJ não vê o que é de Itu em nenhum lugar [P10, detalhado em 06/11 após a auditoria].** Vale para o Painel (só pendências e totais do RJ no Rio), para a árvore de origem do T05 (filhos que estão em Itu não aparecem, nem seus saldos), para o T14 (só os SAs dos itens dos COPs do RJ; os SAs de corte em Itu, Caminho B2, não aparecem), para as exportações e para a aba "RETO por origem".
+
 Em todas as telas há uma busca global no topo. Ela aceita um número de OP, de lote (L-000123), de COP, de SA ou de contêiner (CH11EA) e abre direto o item encontrado.
+
+### 4.2 O que entra na F1 e o que fica para a F1.1 (resumo, atualizado em 06/11)
+
+| Tela | F1 | F1.1 |
+|---|---|---|
+| T15 Entradas Mega a classificar | **Mínima (entra na F1 desde 06/11)**: lista, "Criar lote", "Não é entrada" | Nada previsto além disso |
+| T16 Conciliação com o Mega | Mínima, só leitura (decisão de 04/11); mostra a diferença **explicada** pela T15 | "Ver movimentos", "Ajustar lote", "Marcar como explicada" |
+| Consulta "RETO por origem" (aba do T04) | **Entra na F1 (06/11)** | T19 completo (rastreio por OP, por contêiner, histórico) |
+| T19 Relatórios (os 9) | — | Todos |
+| T26 Material a chegar | — | Sim |
+| T25 Carga inicial | Linha de comando, não é tela | — |
+
+(O plano de etapas e o go/no-go ficam em `coordenacao/ESTADO_COORDENACAO.md`; esta tabela só diz o que cada tela tem de funcionalidade.)
 
 ---
 
@@ -312,7 +328,7 @@ Filtros (todos [DIGITADO]):
 
 **Material a chegar [P17]:** na visão *agrupado por item*, uma coluna "A chegar (kg)" soma os pedidos abertos de T26 e abre a lista ao clicar.
 
-**Modos de visão:** *por lote* (uma linha por lote) e *agrupado por item* (soma por liga + bitola, parecida com o Estoque Geral de hoje).
+**Modos de visão:** *por lote* (uma linha por lote), *agrupado por item* (soma por liga + bitola, parecida com o Estoque Geral de hoje) e a aba ***RETO por origem*** (abaixo, entra na F1).
 
 | Coluna | Origem |
 |---|---|
@@ -332,6 +348,32 @@ Botões:
 - **"Exportar para Excel":** gera a lista filtrada.
 - **"Nova solicitação com este lote":** só para Estoque Itu; abre T07 com o lote preenchido.
 - Clicar numa linha abre T05.
+
+#### T04 aba "RETO por origem": quantos kg de RETO vieram de cada bitola e contêiner **[auditoria 06/11, decisão do Eduardo: entra na F1]**
+
+É a pergunta que motivou o projeto. **Onde fica (proposta, P25):** aba dentro da T04, ao lado de "por lote" e "agrupado por item", porque reaproveita os filtros, a regra de visibilidade (P10) e o botão de exportar. O T19 completo (relatório 2, rastreio por OP e por contêiner, histórico no período) continua na F1.1.
+
+**Quem acessa:** Estoque Itu, Análise e Admin veem Estoque Mega e RJ em Itu. **Operação RJ (Marcelo) vê só o RJ no Rio, com o filtro de estoque travado [P10]**; como no RJ no Rio não existe lote RETO (a sobra fica na linha do contêiner), a aba mostra "Nenhum RETO no RJ no Rio" e nunca mostra RETO de Itu.
+
+**Filtros:** estoque (Mega / RJ em Itu / todos); liga (uma ou várias); bitola de origem (de/até e texto, ex.: "45x610"); contêiner de origem; código Mega; "somente com saldo" (ligado por padrão); "incluir sobras com bitola original (SOBRA)" (desligado por padrão: só RETO); "criado entre" (data do lote RETO).
+
+**Linhas (agrupadas Liga → Bitola de origem → Contêiner de origem; clicar abre os lotes, e o lote abre a T05):**
+
+| Coluna | Origem |
+|---|---|
+| Liga | [LOTE] → catálogo |
+| Bitola de origem | [CALC] bitola do lote **raiz** da árvore de origem (RETO que nasce de RETO continua apontando para a raiz), ou a bitola lida do comentário da carga (§10.8) |
+| Contêiner de origem | [CALC] contêiner do lote raiz; "não informado" quando só se sabe a bitola |
+| Estoque | [CALC] Estoque Mega ou RJ em Itu |
+| Nº de lotes | [CALC] |
+| Saldo kg | [CALC] soma dos movimentos dos lotes RETO |
+| Reservado / Disponível kg | [CALC], como na T04 |
+
+**Três classes de origem, sempre separadas, nunca somadas dentro de uma bitola:** (1) *origem completa* (bitola e contêiner); (2) *só a bitola* (vindo dos comentários do Estoque Geral); (3) ***Sem origem*** (origem não identificada: RETO do Mega que veio da carga e RETO do RJ em Itu sem comentário). A classe 3 aparece em **linha própria por liga** ("Sem origem identificada"), abaixo das linhas com origem, e é a que o botão "Atribuir origem" (T05) vai reduzindo com o tempo.
+
+**Totais:** subtotal por liga (com origem / só bitola / sem origem / total da liga) e total geral no rodapé, no formato "Com origem X kg · Só bitola Y kg · Sem origem Z kg · Total RETO W kg". O total geral é igual à soma dos saldos dos lotes tipo RETO nos filtros aplicados (é o número que deve bater com a T04 filtrada por formato RETO).
+
+**Exportar para Excel:** duas abas, "Resumo" (as linhas agrupadas e os totais) e "Lotes" (um lote por linha: lote, estoque, liga, bitola e contêiner de origem, classe de origem, saldo, reservado, data de criação, nota). O cabeçalho do arquivo traz os filtros usados e a data/hora.
 
 ### T05. Detalhe do lote
 
@@ -588,27 +630,69 @@ Botões:
 
 Uma OP com dois lotes gera duas linhas com o mesmo código de SA, como já acontece hoje.
 
-### T15. Entradas Mega a classificar
+### T15. Entradas Mega a classificar (versão mínima, entra na F1 desde 06/11)
 
-Na sincronização, o sistema compara o saldo de cada código Mega com a soma dos lotes ITU/ITU. Quando o Mega tem **mais** saldo, cria uma pendência.
+**Para que serve (Caminho C, passo 1):** quando uma NF de MP entra no Mega em Itu, o saldo do código sobe, mas o sistema ainda não tem o lote. A T15 deixa o operador transformar essa diferença em lote ou dizer que ela não é entrada, para que o sistema continue igual ao Mega. Na T16 mínima a diferença que o operador explicar aparece como explicada.
 
-| Campo | Origem |
+**Quem usa:** Estoque Itu (Fabiano, Matheus) e Admin alteram; Análise só consulta; Operação RJ não vê a tela. Aparece no menu Itu e como contador no Painel ("Entradas Mega a classificar: N").
+
+**Quando nasce uma pendência.** Na sincronização (6h, 13h e "Sincronizar agora"), para cada código Mega do catálogo (filial 3, só Estoque Mega): `diferença = saldo Mega − soma dos saldos dos lotes ITU/ITU ativos − diferenças já explicadas ("Não é entrada")`. Se a diferença for **maior que `DIVERGENCIA_MEGA_KG`** (T23, 5 kg), existe uma pendência **por código** (a pendência é atualizada a cada sincronização, não duplicada). Diferença **negativa** (Mega menor que os lotes) não é da T15: aparece só na T16 e se corrige pelo T18. Código que o Mega tem e o catálogo não tem aparece com a etiqueta **"Código novo"** (ver "Criar lote").
+
+| Campo da lista | Origem |
 |---|---|
 | Código e descrição | [MEGA] |
 | Saldo Mega × soma dos lotes | [MEGA] × [CALC] |
 | Diferença kg | [CALC] |
-| NF de entrada, data | [MEGA], se a tabela de movimentos for acessível [P01] |
-| Contêiner | [DIGITADO] ou "sem contêiner" |
-| Peças | [DIGITADO], opcional |
+| Última entrada no Mega (NF, data, kg) | [MEGA], movimentos de entrada por NF **[P01]**; "não disponível" se a leitura falhar |
+| Há quanto tempo | [CALC] desde a 1ª sincronização em que a diferença apareceu |
+| Etiquetas | "Código novo" (sem item no catálogo); "Código RETO" (ver abaixo) |
 
-Botões:
+Ordem padrão: mais antiga primeiro. Filtro: situação (Aberta / todas) e busca por código ou descrição.
 
-- **"Criar lote"** (movimento `ENTRADA`).
-- **"Não é entrada"** (exige motivo; ex.: estorno de baixa no Mega). A diferença vai para a conciliação.
+**Botão "Criar lote"** (abre um quadro com os campos abaixo, grava o movimento `ENTRADA` com origem "T15" e a NF/data lida do Mega):
+
+| Campo | Origem | Regra |
+|---|---|---|
+| Código, liga, bitola, formato | [MEGA] → catálogo | Somente leitura. **Código novo:** o sistema cria o item no catálogo interpretando a descrição (mesma regra da carga) e mostra liga e bitola para conferir; o item fica com a marca "criado pela T15, revisar" no T22. Se não conseguir interpretar a descrição, **bloqueia** com "Não consegui ler liga e bitola desta descrição. Peça ao Admin para cadastrar o item no Catálogo (T22)." **[proposta, P25]** |
+| Peso do lote (kg) | [SUGERIDO] = a diferença, editável | Maior que 0. **Bloqueia** se passar da diferença mais `DIVERGENCIA_MEGA_KG`: "O lote não pode ter mais kg do que o Mega tem a mais (X kg)". Menor que a diferença: cria o lote e a pendência continua aberta com o que sobrou (várias NFs ou contêineres no mesmo código) **[proposta, P25]** |
+| Contêiner | [DIGITADO] ou caixa "sem contêiner" | Um dos dois. Com contêiner: formato conferido (ex.: CH11EA) e aviso se já existe lote ativo com o mesmo contêiner **e** o mesmo material ("já existe o lote L-000123; confirma que é outra entrada?", exige "estou ciente"). Sem contêiner: o lote nasce com `origem_identificada = false` |
+| Peças | [DIGITADO], opcional | Só informação (P11, P14) |
+| Data de entrada | [MEGA] data da NF, ou [DIGITADO] se o Mega não trouxer | Não pode ser futura |
+| NF | [MEGA], ou [DIGITADO] opcional | — |
+| Observação | [DIGITADO], opcional | Vai para as notas do lote |
+
+Depois de gravar: o lote nasce **ITU/ITU**, estado `Ativo`, aparece na T04 e na T05 (movimento `ENTRADA`), a diferença da pendência diminui do peso criado e, se ficar dentro de `DIVERGENCIA_MEGA_KG`, a pendência vira **Resolvida** sozinha. Mensagem de sucesso: "Lote L-000123 criado com 1.450,0 kg (código 78290). Diferença restante: 0,0 kg."
+
+**Código RETO (ex.: 1698 H13 RETO):** normalmente o RETO nasce na T13, que já cria o lote RETO e mostra a transferência a fazer no Mega. Se o Fabiano fez a transferência no Mega antes de lançar a T13, aparece uma diferença temporária. A tela mostra o aviso "Código RETO: confira se a T13 deste corte já foi lançada antes de criar o lote". "Criar lote" cria lote tipo RETO sem origem identificada.
+
+**Botão "Não é entrada"** (para o que não é material novo: estorno de baixa no Mega, acerto de inventário feito no Mega, transferência entre códigos etc.):
+
+- Exige o **motivo** escolhido numa lista (Estorno de baixa no Mega / Acerto de inventário no Mega / Transferência entre códigos / Outro) e **justificativa de pelo menos 10 caracteres** (regra geral do §9).
+- O sistema guarda os kg da diferença **explicada** (data, usuário, motivo, justificativa). A pendência fica **Descartada** e **não volta** na sincronização seguinte (a diferença explicada sai do cálculo). Se depois o Mega subir de novo, só o aumento gera nova pendência.
+- A T16 mínima continua mostrando a diferença do código, agora com a etiqueta **"explicada na T15"** e a justificativa (passando o mouse ou expandindo a linha). O destaque vermelho da T16 é só para diferença **não explicada**.
+- Pode ser desfeita pelo Admin ("Reabrir"), com justificativa; a pendência volta a Aberta.
+
+**Estados da pendência:** `Aberta` → `Resolvida` (lote criado e diferença dentro da tolerância) | `Descartada` ("Não é entrada") | `Encerrada pelo Mega` (a diferença voltou para dentro da tolerância sem ação, por ex. porque o Mega estornou a NF). Uma pendência encerrada ou descartada fica na lista (filtro "todas") para auditoria.
+
+**Textos de erro e de aviso:**
+
+| Situação | Texto |
+|---|---|
+| Peso maior que a diferença permitida | "O lote não pode ter mais kg do que o Mega tem a mais (X kg). Informe um peso menor ou confira a diferença." |
+| Sem contêiner nem a caixa "sem contêiner" | "Informe o contêiner ou marque "sem contêiner"." |
+| Contêiner repetido no mesmo material | "Já existe o lote L-000123 com este contêiner e este material. Confirma que é outra entrada?" (estou ciente) |
+| Justificativa curta | "Escreva pelo menos 10 caracteres." |
+| Mega fora do ar | "Mega indisponível. Os dados desta lista são da última sincronização (data/hora)." Os botões continuam funcionando com o saldo em cache |
+| Pendência já tratada por outro usuário | "Esta pendência já foi tratada por NOME às HH:MM. Atualize a lista." |
+| Código novo sem leitura possível da descrição | Ver "Criar lote" |
+
+**Auditoria (T24):** toda criação de lote e todo "Não é entrada" ficam registrados com usuário, código, kg e justificativa. **Dia da carga:** logo depois da carga as pendências devem ser **zero** (cada código do Mega com saldo ganhou o seu lote).
 
 ### T16. Conciliação com o Mega
 
 **Na F1 entra a versão mínima (decisão de 04/11):** só leitura, com código Mega × soma dos lotes Estoque Mega e destaque quando a diferença passa de `DIVERGENCIA_MEGA_KG` (T23, 5 kg). Os botões "Ver movimentos", "Ajustar lote" e "Marcar como explicada" ficam para a F1.1; na F1, a correção é feita pelo T18 a partir do T05.
+
+Na F1 a T16 mostra também a diferença **explicada na T15** ("Não é entrada"), com a etiqueta e a justificativa, e destaca em vermelho só a não explicada.
 
 Só para lotes **ITU/ITU**, porque o material RJ não tem saldo por código no Mega de Itu.
 
@@ -649,7 +733,7 @@ O estorno de corte RJ só é permitido se a solicitação ainda não estiver em 
 Todos com filtros de período, estoque, liga e contêiner, e com botão **"Exportar para Excel"**:
 
 1. **Posição de estoque**: por lote ou por item; substitui o Estoque Geral.
-2. **RETO e sobras por origem**: kg por liga × bitola original × contêiner. É a dor principal que você descreveu.
+2. **RETO e sobras por origem**: kg por liga × bitola original × contêiner. É a dor principal que você descreveu. **A consulta simples já existe na F1** (aba "RETO por origem" da T04); aqui entra o relatório completo (histórico no período, gerado × consumido).
 3. **Consumo por OP / cliente / liga**: kg e peças, com a origem.
 4. **Rastreio de OP**: para uma OP, todos os lotes, cortes, COPs, SAs e pesos envolvidos.
 5. **Rastreio de contêiner**: para onde foi cada kg de um contêiner (OPs, sobras, RETO, saldo).
@@ -662,7 +746,7 @@ Todos com filtros de período, estoque, liga e contêiner, e com botão **"Expor
 
 Já existe. Formato (retangular / redondo / anel), liga, medidas e quantidade dão o peso previsto. Ela também confere o peso de balança contra a regra dos 5 %.
 
-### T21 a T25. Administração
+### T21 a T24 e T26. Administração (a carga T25 não é tela)
 
 - **T21 Usuários** **[R014, R017]**: criar, editar, desativar e redefinir senha. Na criação: **login no padrão `nome.sobrenome`**, nome completo, e-mail, perfil e planta [DIGITADO]; **senha** [DIGITADO, opcional] e caixa **"Obrigar troca de senha"**. Senha em branco = o sistema gera uma temporária, e a troca no 1º acesso é **sempre** obrigatória (a caixa fica marcada e travada). Senha digitada pelo admin = ele escolhe se obriga a troca. O mesmo vale para "Redefinir senha".
 - **T26 Material a chegar** **[P17]**: lista simples por item de MP, com fornecedor, kg, previsão de chegada, situação (pedido / embarcado / chegou / cancelado) e observação [DIGITADO]. Quem usa: Análise (Renato) e Admin; os demais só consultam. Botões "Novo pedido", "Editar", "Marcar como chegou". Aparece na consulta de estoque (T04). Carga inicial: os comentários do Renato no Estoque Geral (ex.: "Pedido EASON 3 tons, prazo final de Nov/2026") vão para a lista de pendências para ele confirmar.
@@ -686,7 +770,7 @@ Já existe. Formato (retangular / redondo / anel), liga, medidas e quantidade d�
   | Aviso de reserva vencendo | 7 dias antes **[R008]** |
 
 - **T24 Auditoria**: busca por usuário, ação, período e entidade. Só leitura.
-- **T25 Carga inicial**: envio das 4 planilhas, prévia do que será importado, lista de pendências de catálogo para revisão e botão **"Importar"**. Usada uma vez, na virada (§10).
+- **T25 Carga inicial: não é tela, é linha de comando** (`python -m app.carga`, rodada pelo TÉCNICO no servidor, com as 4 planilhas numa pasta fora do repositório). Gera a prévia e a lista de pendências em Excel para o Fabiano revisar, e só grava com a opção de gravação. Pode ser repetida em homologação (limpa os dados operacionais e recarrega; usuários, auditoria, ligas e parâmetros ficam). Usada na virada (§10).
 
 ---
 
@@ -783,9 +867,22 @@ Toda justificativa precisa ter pelo menos 10 caracteres e fica gravada com o mov
 
 ---
 
+### 9.1 Regras que hoje estão só no código (auditoria de 06/11): **a confirmar pelo Eduardo**
+
+Foram decididas por quem programou, sem decisão registrada do Eduardo. Ficam descritas aqui como **comportamento atual** e valem até a resposta da P24 (§12). Onde a especificação dizia outra coisa, a divergência está dita.
+
+| # | Regra no código | O que a especificação dizia | Proposta padrão |
+|---|---|---|---|
+| 1 | **Estorno de corte do RJ já é bloqueado quando o corte está num COP aberto.** O Marcelo precisa primeiro tirar o item do COP aberto; com COP fechado, usa "Reabrir COP". Estorno de corte que ainda não foi para nenhum COP: livre para o próprio autor | §8 e T18: "estorno se o COP ainda não fechou" | Manter o código (tirar do COP aberto, depois estornar): evita estornar o que o COP já lista. Corrigir o texto de §8 e T18 |
+| 2 | **Confirmação do SA pelo Mega** só considera entradas a partir de **7 dias antes da data do SA**, e aceita também a transferência (TPM 76) na filial 3, além da compra na filial 13 ou 3 | T14 e §7: entrada por compra na filial 13 (ou 3), sem janela | Manter; 7 dias vira o parâmetro `SA_JANELA_ANTES_DIAS` na T23 |
+| 3 | **CR8MOD é lido como CR8** sem pedir "estou ciente" (A8 MOD, ao contrário, é liga distinta na T07) | §10.7 item 1: A8 MOD ≈ A8 só na paridade da carga | Tratar CR8MOD como liga **distinta**, igual ao A8 MOD (equivalência só na paridade da carga). O Fabiano confirma se CR8 e CR8MOD são o mesmo aço |
+| 4 | **"Peça usa a largura inteira":** se `largura acabada + sobremetal ≥ largura da bitola`, o bruto passa a ser a largura da bitola e o sobremetal de largura vira 0; senão, bruto = acabada + sobremetal | T07: "largura da bitola ou acabada + sobremetal" sem dizer quando é qual | Manter, e escrever na T07 exatamente esta frase |
+
+---
+
 ## 10. Carga inicial: o que vem de cada planilha
 
-A carga é feita uma vez, pela tela T25. O sistema mostra uma **prévia**, gera uma **lista de pendências** para o Fabiano revisar (itens que não conseguiu interpretar, contêineres sem bitola, totais que não batem) e só importa depois da sua aprovação.
+A carga é feita uma vez, pela **linha de comando T25** (não é tela). O sistema gera uma **prévia**, gera uma **lista de pendências** para o Fabiano revisar (itens que não conseguiu interpretar, contêineres sem bitola, totais que não batem) e só importa depois da sua aprovação.
 
 ### 10.1 ESTOQUE 2026.xlsx
 
@@ -814,7 +911,7 @@ A carga é feita uma vez, pela tela T25. O sistema mostra uma **prévia**, gera 
 | COMPR. FIXADOS (MM) | `item_mp.comprimento_fixado` |
 | ESTOQUE MEGA | Só conferência: o saldo Mega real é lido do Oracle no dia da carga |
 | ESTOQUE RJ (no Rio) | Conferência contra a soma dos lotes da ESTOQUE 2026 e **ponte de paridade** **[P06]**, ver abaixo |
-| ESTOQUE RJ (em Itu) | Lotes **RJ em Itu** com `origem_identificada = false` (não se sabe o contêiner), por item **[P07]**. Conforme novas entradas e cortes acontecem, os contêineres vão sendo amarrados (botão "Atribuir origem" em T05, com justificativa) |
+| ESTOQUE RJ (em Itu) | Lotes **RJ em Itu** com `origem_identificada = false` (não se sabe o contêiner), por item **[P07]**. **Linhas RETO: sub-lotes por bitola de origem lida dos comentários, sempre tipo RETO (§10.8).** Conforme novas entradas e cortes acontecem, os contêineres vão sendo amarrados (botão "Atribuir origem" em T05, com justificativa) |
 | OBSERVAÇÕES ("RESERVADO CPR", "não usar para guilhotinas", "SOBRAS"…) | Reservas e restrições (T17) nos lotes do item, revisadas uma a uma |
 | CLIENTES / USO e OBS | `item_mp.observacao_uso` |
 
@@ -892,6 +989,21 @@ Divergência encontrada: corrige-se **no sistema** (T18 ajuste ou estorno, com j
    - **Solicitações ativas:** as 4 cortadas (OPs 94394, 94429, 94528 e 94529) já foram enviadas e entram como concluídas. As 8 com material insuficiente ou mais de 1 ano (92756, 93620, 94356, 94646, 96111, 96674, 96772 e 97662) entram canceladas. As outras 6 continuam na Fila RJ.
 6. **Depois da implantação (BLOCO 2):** OPs mal digitadas, SEM OP, cortes sem peso e solicitações sem lote.
 
+### 10.8 O que a carga passa a fazer após a auditoria de 06/11 (decisão do Eduardo, registrada em DECISOES de 2026-11-06)
+
+**1. RETO do "RJ em Itu" em sub-lotes por bitola de origem.** No Estoque Geral, a célula "ESTOQUE RJ (em Itu)" das linhas RETO traz, em comentário, as parcelas com a bitola de onde veio cada sobra (ex.: "381 kg (D2 25X610)"). A carga deixa de criar um lote só "origem não identificada" e passa a:
+
+- ler cada parcela "N kg (liga bitola)" do comentário e criar **um sub-lote RETO por parcela**, estoque RJ em Itu, com a **bitola de origem** da parcela, contêiner "não informado" (classe "só a bitola" da aba "RETO por origem") e o texto do comentário na nota do lote;
+- criar **um lote RETO "sem origem"** com o resto: `valor da célula − soma das parcelas` (ex. com números ilustrativos: célula de 1.100 kg com 6 parcelas que somam 1.027 kg gera 6 sub-lotes e 1 lote sem origem de 73 kg);
+- **se a soma das parcelas passar do valor da célula**, vale o valor da célula: não quebra, cria o lote único sem origem, guarda o comentário na nota e põe a linha na lista de pendências;
+- **parcelas sem bitola** (a célula é só uma conta, ex.: `=840+867+7+432+44+115`) e **linhas RETO sem comentário** ficam num lote único sem origem; as parcelas da conta vão na nota do lote. Se o Fabiano informar a bitola das parcelas (P25 / texto de 06/11), a carga é refeita com elas;
+- **parcela cuja liga é diferente da liga da linha** (caso do D2 36X510 dentro do DC53 RETO): carregar como veio, na linha em que está, com a etiqueta REVISAR, até o Fabiano responder (texto de 06/11). Não decidir sozinho se é erro ou mistura;
+- **conferência da carga:** a soma dos sub-lotes e do lote sem origem de cada linha é igual ao valor da célula (diferença zero).
+
+**2. Todo RETO é lote tipo RETO**, inclusive os do RJ em Itu. Até a v3.3 só o RETO do Estoque Mega era marcado como RETO, e os 6 RETO do RJ em Itu (A8, D2, D6, DC53, H13 e 1.2767) entravam como ORIGINAL, de modo que a consulta "quanto RETO eu tenho" saía com cerca de 10,8 t a menos.
+
+**3. Redondo com comprimento é redondo.** Descrições como "D2 Ø90X2425", "IMP-D2 RED 90X2425MM" e "STEEL ROUND BARS 91X2430" são barras **redondas** de diâmetro N e comprimento M (vindo do packing list). A regra do leitor de medidas: **"Ø", "RED" ou "ROUND" seguido de N×M → formato redondo, diâmetro N, comprimento M**; "RED 88,90" (sem comprimento) → redondo 88,9. O comprimento é só informação do lote (P11, P14), **não faz parte da bitola** e não entra na comparação da paridade. Efeitos esperados: (a) somem os lotes "esgotados" fantasmas do HISTORICO (ex.: "A8MOD 422X2897"), que eram o mesmo redondo lido como chapa; (b) os contêineres ativos deixam de ter lote duplicado e passam a ter a data de entrada do HISTORICO; (c) as 6 solicitações de redondo que não foram importadas passam a entrar; (d) o **D2 Ø90 do contêiner CH39SH volta a ser comparado com o código 95199 IMP-D2 RED 90X2425** (a resposta do Fabiano "não tem em Itu" foi dada sem esta evidência e será refeita, texto de 06/11).
+
 ---
 
 ## 11. Modelo de dados completo
@@ -952,3 +1064,10 @@ Todo registro importado guarda **arquivo, aba e linha** de origem. Assim, qualqu
 | **P16** | De onde vem o **R$/kg** do valor precificador do SA? Não é o "valor unitário" da ESTOQUE 2026 | **Manual.** Outras pessoas preenchem o R$/kg; o sistema não calcula, só guarda o que for digitado |
 | **P17** | Incluir **"Material a chegar"** (os pedidos de importação que o Renato anota em comentários, ex.: "Pedido EASON 3 tons, prazo final de Nov/2026")? | **Aceita:** lista simples por item (fornecedor, kg, previsão, situação), aparece na consulta de estoque → T26 |
 | **P18** | **1.2344 e H13** (e outras equivalências) podem ser usados um no lugar do outro numa OP? | **Aceita:** compatíveis com selo "liga equivalente" e "estou ciente" |
+| **P19** | **Confirmar a P06:** os dois estoques valem (RJ por contêiner na planilha, Itu por código no Mega) e a carga liga cada material RJ a um código Mega. | **A confirmar pelo Eduardo.** Proposta padrão: confirmar, com as exceções "só no RJ" já vistas pelo Fabiano |
+| **P20** | Parâmetros que o sistema usa e que ninguém escolheu: divergência com o Mega **5 kg**, giro de estoque **180 dias**, verificação de SA no Mega a cada **30 min**, aviso de reserva **7 dias** antes. | **A confirmar pelo Eduardo.** Proposta padrão: manter os quatro (ficam na T23 e podem ser mudados depois) |
+| **P21** | Importar **todo o histórico** na carga e **não ter aprovador humano** (a validação é automática, com "estou ciente" e justificativa no lugar de uma aprovação). | **A confirmar pelo Eduardo.** Proposta padrão: manter os dois |
+| **P22** | Dois acréscimos à regra do Matheus: (a) **barra inteira pesada no RJ** não passa pela regra dos 5 %; (b) com **vários códigos de SA** para o mesmo item, vale o **mais recente**. | **A confirmar pelo Eduardo e pelo Matheus** (o Matheus ainda não respondeu). Proposta padrão: manter os dois |
+| **P23** | "Lembrar minha senha" virou **"Manter conectado"** (sessão de 30 dias, o sistema não guarda a senha). | **A confirmar pelo Eduardo.** Proposta padrão: manter |
+| **P24** | As 4 regras do §9.1 que estão só no código (estorno com COP aberto, janela de 7 dias do SA, CR8MOD, largura inteira). | **A confirmar pelo Eduardo.** Proposta padrão: a coluna "Proposta padrão" do §9.1 |
+| **P25** | Escolhas minhas na T15 mínima e na consulta "RETO por origem" (06/11): (a) a consulta é **aba da T04**; (b) "Criar lote" com **código novo** cria o item do catálogo pela descrição (bloqueia se não conseguir ler); (c) peso do lote **não passa da diferença + 5 kg**; (d) **"Não é entrada"** exige motivo da lista + justificativa e a diferença fica explicada na T16; (e) parcelas de RETO sem bitola ficam num lote só até o Fabiano responder. | **A confirmar pelo Eduardo.** Proposta padrão: aceitar as cinco |

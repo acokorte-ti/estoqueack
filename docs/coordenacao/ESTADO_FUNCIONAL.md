@@ -1,44 +1,33 @@
 # Estado — FUNCIONAL
 
-Atualizado: 2026-11-04 (respostas do Fabiano ao BLOCO 1)
+Atualizado: 2026-11-06 (correção da auditoria, especificação v3.4)
 
 ## No ar
 
-- **Especificação v3.3** (`estoqueack/docs/03_especificacao_funcional.md`, cópia na raiz).
-  - **§10.7 (novo):** regras da carga que o Fabiano definiu.
-    - Paridade sem múltiplo.
-    - Material do RJ sem igual em Itu fica sem código Mega, e as medidas não se juntam.
-    - Quando os totais divergem, vale a ESTOQUE 2026.
-    - Código do Mega fora do catálogo entra se teve movimento no kardex nos últimos 2 anos.
-    - 13 restrições entram com "estou ciente"; "RESERVADO CPR" (2) não entra.
-    - Solicitações ativas: 4 concluídas, 8 canceladas, 6 mantidas.
-  - **R024 fechado:** perda de corte normal até 6 % do material usado (T13, §9, T23).
-  - **Da v3.2:** decisões de 04/11 (T16 mínima, impressão da T09, sem data, conferência semanal, §10.6), R037 e R024 itens 2–5.
-- **BLOCO 1 respondido:** `carga/revisao_bloco1_fabiano_RESPONDIDO.xlsx`. R032 respondido; a recarga foi pedida ao TÉCNICO no **R038**.
+- **Especificação v3.4** (`estoqueack/docs/03_especificacao_funcional.md`; a cópia da raiz deixou de ser atualizada).
+  - **T15 mínima na F1** (Caminho C passo 1): "Criar lote" ou "Não é entrada"; a T16 mínima mostra a diferença explicada. Resumo F1 x F1.1 no §4.2.
+  - **Aba "RETO por origem" na T04** (F1): Liga → bitola → contêiner, "sem origem" separado, totais, Excel. T19 completo continua F1.1.
+  - **§10.8:** a carga quebra o RETO do RJ em Itu por bitola de origem, marca tudo como RETO e lê Ø/RED/ROUND como redondo.
+  - **§9.1:** 4 regras que só estavam no código, marcadas "a confirmar". **T25 é linha de comando.** P10 detalhado (Painel, T05, T14).
+  - **Perguntas P19 a P25** para o Eduardo (todas com proposta padrão).
+- **Pedidos:** R040 (TÉCNICO), R041 (FRONTEND), R042 (BANCO E TESTES), todos ABERTO.
+- **Texto para o Fabiano:** `carga/texto_fabiano_auditoria_2026-11-06.md` (fora do repo): D2 Ø90 ↔ 95199, 7 pares do B04, D2 36X510 no DC53 RETO, bitola das 6 parcelas do 1.2767.
+- **Antes (v3.3):** §10.7 com as respostas do BLOCO 1, R024 fechado (perda de corte até 6 %), RESERVADO CPR fora da carga.
 
 ## Próximo
 
-- Conferir a lista de códigos que entraram pelo kardex, quando o TÉCNICO mandar (R038 item 2), e a prévia da recarga.
-- Depois da implantação: lista do BLOCO 2 (OPs mal digitadas, SEM OP, cortes sem peso, solicitações sem lote).
-- Roteiro de aceite com o BANCO E TESTES, se for pedido.
+- Ler as respostas do Fabiano (texto acima) e do Eduardo (P19 a P25); atualizar §10.8 e pedir a nova carga ao TÉCNICO.
+- Conferir os textos da T15 e da aba "RETO por origem" quando o FRONTEND entregar.
+- Depois da implantação: lista do BLOCO 2 (OPs mal digitadas, SEM OP, cortes sem peso, solicitações sem lote), contêiner digitado errado no Controle de Corte, comentário com várias OPs, corte dividido entre contêineres, "PESO INICIAL" (achados B05 a B08 da auditoria, ainda sem texto na spec).
 
 ## Aguardando
 
-- **R038 (TÉCNICO):** recarga da T25 com as respostas do BLOCO 1.
-- **Eduardo:** avisar o Fabiano sobre o IPI do NCM 82089000 e confirmar a P06.
-
-## Em andamento / não commitado (2026-11-05, migração para o Claude Code)
-
-- **Tudo do FUNCIONAL está commitado e no `main`.** Último commit: `eb9b59b`, especificação v3.3 com o R024 fechado e o RESERVADO CPR fora da carga.
-- **Fora do repositório, de propósito:**
-  - pasta `coordenacao\`;
-  - cópias na raiz `03_Especificacao_Funcional.md` e `04_Conferencia_Planilhas_x_Fluxo.md`, idênticas às de `estoqueack/docs/`;
-  - `carga/revisao_bloco1_fabiano.xlsx` e `carga/revisao_bloco1_fabiano_RESPONDIDO.xlsx`, que têm dados da empresa e por isso não vão para o repositório público.
-- **Em andamento:** nada. Aguardando o R038 (recarga com as respostas do BLOCO 1).
+- **Eduardo:** P19 a P25; repassar o texto ao Fabiano; avisar o Fabiano sobre o IPI do NCM 82089000.
+- **TÉCNICO / FRONTEND / BANCO E TESTES:** R040, R041, R042.
 
 ## Instruções permanentes desta frente
 
-1. **A especificação oficial é `estoqueack/docs/03_especificacao_funcional.md`.** Depois de editar, copiar para a raiz (`03_Especificacao_Funcional.md`) e subir a versão no cabeçalho (v3.3 → v3.4…), explicando em uma frase o que mudou.
+1. **A especificação oficial é `estoqueack/docs/03_especificacao_funcional.md`** (sem cópia na raiz). Ao editar, subir a versão no cabeçalho (v3.4 → v3.5…), explicando em uma frase o que mudou.
 2. **Git:**
    - Commit e push pelo **PowerShell do Windows**, porque o git do sandbox trava em `index.lock`.
    - Usar `git add` só do arquivo da especificação. Nunca `-A`: há arquivos de outros chats sem commit na mesma pasta.
@@ -66,4 +55,4 @@ Atualizado: 2026-11-04 (respostas do Fabiano ao BLOCO 1)
 9. **Quando eu gerar uma lista para o Fabiano revisar:** Excel com aba "Leia-me", colunas amarelas só para ele preencher, sugestão minha em coluna separada e o arquivo em `carga/` (fora do repositório).
 10. **Pedidos (`PEDIDOS.md`):**
     - Ao responder, mudar o status e escrever no máximo ~5 linhas, sem quebra de linha na célula. O detalhe vai na especificação ou neste ESTADO.
-    - Próximo número de pedido: o maior R0xx em `PEDIDOS.md` + 1 (em 05/11 o último era R039).
+    - Próximo número de pedido: o maior R0xx em `PEDIDOS.md` + 1 (em 06/11 o último era R042).

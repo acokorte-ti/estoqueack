@@ -1,6 +1,6 @@
 # Estado — BACKEND / TÉCNICO
 
-Atualizado: 2026-11-04 (19h55) pelo TÉCNICO (chat BACKEND 2): rodada 4a — perda de corte em % (R024) e recarga com a revisão do Fabiano (R038).
+Atualizado: 2026-11-06 pelo TÉCNICO: correção da auditoria de 06/11 (commit local `591d583`, **push pendente**).
 
 > Para retomar a parte técnica do zero: `estoqueack/docs/tecnico/00_RETOMAR_PROJETO.md` (inventário, onde fica cada segredo, operação, lições e incidentes; §7.2 e §7.3 = Fase 1).
 
@@ -11,9 +11,18 @@ Atualizado: 2026-11-04 (19h55) pelo TÉCNICO (chat BACKEND 2): rodada 4a — per
 - **CI verde de novo** (R029 resolvido pelo BANCO E TESTES no `3f2b1ca`, publicado sozinho às 15h55). Homologação no commit `3f2b1ca`, 103 testes.
 - **T25 carga inicial NO AR na homologação (2026-11-03 17h33)** com as planilhas de 03/11 (`planilhas\2026-11-03\`) e o saldo do Mega das 17h02. Re-executável (rodou 2 vezes seguidas com o mesmo resultado). Conferência: (a) Estoque Mega = saldo Mega em **todos** os códigos; (b) RJ no Rio **239.066,5 kg** = ESTOQUE 2026; (c) RJ em Itu **28.441,8 kg** = Estoque Geral; (d) 790 de 810 solicitações, 741 de 795 cortes, 45 de 45 COPs, 8.293 de 8.293 SAs (o que ficou de fora está nas pendências). Relatórios em `Documents\projeto-controle_mp\carga\relatorios\` (prévia `carga_previa_20261103_2031.xlsx`, resultado `carga_resultado_20261103_2032.xlsx`). **R032 aberto para o FUNCIONAL revisar a prévia com o Fabiano.**
 - **Rodada 2 (2026-11-04, commit `7b60e7f`, 121 testes):** API do **painel T03** com pendências por perfil, **T16 conciliação mínima** (só leitura), **avisos automáticos do sino** no agendador e **exportações Excel** (estoque, solicitações, SA). Contrato §11–§14 e pedido **R035** para o FRONTEND.
-- **Comigo daqui para frente:** recarregar a T25 quando o Fabiano devolver as correções do R032 (avisar antes no R033); campos da impressão da Fila RJ se o FUNCIONAL pedir; no dia da implantação, a carga final (roteiro do BANCO E TESTES, `docs/tecnico/06_implantacao_13_11.md`). PDFs de romaneio e ficha do lote ficaram para a F1.1.
+- **Comigo daqui para frente:** recarregar a T25 quando o Fabiano devolver as correções do R032 (avisar antes no R033); campos da impressão da Fila RJ se o FUNCIONAL pedir; na implantação, a carga final (roteiro do BANCO E TESTES, em `deploy/implantacao/`). PDFs de romaneio e ficha do lote ficaram para a F1.1.
 
 ## 2. Feito
+
+### Correção da auditoria de 06/11 (commit `591d583`; NÃO publicado: push negado; CI e prévia no servidor pendentes)
+
+- **RETO do RJ em Itu:** entra como tipo RETO e em sub-lotes pelas parcelas do comentário da célula ("381kg de sobra (MEDIDA ORIGINAL IMP-D2 25X610MM)"); o resto do saldo vira um lote "sem origem"; soma = saldo da célula. Dry-run local (planilhas de 03/11, sem Mega): 6 linhas RETO = 14 lotes, 10.836,8 kg. D2 = 6 parcelas + 73 kg sem origem; DC53 = 2 parcelas + 680 kg; A8, D6, H13 e 1.2767 = 1 lote cada (sem comentário; o 1.2767 é fórmula de 6 parcelas sem bitola).
+- **Decisão de modelo (sem migração):** a medida de origem fica em `lote.origem_ref["bitola_origem"]` e na nota do lote. Havendo **um só** lote ORIGINAL com a mesma liga e bitola no cadastro, o sub-lote ganha `lote_pai_id` e `origem_identificada=true` (hoje 5 do D2 e 1 do DC53); zero ou vários candidatos, ou medida em faixa ("45x510~610"), fica sem pai. A parcela D2 36X510 dentro do DC53 RETO está registrada como veio (pendência REVISAR `RETO_ORIGEM_DE_OUTRA_LIGA`, pergunta ao Fabiano).
+- **`reto_por_origem`** (domínio) agora agrupa também o RETO sem pai pela `bitola_origem`. Falta o serviço que monta `LoteInfo` do banco (R040 item 2), não feito por ordem da coordenação.
+- **Leitor de medidas:** Ø/RED/ROUND + N×M = redondo de diâmetro N e comprimento M. Dry-run local: lotes esgotados do HISTORICO 493 → 346; ativos sem data de entrada 31 → 13; solicitações importadas 790 → 796 (+6). Restam 4 linhas D6 (97X2660, 101X2260…) que parecem redondos sem marcador; perguntar ao Fabiano.
+- **Solicitação parcial travada:** em Material insuficiente com corte, "Encerrar com saldo pendente" passa a valer (leva a Cortada) e os cortes já feitos entram no COP. Trocar lote e Cancelar seguem bloqueados com corte. Pedido R043 ao FRONTEND.
+- Testes novos (solicitação, medidas/lotes, carga); suíte local verde (SQLite), ruff limpo. Recarga na homologação não feita.
 
 ### Rodada 4a (2026-11-04)
 

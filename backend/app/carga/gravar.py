@@ -101,6 +101,10 @@ def gravar(db: Session, pl: Plano, *, usuario_id: int | None, arquivos: dict[str
         db.add(lote)
         lotes[id(lp)] = lote
     db.flush()
+    for lp in pl.lotes:                       # RETO filho aponta para o lote de origem (quando a carga o identificou)
+        if lp.pai is not None:
+            lotes[id(lp)].lote_pai_id = lotes[id(lp.pai)].id
+    db.flush()
 
     # COPs, solicitações e cortes
     cops: dict[int, Cop] = {}

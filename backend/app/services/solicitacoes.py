@@ -418,8 +418,12 @@ def encerrar_saldo_pendente(db: Session, sol_id: int, justificativa: str, *, usu
                             ip: str | None) -> SolicitacaoCorte:
     """[R004] Parcial: libera a reserva do restante; o que foi cortado segue para COP."""
     sol = obter(db, sol_id, travar=True)
-    if sol.situacao != "CORTADA_PARCIAL":
-        raise ErroNegocio("\"Encerrar com saldo pendente\" vale só para solicitação parcial.")
+    # Parcial, ou Material insuficiente que já tinha corte (o restante não sai deste lote: libera a reserva e
+    # as peças cortadas seguem para o COP; o restante vai em outra solicitação).
+    if sol.situacao != "CORTADA_PARCIAL" and not (sol.situacao == "MATERIAL_INSUFICIENTE"
+                                                  and movimentos.liberacoes_ativas(db, sol.id)):
+        raise ErroNegocio("\"Encerrar com saldo pendente\" vale para solicitação parcial (ou em Material "
+                          "insuficiente com corte já feito).")
     j = _justificativa(justificativa)
     sol.encerrada_saldo_pendente, sol.motivo = True, j
     recalcular_solicitacao(db, sol)

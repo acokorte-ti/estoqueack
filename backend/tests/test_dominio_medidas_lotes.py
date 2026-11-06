@@ -68,3 +68,29 @@ class TestLotes(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRedondoComComprimento(unittest.TestCase):
+    """Auditoria 06/11 (B03): Ø/RED/ROUND + N×M = redondo de diâmetro N e comprimento M, não chapa."""
+
+    def test_redondo_com_comprimento(self):
+        for texto in ("D2 Ø90X2425", "IMP-D2 RED 90X2425MM", "D2 STEEL ROUND BARS 90X2425", "D2 REDØ90X2425"):
+            m = interpretar(texto)
+            self.assertEqual((m.formato, m.diametro, m.comprimento, m.bitola), ("REDONDO", 90.0, 2425.0, "Ø90"),
+                             texto)
+
+    def test_chapa_continua_chapa(self):
+        m = interpretar("A8 MOD 21x204x1110 Múltiplo")
+        self.assertEqual((m.formato, m.espessura, m.largura), ("RETANGULAR", 21.0, 204.0))
+        self.assertEqual(interpretar("IMP-H13 50X610MM").formato, "RETANGULAR")
+        self.assertEqual(interpretar("IMP-H13 RED 54MM").comprimento, None)
+
+    def test_reto_sem_pai_com_bitola_de_origem(self):
+        lotes = {1: LoteInfo(1, "CH26SH", "D2", "25X610", "ORIGINAL", None, 0),
+                 2: LoteInfo(2, "", "D2", "RETO", "RETO", 1, 381),
+                 3: LoteInfo(3, "", "D2", "RETO", "RETO", None, 54, "IMP-D2 45x510~610MM"),
+                 4: LoteInfo(4, "", "D2", "RETO", "RETO", None, 73)}
+        r = reto_por_origem(lotes, liga="D2")
+        self.assertEqual(r[("D2", "25X610", "CH26SH")], 381)
+        self.assertEqual(r[("D2", "IMP-D2 45x510~610MM", "sem lote de origem")], 54)
+        self.assertEqual(r[("D2", "RETO", "")], 73)

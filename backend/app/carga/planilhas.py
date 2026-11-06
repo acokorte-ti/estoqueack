@@ -222,6 +222,18 @@ class LinhaGeral:
     obs: str | None
     comentarios: list[str]
     origem: dict[str, Any]
+    # Comentário da célula "ESTOQUE RJ (em Itu)": o Itu anota ali cada parcela de sobra com a medida de origem
+    # ("381kg de sobra (MEDIDA ORIGINAL IMP-D2 25X610MM)"). Lista de (kg, medida de origem).
+    parcelas_itu: list[tuple[float, str]] = field(default_factory=list)
+    comentario_itu: str | None = None
+
+
+_RE_PARCELA_SOBRA = re.compile(r"(\d+(?:[.,]\d+)?)\s*kg\s+de\s+sobra\s*\(\s*MEDIDA\s+ORIGINAL\s+(.+?)\s*\)", re.I)
+
+
+def parcelas_de_sobra(texto: str | None) -> list[tuple[float, str]]:
+    """Extrai (kg, medida de origem) do comentário do RETO em Itu. Ignora o que não tiver o formato."""
+    return [(float(m.group(1).replace(",", ".")), m.group(2).strip()) for m in _RE_PARCELA_SOBRA.finditer(texto or "")]
 
 
 def ler_geral(pasta: Path) -> list[LinhaGeral]:
@@ -242,12 +254,15 @@ def ler_geral(pasta: Path) -> list[LinhaGeral]:
         if not desc:
             continue
         coms = [_autor_fora(x.comment.text) for x in ws[r] if x.comment]
+        cel_itu = ws.cell(r, c("ESTOQUE RJ (em Itu)"))
+        com_itu = _autor_fora(cel_itu.comment.text) if cel_itu.comment else None
         out.append(LinhaGeral(
             r, _int(ws.cell(r, c("ITEM")).value), desc, _texto(ws.cell(r, c("COMPR. FIXADOS (MM)")).value),
             _num(ws.cell(r, c("ESTOQUE MEGA")).value), _num(ws.cell(r, c("ESTOQUE RJ (no Rio)")).value) or 0.0,
             _num(ws.cell(r, c("ESTOQUE RJ (em Itu)")).value) or 0.0, _texto(ws.cell(r, obs_cols[0]).value),
             _texto(ws.cell(r, obs_cols[1]).value), _texto(ws.cell(r, c("CLIENTES / USO")).value),
-            _texto(ws.cell(r, c("OBS:")).value), coms, ref(ARQ_GERAL, ws.title, r)))
+            _texto(ws.cell(r, c("OBS:")).value), coms, ref(ARQ_GERAL, ws.title, r),
+            parcelas_de_sobra(com_itu), com_itu))
     return out
 
 

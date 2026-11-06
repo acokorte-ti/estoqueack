@@ -91,6 +91,41 @@ def test_parcial_e_encerrar_com_saldo_pendente(amb):
     assert _lote(client, ids["l33"])["reservado_kg"] == 0
 
 
+def test_parcial_com_material_insuficiente_nao_fica_travada(amb):
+    """Auditoria 06/11: parcial marcada 'material insuficiente' tinha corte e não saía mais do estado."""
+    client, u, ids = amb
+    h = entrar(client, u["itu"])
+    s = client.post("/api/solicitacoes", json=corpo_solicitacao(ids["l33"]), headers=h).json()["solicitacoes"][0]
+    h = entrar(client, u["rj"])
+    client.post(f"/api/solicitacoes/{s['id']}/corte", headers=h,
+                json={"linhas": [{"lote_id": ids["l33"], "pecas": 4, "peso_real_kg": 27.5}]})
+    r = client.post(f"/api/solicitacoes/{s['id']}/material-insuficiente", headers=h,
+                    json={"observacao": "Barra com trinca, faltam peças"})
+    assert r.json()["situacao"] == "MATERIAL_INSUFICIENTE" and r.json()["pecas_cortadas"] == 4
+    h = entrar(client, u["itu"])
+    # as peças já cortadas entram no COP mesmo com a solicitação em Material insuficiente
+    assert len(client.get("/api/cops/cortes-prontos").json()) == 1
+    # trocar lote / cancelar continuam bloqueados (já há corte); a saída é encerrar com saldo pendente
+    assert client.post(f"/api/solicitacoes/{s['id']}/cancelar", json={"motivo": "x"}, headers=h).status_code == 400
+    r = client.post(f"/api/solicitacoes/{s['id']}/encerrar", headers=h,
+                    json={"justificativa": "Restante vai em outra solicitação com outro lote"})
+    assert r.status_code == 200, r.text
+    assert r.json()["situacao"] == "CORTADA" and r.json()["reserva_kg"] == 0
+    assert len(client.get("/api/cops/cortes-prontos").json()) == 1
+
+
+def test_encerrar_sem_corte_em_material_insuficiente_continua_bloqueado(amb):
+    client, u, ids = amb
+    h = entrar(client, u["itu"])
+    s = client.post("/api/solicitacoes", json=corpo_solicitacao(ids["l33"]), headers=h).json()["solicitacoes"][0]
+    h = entrar(client, u["rj"])
+    client.post(f"/api/solicitacoes/{s['id']}/material-insuficiente", headers=h, json={"observacao": "Sem material"})
+    h = entrar(client, u["itu"])
+    r = client.post(f"/api/solicitacoes/{s['id']}/encerrar", headers=h,
+                    json={"justificativa": "Tentativa sem corte nenhum"})
+    assert r.status_code == 400
+
+
 def test_lote_trocado_e_dividido_no_rj(amb):
     client, u, ids = amb
     h = entrar(client, u["itu"])

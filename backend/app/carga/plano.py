@@ -112,6 +112,7 @@ class LoteP:
     conferencia_kg: float | None = None     # valor da planilha para conferir o saldo
     origem: dict[str, Any] | None = None
     estoque: str = ""
+    pai: LoteP | None = None            # lote de origem (RETO filho), quando a origem existe no cadastro
 
     @property
     def saldo(self) -> float:
@@ -263,6 +264,7 @@ def montar(ctx: Contexto, estoque: list[P.LinhaEstoque2026], historico: list[dic
     _esgotados_historico(pl, ctx, estoque, historico, lotes_rj)
     _rj_em_itu(pl, geral)
     _estoque_mega(pl, ctx, geral)
+    _ligar_reto_origem(pl)
     _restricoes_e_avisos(pl, geral)
     _solicitacoes(pl, ctx, corte, lotes_rj, estoque)
     _sas(pl, sas, lotes_rj)
@@ -481,20 +483,80 @@ def _esgotados_historico(pl: Plano, ctx: Contexto, estoque, historico: list[dict
 
 
 def _rj_em_itu(pl: Plano, geral: list[P.LinhaGeral]) -> None:
+    """RJ em Itu. Linha RETO entra como tipo RETO (auditoria 06/11, B02). Se a célula tem comentário com as parcelas
+    de sobra ("381kg de sobra (MEDIDA ORIGINAL IMP-D2 25X610MM)"), vira um sub-lote RETO por parcela, com a medida
+    de origem guardada em origem_ref["bitola_origem"] (e ligado ao lote de origem em _ligar_reto_origem, se existir);
+    o que sobra do saldo da célula fica num lote "sem origem". A soma dos sub-lotes é sempre o saldo da célula."""
     for g in geral:
         if g.rj_em_itu and g.rj_em_itu > 0:
             ch = ("CM", g.codigo) if g.codigo and ("CM", g.codigo) in pl.itens else ("GERAL", g.linha)
             if ch not in pl.itens:
                 continue
-            lote = LoteP(ch, "RJ", "ITU", None, g.rj_em_itu, origem_identificada=False, conferencia_kg=g.rj_em_itu,
-                         origem=g.origem, estoque="RJ_EM_ITU")
-            lote.movimentos.append(MovP("SALDO_INICIAL", g.rj_em_itu, documento="Carga Estoque Geral (RJ em Itu)",
-                                        origem=g.origem))
-            if g.obs_itu:
-                lote.notas.append(f"Observação do Estoque Geral (RJ em Itu): {g.obs_itu}")
-            pl.lotes.append(lote)
-            pl.pend("RJ_EM_ITU_SEM_ORIGEM", "INFO", f"{g.descricao}: {g.rj_em_itu:.1f} kg RJ em Itu entram com "
-                    "origem não identificada [P07].", g.origem, "Atribuir origem (T05) quando souber o contêiner")
+            reto = pl.itens[ch].formato == "RETO"
+            tipo = "RETO" if reto else "ORIGINAL"
+            parcelas = list(g.parcelas_itu) if reto else []
+            if parcelas and sum(k for k, _ in parcelas) > g.rj_em_itu + 0.0005:
+                pl.pend("RETO_PARCELAS_MAIORES_QUE_SALDO", "REVISAR", f"{g.descricao}: o comentário da célula soma "
+                        f"{sum(k for k, _ in parcelas):.1f} kg, mais que o saldo ({g.rj_em_itu:.1f} kg). Entra um lote "
+                        "só, sem origem.", g.origem, "Conferir o comentário com o Fabiano")
+                parcelas = []
+            fatias: list[tuple[float, str | None]] = [(k, d) for k, d in parcelas]
+            resto = round(g.rj_em_itu - sum(k for k, _ in parcelas), 3)
+            if resto > 0.0005 or not fatias:
+                fatias.append((resto if fatias else g.rj_em_itu, None))
+            for kg, desc_origem in fatias:
+                origem = dict(g.origem or {})
+                if desc_origem:
+                    origem["bitola_origem"] = desc_origem
+                lote = LoteP(ch, "RJ", "ITU", None, kg, tipo=tipo, origem_identificada=False, conferencia_kg=kg,
+                             origem=origem, estoque="RJ_EM_ITU")
+                lote.movimentos.append(MovP("SALDO_INICIAL", kg, documento="Carga Estoque Geral (RJ em Itu)",
+                                            origem=origem))
+                if desc_origem:
+                    lote.notas.append(f"Parcela de sobra anotada no Estoque Geral: {kg:g} kg, medida original "
+                                      f"{desc_origem}.")
+                elif parcelas:
+                    lote.notas.append("Saldo da célula RJ em Itu sem origem anotada no comentário (parcelas "
+                                      f"anotadas: {sum(k for k, _ in parcelas):g} kg de {g.rj_em_itu:g} kg).")
+                if g.obs_itu:
+                    lote.notas.append(f"Observação do Estoque Geral (RJ em Itu): {g.obs_itu}")
+                pl.lotes.append(lote)
+            if parcelas:
+                pl.pend("RETO_EM_ITU_POR_ORIGEM", "INFO", f"{g.descricao}: {g.rj_em_itu:.1f} kg em {len(parcelas)} "
+                        f"parcela(s) com medida de origem + {max(resto, 0):.1f} kg sem origem.", g.origem)
+                ligas = {chave_familia(d)[0] for _, d in parcelas}
+                if ligas - {chave_familia(g.descricao)[0]}:
+                    pl.pend("RETO_ORIGEM_DE_OUTRA_LIGA", "REVISAR", f"{g.descricao}: parcela com medida de origem de "
+                            "outra liga (" + "; ".join(f"{k:g} kg {d}" for k, d in parcelas
+                                                       if chave_familia(d)[0] != chave_familia(g.descricao)[0]) +
+                            "). Registrada como veio na planilha.", g.origem, "Perguntar ao Fabiano: erro ou mistura?")
+            else:
+                pl.pend("RJ_EM_ITU_SEM_ORIGEM", "INFO", f"{g.descricao}: {g.rj_em_itu:.1f} kg RJ em Itu entram com "
+                        "origem não identificada [P07].", g.origem, "Atribuir origem (T05) quando souber o contêiner")
+
+
+def _ligar_reto_origem(pl: Plano) -> None:
+    """Liga cada sub-lote RETO (com bitola_origem) ao lote de origem quando há UM candidato só no cadastro
+    (mesma liga e bitola, lote ORIGINAL). Zero ou vários candidatos: fica sem pai (a bitola fica em origem_ref)."""
+    for lote in pl.lotes:
+        desc = (lote.origem or {}).get("bitola_origem")
+        if lote.tipo != "RETO" or not desc:
+            continue
+        m = medida(desc)
+        if "~" in desc or m.formato not in ("RETANGULAR", "REDONDO"):
+            pl.pend("RETO_ORIGEM_SEM_LOTE", "INFO", f"RETO {lote.saldo:g} kg, origem \"{desc}\": medida ambígua, "
+                    "fica sem lote de origem (a medida está na nota).", lote.origem)
+            continue
+        alvo = chave_item(ALIAS_LIGA.get(m.liga, m.liga), m)[1:]
+        cands = [x for x in pl.lotes if x.tipo == "ORIGINAL" and (pl.itens[x.item].liga, pl.itens[x.item].formato,
+                 pl.itens[x.item].espessura, pl.itens[x.item].largura, pl.itens[x.item].diametro) == alvo]
+        if len(cands) == 1:
+            lote.pai = cands[0]
+            lote.origem_identificada = True
+        else:
+            pl.pend("RETO_ORIGEM_SEM_LOTE", "INFO", f"RETO {lote.saldo:g} kg, origem \"{desc}\": "
+                    + ("nenhum lote com essa medida no cadastro" if not cands else
+                       f"{len(cands)} lotes com essa medida (ambíguo)") + "; fica sem lote de origem.", lote.origem)
 
 
 def _estoque_mega(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:

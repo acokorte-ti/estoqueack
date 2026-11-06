@@ -81,6 +81,10 @@ _RE_RED = re.compile(r"(?:RED\.?\s*Ø?|Ø\s*)(\d+(?:[.,]\d+)?)")
 _RE_RET = re.compile(r"(\d+(?:[.,]\d+)?)\s*X\s*(\d+(?:[.,]\d+)?)(?:\s*X\s*(\d+(?:[.,]\d+)?))?")
 
 
+_RE_MARCA_REDONDO = re.compile(r"Ø|(?<![A-Z])RED(?![A-Z])|(?<![A-Z])ROUND(?![A-Z])")
+_RE_DIAM_COMP = re.compile(r"(\d+(?:[.,]\d+)?)\s*X\s*(\d+(?:[.,]\d+)?)(?!\s*X)")
+
+
 def interpretar(descricao: str) -> Medida:
     """Extrai liga e bitola de uma descrição livre."""
     liga = normalizar_liga(descricao)
@@ -93,6 +97,12 @@ def interpretar(descricao: str) -> Medida:
     t_sem_liga = re.sub(r"\b(DIN\s*)?1[.,]?\d{4}\b", " ", t)
     if liga and not liga[0].isdigit():
         t_sem_liga = t_sem_liga.replace(liga, " ", 1)
+    # Redondo com comprimento: 'Ø90X2425', 'RED 90X2425MM', 'STEEL ROUND BARS 91X2430'
+    # = redondo de diâmetro N e comprimento M (não é chapa N×M).
+    if _RE_MARCA_REDONDO.search(t_sem_liga):
+        mr = _RE_DIAM_COMP.search(t_sem_liga)
+        if mr:
+            return Medida(liga, "REDONDO", diametro=_num(mr.group(1)), comprimento=_num(mr.group(2)))
     m = _RE_RET.search(t_sem_liga)
     if m:
         a, b = _num(m.group(1)), _num(m.group(2))

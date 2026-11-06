@@ -232,3 +232,35 @@ def test_r038_revisao_do_fabiano(base, tmp_path):
     pl2 = plano.montar(sem_kardex, e, h, planilhas.ler_geral(tmp_path), planilhas.ler_corte(tmp_path),
                        planilhas.ler_sa(tmp_path))
     assert any(p.tipo == "SEM_KARDEX" and p.gravidade == "BLOQUEIA" for p in pl2.pendencias)
+
+
+def test_reto_rj_em_itu_por_origem(base, tmp_path):
+    """Auditoria 06/11: RJ em Itu RETO entra como RETO, quebrado por parcela do comentário; soma = saldo da célula."""
+    from sqlalchemy import select
+
+    from app.core.db import SessionLocal
+    from app.models import Lote
+    import openpyxl
+    from openpyxl.comments import Comment
+
+    from app.carga import planilhas as P
+    _planilhas(tmp_path)
+    wb = openpyxl.load_workbook(tmp_path / P.ARQ_GERAL)
+    wb["Estoque Geral"]["H3"].comment = Comment("Autor:\n50kg de sobra (MEDIDA ORIGINAL IMP-H13 33X105MM)\n"
+                                                "Responder:\n30kg de sobra (MEDIDA ORIGINAL IMP-D2 36X510MM)", "x")
+    wb.save(tmp_path / P.ARQ_GERAL)
+    pl, _ = _rodar(tmp_path)
+    reto = [lp for lp in pl.lotes if lp.estoque == "RJ_EM_ITU" and lp.tipo == "RETO"]
+    assert sorted(lp.saldo for lp in reto) == [30.0, 40.5, 50.0]
+    assert round(sum(lp.saldo for lp in reto), 3) == 120.5
+    com_pai = [lp for lp in reto if lp.pai is not None]
+    assert [lp.saldo for lp in com_pai] == [50.0] and com_pai[0].pai.conteiner == "CH33K"
+    with SessionLocal() as db:
+        lotes = list(db.scalars(select(Lote).where(Lote.tipo == "RETO", Lote.local_fisico == "ITU",
+                                                   Lote.planta_fiscal == "RJ")))
+        assert len(lotes) == 3
+        filho = next(lo for lo in lotes if float(lo.saldo_kg) == 50.0)
+        assert filho.lote_pai_id is not None and filho.origem_identificada is True
+        assert filho.origem_ref["bitola_origem"] == "IMP-H13 33X105MM"
+        outra = next(lo for lo in lotes if float(lo.saldo_kg) == 30.0)      # outra liga, sem lote: como veio
+        assert outra.lote_pai_id is None and outra.origem_ref["bitola_origem"] == "IMP-D2 36X510MM"

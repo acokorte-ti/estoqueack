@@ -19,6 +19,8 @@ class LoteInfo:
     tipo: str                  # ORIGINAL | SOBRA | RETO
     pai_id: int | None
     saldo_kg: float
+    # medida de origem anotada na carga (origem_ref["bitola_origem"]) para RETO sem lote pai
+    bitola_origem: str | None = None
 
 
 def saldo(movimentos_kg: list[float]) -> float:
@@ -60,5 +62,8 @@ def reto_por_origem(lotes: dict[int, LoteInfo], liga: str | None = None) -> dict
         if liga and l.liga != liga:
             continue
         r = raiz(l.id, lotes)
+        if r.id == l.id and l.bitola_origem:     # RETO sem pai, mas com a medida de origem anotada
+            total[(l.liga, l.bitola_origem, "sem lote de origem")] += l.saldo_kg
+            continue
         total[(l.liga, r.bitola, r.conteiner)] += l.saldo_kg
     return {k: round(v, 3) for k, v in total.items()}

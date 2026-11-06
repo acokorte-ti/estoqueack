@@ -34,10 +34,13 @@ def _estagio_liberacao(db: Session, sol: SolicitacaoCorte, lib) -> str:
 
 
 def recalcular_solicitacao(db: Session, sol: SolicitacaoCorte) -> str:
-    if sol.situacao in ("RASCUNHO", "CANCELADA", "MATERIAL_INSUFICIENTE"):
+    if sol.situacao in ("RASCUNHO", "CANCELADA"):
         return sol.situacao
     db.refresh(sol, ["liberacoes"])
     libs = [l for l in sol.liberacoes if not l.estornada]
+    if sol.situacao == "MATERIAL_INSUFICIENTE" and not (sol.encerrada_saldo_pendente and libs):
+        # sai daqui só por "trocar lote" (sem corte) ou por "encerrar com saldo pendente" (com corte)
+        return sol.situacao
     if not libs:
         sol.situacao = "ENVIADA"
     elif pecas_cortadas(sol) < sol.quantidade and not sol.encerrada_saldo_pendente:

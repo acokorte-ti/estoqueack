@@ -1,9 +1,10 @@
 # Estado — FUNCIONAL
 
-Atualizado: 2026-11-10 (respostas da auditoria, especificação v3.5)
+Atualizado: 2026-11-11 (P26 respondida em parte, especificação v3.6)
 
 ## No ar
 
+- **Especificação v3.6:** P26 aplicada (consumo misto opção A na F1; peça inteira do RJ sem SA complementar; justificativa de sobremetal > 20 % mantida; redondo inteiro do RJ com a mesma lógica). P26(2a) (aviso de barra mais leve) segue proposta. **P27** aberta (a regra sem SA complementar vale para o B2?), em `carga/perguntas_eduardo_2026-11-11b.txt`. Pedido **R047** (TÉCNICO, FRONTEND).
 - **Especificação v3.5** (`estoqueack/docs/03_especificacao_funcional.md`).
   - **P19 a P25 fechadas** (§12); §9.1 sem "a confirmar" (CR8MOD é liga distinta).
   - **P22(a) reescrita** (§2.2, T13, §9, T23): material inteiro do RJ com previsto pela peça acabada e oscilação de **8 %**; 5 % segue no corte RJ e no Estoque Mega. P22(b): vale o SA mais recente.
@@ -15,14 +16,14 @@ Atualizado: 2026-11-10 (respostas da auditoria, especificação v3.5)
 ## Próximo
 
 - Aplicar as respostas do Fabiano (7 pares) em §10.7 e avisar o TÉCNICO.
-- Aplicar a resposta do Eduardo à P26 (consumo misto A ou B, avisos da peça inteira) e liberar o R045 item 5.
+- Aplicar P26(2a) e P27 quando o Eduardo responder.
 - Depois da implantação: lista do BLOCO 2 (OPs mal digitadas, SEM OP, cortes sem peso, solicitações sem lote), contêiner digitado errado, comentário com várias OPs, corte dividido entre contêineres, "PESO INICIAL" (B05 a B08).
 
 ## Aguardando
 
-- **Eduardo:** P26. Avisar o Fabiano sobre o IPI do NCM 82089000 (se ainda não foi).
+- **Eduardo:** P26(2a), P27. Avisar o Fabiano sobre o IPI do NCM 82089000 (se ainda não foi).
 - **Fabiano:** 7 pares do B04.
-- **TÉCNICO / FRONTEND:** R045, R046.
+- **TÉCNICO / FRONTEND:** R045, R046, R047.
 
 ## Instruções permanentes desta frente
 
@@ -54,4 +55,4 @@ Atualizado: 2026-11-10 (respostas da auditoria, especificação v3.5)
 9. **Quando eu gerar uma lista para o Fabiano revisar:** Excel com aba "Leia-me", colunas amarelas só para ele preencher, sugestão minha em coluna separada e o arquivo em `carga/` (fora do repositório).
 10. **Pedidos (`PEDIDOS.md`):**
     - Ao responder, mudar o status e escrever no máximo ~5 linhas, sem quebra de linha na célula. O detalhe vai na especificação ou neste ESTADO.
-    - Próximo número de pedido: o maior R0xx em `PEDIDOS.md` + 1 (em 10/11 o último era R046).
+    - Próximo número de pedido: o maior R0xx em `PEDIDOS.md` + 1 (em 11/11 o último era R047).

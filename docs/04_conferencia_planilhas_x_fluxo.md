@@ -100,7 +100,7 @@ A coluna PESO do Controle de Corte, nas 94 linhas com número (peça inteira), f
 
 - **Contra a medida acabada:** PESO fica entre 1,05 e 1,7 vezes o peso da peça acabada (mediana 1,25).
 - **Contra a espessura da bitola × largura e comprimento acabados:** ainda fica acima. Ou seja, o previsto inclui **espessura da bitola + sobremetal na largura + sobremetal no comprimento**.
-- **Exemplo, OP 91050:** peça 23×65×165,2, 80 peças, bitola H13 28×610. A peça acabada pesa 155 kg, a espessura da bitola × acabado dá 189 kg e o previsto informado é **236 kg**, perto de 28 × 70 × 190 mm.
+- **Exemplo, OP 90015:** peça 23×65×165,2, 80 peças, bitola H13 28×610. A peça acabada pesa 155 kg, a espessura da bitola × acabado dá 189 kg e o previsto informado é **236 kg**, perto de 28 × 70 × 190 mm.
 
 **Sobremetal no comprimento:** o padrão é **5 mm**. Ele aparece em 280 de 394 instruções de corte ("N PEÇAS COM xxxMM"), e o valor seguinte mais comum, 4 ou 6 mm, aparece em 22 cada. A diferença entre a largura da barra e a largura acabada fica entre 2 e 7 mm nas barras chatas.
 
@@ -118,11 +118,11 @@ O sistema preenche as três e o usuário pode alterar cada uma. Assim continua v
 
 **Evidências:**
 
-- **Instruções que já citam a barra:** muitas apontam a barra exata, como "TRAZER 01 PEÇA H13 45X610**X3905**" (OP 91958).
+- **Instruções que já citam a barra:** muitas apontam a barra exata, como "TRAZER 01 PEÇA H13 45X610**X3905**" (OP 90019).
 - **PESO2 igual ao packing list:** o PESO2 dessas linhas é **exatamente** o peso daquela barra no packing list (aba HISTORICO: "H13 45 X 610 X 3905 → 859 kg"). Ou seja, a barra **não é pesada**, e o peso vem do packing list.
-- **Registro barra a barra:** a aba HISTORICO registra muitas entradas **uma barra por linha**, com comprimento e peso. Exemplos: CH31K, CH35SH e as linhas Ø de CH37SH e CH38SH.
+- **Registro barra a barra:** a aba HISTORICO registra muitas entradas **uma barra por linha**, com comprimento e peso. Exemplos: CH93XC, CH87XR e as linhas Ø de CH88XS e CH89XT.
 - **Contagem de peças e pedaços:** a coluna "QUANTIDADE CHAPA/BARRA" da ESTOQUE 2026 tem comentários como "6 PEÇAS / 1 PEDAÇO", "15 - 1762 KG / 13 - 1522 KG…" e uma lista de comprimentos de cada barra.
-- **Ajuste no ESTOQUE 2026:** em 24 peças inteiras, ele abate o peso **da barra** (ex.: OP 99490: 1.401 kg), enquanto o PESO2 do Controle de Corte ficou com o previsto (349 kg). Por isso o PESO2 da planilha não é confiável para peça inteira.
+- **Ajuste no ESTOQUE 2026:** em 24 peças inteiras, ele abate o peso **da barra** (ex.: OP 90020: 1.401 kg), enquanto o PESO2 do Controle de Corte ficou com o previsto (349 kg). Por isso o PESO2 da planilha não é confiável para peça inteira.
 
 **O que muda na especificação:**
 
@@ -137,15 +137,15 @@ Isso altera a proposta da P11 (antes era "peças só como informação"). Ver a 
 | Evidência | Número |
 |---|---|
 | Consumos da ESTOQUE 2026 abatidos de um **contêiner diferente** do solicitado | 67 de 475 (14 %) |
-| Comentários de troca de contêiner no Controle de Corte | "CH34SH", "OU CH21K", "50x460 (CH29K)" |
-| Corte dividido entre dois lotes | M795: "CH40SH - 16 PEÇAS 630,5KG / CH11EA - 4 PEÇAS 156,5KG"; M787: "14X123 CH02CR - 13 PEÇAS 198KG / 14X130 CH39SH - 29 PEÇAS 452KG"; P354: duas bitolas de DC53C |
-| SAs com mais de uma linha para a mesma OP (bitolas e contêineres diferentes) | Comuns. Ex.: OP 99884, com 4 linhas |
+| Comentários de troca de contêiner no Controle de Corte | "CH86XQ", "OU CH83XM", "50x460 (CH84XN)" |
+| Corte dividido entre dois lotes | M795: "CH96XF - 16 PEÇAS 630,5KG / CH91XA - 4 PEÇAS 156,5KG"; M787: "14X123 CH81XK - 13 PEÇAS 198KG / 14X130 CH95XE - 29 PEÇAS 452KG"; P354: duas bitolas de DC53C |
+| SAs com mais de uma linha para a mesma OP (bitolas e contêineres diferentes) | Comuns. Ex.: OP 90021, com 4 linhas |
 
 **O que muda na especificação (T10):** botão **"Usar outro lote / dividir"**. O Marcelo informa, para cada lote usado, as peças e o peso. O sistema valida saldo e bitola, pede justificativa, notifica o Fabiano e gera uma linha de SA por lote, como já é hoje.
 
 ### 2.6 Corte em Itu de material RJ em Itu é um caminho próprio e grande ⚠️
 
-- **Volume:** são 649 SAs desde maio/2025 sem linha no Controle de Corte. Origens: CH31K, CH30K, CH29K e outros. Pesos pequenos, de 7 a 300 kg.
+- **Volume:** são 649 SAs desde maio/2025 sem linha no Controle de Corte. Origens: CH93XC, CH85XP, CH84XN e outros. Pesos pequenos, de 7 a 300 kg.
 - **NF própria:** são NFs de transferência **só fiscal**, emitidas em lote (ex.: 2025-05-08, NFs 556, 557 e 558 com dezenas de SAs).
 - **Origem:** o Estoque Geral guarda a origem das sobras **em comentário**. Exemplo (H276, D2 RETO): "381kg de sobra (MEDIDA ORIGINAL IMP-D2 25X610MM)", "450kg de sobra (… 30,5x610MM)".
 
@@ -157,8 +157,8 @@ Isso altera a proposta da P11 (antes era "peças só como informação"). Ver a 
 |---|---|
 | Consumos da ESTOQUE 2026 com o peso igual ao PESO2 (peso real do corte) | 327 de 407 cortes |
 | Consumos com a data do comentário igual à DATA DE LIBERAÇÃO | 279 de 380 |
-| OPs **digitadas erradas** nos comentários (ex.: "989123", "10008") | 9 |
-| Consumos marcados "SEM OP" | 3 (ex.: 1.460 kg de H13 75×610 / CH33K) |
+| OPs **digitadas erradas** nos comentários (ex.: "9090123", "10008") | 9 |
+| Consumos marcados "SEM OP" | 3 (ex.: 1.460 kg de H13 75×610 / CH94XD) |
 
 A especificação já baixa o lote com o peso real no registro do corte, e a OP vem da solicitação, sem redigitação. ✅
 
@@ -173,12 +173,12 @@ A especificação já baixa o lote com o peso real no registro do corte, e a OP 
 
 ### 2.9 SA de RETO mantém o contêiner de origem ✅
 
-Há 25 SAs com DIMENSÃO "RETO" e ORIGEM = contêiner (ex.: OP 100126, 1.2746 RETO, CH35SH). A rastreabilidade do RETO até o contêiner já é usada na prática, e a especificação cobre isso.
+Há 25 SAs com DIMENSÃO "RETO" e ORIGEM = contêiner (ex.: OP 90018, 1.2746 RETO, CH87XR). A rastreabilidade do RETO até o contêiner já é usada na prática, e a especificação cobre isso.
 
 ### 2.10 Valor precificador (R$/kg) do SA ❓P16
 
 - **Fórmula:** o SA usa `= (R$/kg × PESO) / QTDE`, com o R$/kg digitado dentro da fórmula.
-- **Origem desconhecida:** esse R$/kg **não bate** com o "VALOR UNITÁRIO" do contêiner na ESTOQUE 2026. Ex.: CH11EA A8 21×202 tem 13,11 na ESTOQUE 2026 e 14,06 no SA.
+- **Origem desconhecida:** esse R$/kg **não bate** com o "VALOR UNITÁRIO" do contêiner na ESTOQUE 2026. Ex.: CH91XA A8 21×202 tem 13,11 na ESTOQUE 2026 e 14,06 no SA.
 - **Por que precisa resolver:** o campo é obrigatório no SA de hoje, então o sistema precisa saber de onde vem o número (P16).
 
 ### 2.11 Renato baixa os SAs periodicamente ⚠️
@@ -220,7 +220,7 @@ Exemplos encontrados:
 
 - "FOI INFORMADO O PESO ERRADO PELO FUNCIONÁRIO ELIAS. O PESO CORRETO É 193,5KG".
 - "Descontado o peso de 1199,5Kg conforme informado via e-mail por conta de erro no controle do RJ".
-- "99588 deveria ter pedido material A8 comum… anexamos essas outras 20 peças na OP 99788".
+- "90016 deveria ter pedido material A8 comum… anexamos essas outras 20 peças na OP 90017".
 - "Foi definido que cortaríamos 80 peças a mais… A op será ajustada no mega".
 - "Solicitado erroneamente CR12MOV".
 
@@ -238,8 +238,8 @@ Tudo isso vira **estorno ou ajuste com justificativa** e **troca de OP** (§8), 
 
 | Planilha | Achado | Tratamento |
 |---|---|---|
-| HISTORICO | Não é só de lotes esgotados. Tem as **entradas** dos contêineres ativos (CH31K a CH40SH, CH01AT, CH04TG, CH10EA, CH11EA), com o detalhe por barra. As saídas não são mantidas desde cerca de 2019 | Usar para criar as **peças** (comprimento e peso) dos lotes ativos. O saldo vem da ESTOQUE 2026 |
-| ESTOQUE 2026 | 5 contêineres sem entrada no HISTORICO (10, 103, 1K, CH03K, CH4R) | Lotes sem documento de entrada, marcados na pendência |
+| HISTORICO | Não é só de lotes esgotados. Tem as **entradas** dos contêineres ativos (todos os contêineres que estão na ESTOQUE 2026), com o detalhe por barra. As saídas não são mantidas desde cerca de 2019 | Usar para criar as **peças** (comprimento e peso) dos lotes ativos. O saldo vem da ESTOQUE 2026 |
+| ESTOQUE 2026 | 5 contêineres sem entrada no HISTORICO (10, 103, 1K, CH82XL, CH4R) | Lotes sem documento de entrada, marcados na pendência |
 | ESTOQUE 2026 | 9 OPs mal digitadas e 3 "SEM OP" | Lista de pendências para o Fabiano corrigir |
 | Controle de Corte | Aba "Planilha1" com OPs repetitivas da LP (Chile/Brasil) e linhas "EM PROCESSO" | Conferir se ainda estão ativas. Se estiverem, importar como solicitações abertas |
 | Controle de Corte | Coluna "Peso previsto (acabado)" sempre vazia | Ignorar |

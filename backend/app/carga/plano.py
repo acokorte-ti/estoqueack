@@ -485,7 +485,7 @@ def _esgotados_historico(pl: Plano, ctx: Contexto, estoque, historico: list[dict
 def _rj_em_itu(pl: Plano, geral: list[P.LinhaGeral]) -> None:
     """RJ em Itu. Linha RETO entra como tipo RETO (auditoria 06/11, B02). Se a célula tem comentário com as parcelas
     de sobra ("381kg de sobra (MEDIDA ORIGINAL IMP-D2 25X610MM)"), vira um sub-lote RETO por parcela, com a medida
-    de origem guardada em origem_ref["bitola_origem"] (e ligado ao lote de origem em _ligar_reto_origem, se existir);
+    de origem guardada em origem_ref["bitola_origem"] (sem lote-pai: ver _ligar_reto_origem);
     o que sobra do saldo da célula fica num lote "sem origem". A soma dos sub-lotes é sempre o saldo da célula."""
     for g in geral:
         if g.rj_em_itu and g.rj_em_itu > 0:
@@ -536,8 +536,10 @@ def _rj_em_itu(pl: Plano, geral: list[P.LinhaGeral]) -> None:
 
 
 def _ligar_reto_origem(pl: Plano) -> None:
-    """Liga cada sub-lote RETO (com bitola_origem) ao lote de origem quando há UM candidato só no cadastro
-    (mesma liga e bitola, lote ORIGINAL). Zero ou vários candidatos: fica sem pai (a bitola fica em origem_ref)."""
+    """Sub-lote RETO do RJ em Itu com bitola_origem NÃO ganha lote-pai por "candidato único" (decisão do Fabiano,
+    2026-11-10, spec v3.5 §10.8): existir um só lote com a mesma liga e bitola não prova a origem (ex.: 11 kg de
+    D2 45x300 com o mesmo peso de um lote que está em "RJ no Rio"). Fica sem pai, com a bitola do comentário em
+    origem_ref (classe "só a bitola"); o pai só vem por regra explícita ("Atribuir origem" na T05)."""
     for lote in pl.lotes:
         desc = (lote.origem or {}).get("bitola_origem")
         if lote.tipo != "RETO" or not desc:
@@ -547,16 +549,9 @@ def _ligar_reto_origem(pl: Plano) -> None:
             pl.pend("RETO_ORIGEM_SEM_LOTE", "INFO", f"RETO {lote.saldo:g} kg, origem \"{desc}\": medida ambígua, "
                     "fica sem lote de origem (a medida está na nota).", lote.origem)
             continue
-        alvo = chave_item(ALIAS_LIGA.get(m.liga, m.liga), m)[1:]
-        cands = [x for x in pl.lotes if x.tipo == "ORIGINAL" and (pl.itens[x.item].liga, pl.itens[x.item].formato,
-                 pl.itens[x.item].espessura, pl.itens[x.item].largura, pl.itens[x.item].diametro) == alvo]
-        if len(cands) == 1:
-            lote.pai = cands[0]
-            lote.origem_identificada = True
-        else:
-            pl.pend("RETO_ORIGEM_SEM_LOTE", "INFO", f"RETO {lote.saldo:g} kg, origem \"{desc}\": "
-                    + ("nenhum lote com essa medida no cadastro" if not cands else
-                       f"{len(cands)} lotes com essa medida (ambíguo)") + "; fica sem lote de origem.", lote.origem)
+        pl.pend("RETO_ORIGEM_SO_BITOLA", "INFO", f"RETO {lote.saldo:g} kg, origem \"{desc}\": fica sem lote-pai, com a "
+                "bitola do comentário (não se liga por candidato único).", lote.origem,
+                "\"Atribuir origem\" na T05 quando souber o contêiner")
 
 
 def _estoque_mega(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:

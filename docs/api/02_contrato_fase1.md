@@ -15,7 +15,25 @@ Situação: ✅ no ar (commit `e9fe723` em diante) · 📋 contrato definido, ai
 
 ### Passo 2: `GET /api/lotes/compativeis` ✅
 
-Parâmetros: `liga` (obrigatório), `formato` (`RETANGULAR`/`REDONDO`), `espessura`, `largura`, `diametro`, `comprimento`, `quantidade`, `estoque` (opcional). Resposta paginada `{ itens: [...], total }` (como `GET /api/lotes`). Traz lotes da liga **e das ligas equivalentes** (`liga_equivalente: true` → selo), cuja bitola comporta a medida acabada e com disponível > 0. Cada item tem os campos de `GET /api/lotes` mais `peso_previsto_kg`, `peso_peca_kg`, `sobremetal_pct` (estimados com 5 mm) e `substituido_por_id`. Ordem: menor sobremetal, depois o mais antigo.
+Parâmetros: `liga` (obrigatório), `formato` (`RETANGULAR`/`REDONDO`), `espessura`, `largura`, `diametro`, `comprimento`, `quantidade`, `estoque` (opcional). Resposta paginada `{ itens: [...], total }` (como `GET /api/lotes`). Traz lotes da liga **e das ligas equivalentes** (`liga_equivalente: true` → selo), cuja bitola comporta a medida acabada e com disponível > 0. Cada item tem os campos de `GET /api/lotes` mais `peso_previsto_kg`, `peso_peca_kg`, `sobremetal_pct` (estimados com 5 mm), `substituido_por_id` e `multiplo` (null = material comum; `"1110"` = múltiplo de 1.110 mm). Ordem: menor sobremetal, depois o mais antigo.
+
+**Sugestão por liga × bitola (spec v3.5, 2026-11-11, R045/R046)** ✅. Parâmetro novo opcional `peso_necessario_kg` (o peso previsto do passo 3). A resposta ganha `grupos` (a lista `itens` continua igual):
+
+```json
+{ "grupos": [ { "chave": "H13|RETANGULAR|33X105|", "liga": "H13", "formato": "RETANGULAR", "bitola": "33X105",
+    "multiplo": null, "liga_equivalente": false, "peso_previsto_kg": 82.7, "sobremetal_pct": 17.8,
+    "peso_necessario_kg": 120.0, "total_disponivel_kg": 140.0, "falta_kg": 0.0, "sobra_kg": 20.0,
+    "so_um_estoque": false, "frase": "Necessário 120,0 kg × disponível 140,0 kg: sobra 20,0 kg",
+    "estoques": { "ITU": { "disponivel_kg": 40.0, "lotes": [ { "id": 3, "codigo": "L-000003", "estoque": "ESTOQUE_MEGA",
+                                                                "conteiner": null, "codigo_mega": 78290, "tipo": "ORIGINAL",
+                                                                "saldo_kg": 40.0, "reservado_kg": 0.0, "disponivel_kg": 40.0,
+                                                                "indicadores": {} } ] },
+                  "RJ_NO_RIO": { "disponivel_kg": 100.0, "lotes": [ ... ] } } } ] }
+```
+
+- Grupo = **liga e bitola exatas** (mesmo formato e medidas; 21x202 e 21x203 nunca se juntam) **e o mesmo múltiplo**. `ITU` junta Estoque Mega e RJ em Itu (cada lote traz `codigo_mega`); `RJ_NO_RIO` lista por contêiner. Estoque sem lote vem com `lotes: []`.
+- Liga equivalente (1.2344 ≈ H13) vem em grupo próprio com `liga_equivalente: true`, depois dos grupos da liga pedida. A8MOD e **CR8MOD** são ligas distintas (P24): não aparecem no grupo de A8/CR8.
+- `peso_necessario_kg` ausente → usa o `peso_previsto_kg` estimado do grupo. `falta_kg`/`sobra_kg` = necessário − total disponível. Nada é escolhido sozinho: a tela deixa marcar lotes de um ou dos dois estoques (ver "Consumo misto").
 
 ### Passos 3 e 4: `POST /api/solicitacoes/validar` e `POST /api/solicitacoes` ✅
 
@@ -38,6 +56,7 @@ Parâmetros: `liga` (obrigatório), `formato` (`RETANGULAR`/`REDONDO`), `espessu
 - `liga`: liga pedida. Lote de liga equivalente → `LIGA_EQUIVALENTE` (CIENCIA) **[P18]**.
 - `enviar: false` grava rascunho sem exigir justificativas. `enviar: true` exige o `ok`.
 - Um item = uma solicitação. Dois lotes para a mesma OP = dois itens no mesmo POST.
+- **`consumo_misto`** (bool, padrão false; spec v3.5 T07, P26 opção A, decisão do Eduardo de 2026-11-11) ✅: marca que a OP também consome lote de **Itu**. A parte do RJ é esta solicitação (modo `CORTAR_RJ`/`TRAZER_INTEIRA`); a parte de Itu **não** entra no POST: a tela abre a T13 ("Registrar corte em Itu agora") com a mesma OP, o lote de Itu, `previsto_kg` da parte e `consumo_misto: true`. A segunda parte não gera `OP_DUPLICADA` quando a primeira foi marcada (registro sem a marca continua gerando). A conta "faltam X kg para a OP" fica na tela, com o quadro de sugestão (aviso, não bloqueia).
 
 Resposta do `/validar` (`resultado`):
 
@@ -55,7 +74,7 @@ Resposta do `/validar` (`resultado`):
 
 Ocorrências possíveis: `OP_INEXISTENTE`, `OP_ENCERRADA`, `OP_SITUACAO_DESCONHECIDA` (ALERTA), `OP_NAO_CONFIRMADA` (ALERTA), `OP_DUPLICADA`, `MODO_INVALIDO`, `MODO_INCOMPATIVEL`, `LOTE_SEM_SALDO`, `DIMENSOES_INCOMPLETAS`, `BITOLA_MENOR_QUE_PECA`, `SOBREMETAL_ACIMA_TOLERANCIA`, `SALDO_INSUFICIENTE`, `USA_SALDO_RESERVADO`, `DESTINACAO_n`, `LIGA_EQUIVALENTE`, `LIGA_DIFERENTE` (CIENCIA, ver R024), `ITEM_SUBSTITUIDO` (ALERTA, com `dados.substituto_id`).
 
-Gravou: `201` com `{ "solicitacoes": [ <detalhe> ] }`.
+Gravou: `201` com `{ "solicitacoes": [ <detalhe> ] }`. O detalhe e o item da lista (§2) trazem `consumo_misto`: `null` ou `{ "itu_kg": 40.0, "rj_kg": 100.0, "texto": "OP com consumo misto: Itu 40,0 kg + RJ 100,0 kg" }` (RJ = peso real já cortado das solicitações marcadas da OP, ou o previsto enquanto não cortadas; Itu = consumo dos cortes em Itu marcados da OP). O Excel de solicitações ganha a coluna "Consumo misto".
 
 ### Rascunho
 
@@ -77,7 +96,7 @@ Item da lista:
   "modo": "CORTAR_RJ", "quantidade": 12, "pecas_cortadas": 0, "peso_previsto_kg": 82.7, "peso_real_kg": null,
   "reserva_kg": 82.7, "prazo": "2026-12-09", "instrucao": "...", "instrucao_processo": null,
   "situacao": "ENVIADA", "encerrada_saldo_pendente": false, "motivo": null,
-  "dias_em_aberto": 0, "atraso": "NORMAL", "cops": [], "enviada_em": "..." }
+  "dias_em_aberto": 0, "atraso": "NORMAL", "cops": [], "enviada_em": "...", "consumo_misto": null }
 ```
 
 `atraso`: `NORMAL` (até 7 dias), `ATENCAO` (até 15), `ATRASADO` ou `null` (fora das situações Enviada/Parcial/Material insuficiente).
@@ -106,7 +125,7 @@ Ações (Estoque Itu):
   "data_corte": "2026-11-03", "observacao": null, "confirmacoes": {} }
 ```
 
-Várias linhas = "Usar outro lote / dividir". Ocorrências: `SITUACAO_INVALIDA`, `DATA_CORTE_INVALIDA` (hoje até 7 dias atrás), `PECAS_ACIMA_SOLICITADO` (ALERTA), `LOTE_FORA_DO_RJ`, `SALDO_INSUFICIENTE`, `BITOLA_MENOR_QUE_PECA`, `LIGA_DIFERENTE` (ERRO no corte), `LOTE_TROCADO` (CIENCIA; o Fabiano é avisado), `DESTINACAO_n`, `EXCESSO_TOLERANCIA` / `ABAIXO_PREVISTO` (só no modo corte, sobre o previsto proporcional às peças; **peça inteira não tem regra dos 5 % aqui**). `resultado.efeitos[]` traz `antes_kg`/`depois_kg` por lote e `resultado.previsto_kg`. Gravou: `201` com o detalhe da solicitação.
+Várias linhas = "Usar outro lote / dividir". Ocorrências: `SITUACAO_INVALIDA`, `DATA_CORTE_INVALIDA` (hoje até 7 dias atrás), `PECAS_ACIMA_SOLICITADO` (ALERTA), `LOTE_FORA_DO_RJ`, `SALDO_INSUFICIENTE`, `BITOLA_MENOR_QUE_PECA`, `LIGA_DIFERENTE` (ERRO no corte), `LOTE_TROCADO` (CIENCIA; o Fabiano é avisado), `DESTINACAO_n`, `EXCESSO_TOLERANCIA` / `ABAIXO_PREVISTO` (só no modo corte, sobre o previsto proporcional às peças, **5 %**; **peça inteira não tem faixa de 5 % nem de 8 % aqui**). **Peça inteira:** `BARRA_MAIS_LEVE_QUE_PECA` (ALERTA, não bloqueia; P26 item 2a, decisão do Eduardo de 2026-11-11) quando o peso da barra é menor que o previsto da peça (proporcional às peças): "A barra (800,0 kg) pesa menos do que a peça prevista (837,0 kg); confira a pesagem ou a bitola." `resultado.efeitos[]` traz `antes_kg`/`depois_kg` por lote e `resultado.previsto_kg`. Gravou: `201` com o detalhe da solicitação.
 
 ## 4. T11 COP ✅ (Operação RJ altera; Estoque Itu e Análise consultam)
 
@@ -146,6 +165,8 @@ COP: `{ id, numero, situacao, data, fechado_em, enviado_em, qtd_itens, peso_tota
 - `peso_usado_kg`: peso do material antes do corte (barra/pedaço usado). Em branco = saldo do lote. **Perda = usado − consumo − sobra.**
 - `previsto_kg`: vem do T07 "Registrar corte em Itu agora". Para a peça inteira recebida, o sistema usa o previsto da solicitação.
 - No `resultado`: `perda_kg`, **`perda_pct`** (% do material usado), **`perda_max_pct`** (parâmetro `PERDA_CORTE_MAX_PCT`, 6), **`perda_max_kg`**, **`peso_usado_kg`** (2026-11-04, R024; `perda_esperada_kg` saiu), `previsto_kg`, `gera_sa` (lote fiscal RJ que não é o 1º corte da peça inteira da mesma OP), `instrucao_mega` (lote Mega: "Baixar 105,0 kg do código 78290 na OP 100508. Transferir 12,0 kg do código 78290 para o código 1698 (IMP-H13 RETO).").
+- **Tolerância (spec v3.5, P22(a))** ✅: lote **fiscal RJ em Itu** (peça inteira recebida, sobra e RETO RJ em Itu) usa `TOLERANCIA_EXCESSO_RJ_INTEIRO_PCT` (**8 %**); lote do **Estoque Mega** usa `TOLERANCIA_EXCESSO_PCT` (5 %). `resultado.tolerancia_excesso_pct` diz qual valeu; `EXCESSO_TOLERANCIA` tem `dados.limite_pct` e `dados.limite_de` e a mensagem termina com "Limite: 8 % para material do RJ." (ou "5 % para lote do Estoque Mega"). Redondo segue a mesma regra (Ø da barra, comprimento + 5 mm). **Não há SA complementar** do excesso na peça inteira (P26 2b): o SA da peça inteira continua com o previsto.
+- **`consumo_misto`** (bool, padrão false) no corpo: parte de Itu de uma OP com consumo Itu + RJ (ver §1). Volta em `resultado.consumo_misto` e no 201.
 - Ocorrências: `OP_INEXISTENTE`, `OP_ENCERRADA`, `OP_NAO_CONFIRMADA`, `LOTE_FORA_DE_ITU`, `PESO_INVALIDO`, `SALDO_INSUFICIENTE`, `EXCESSO_TOLERANCIA`, `ABAIXO_PREVISTO`, `SOMA_MAIOR_QUE_LOTE`, `PERDA_CORTE_ALTA` (CIENCIA quando a perda passa de `PERDA_CORTE_MAX_PCT` % do material usado; `dados`: `perda_kg`, `perda_pct`, `limite_kg`, `limite_pct`), `USA_SALDO_RESERVADO`, `DESTINACAO_n`, `DATA_CORTE_INVALIDA`.
 - Gravou: `201` com `{ id, op, lote, consumo_kg, sobra_kg, perda_kg, lote_reto: {id, codigo}|null, sa_id, instrucao_mega, ... }`.
 
@@ -196,6 +217,7 @@ Ocorrências: `NF_DUPLICADA`, `SEM_ITENS`, `LIGA_DESCONHECIDA#n`, `BITOLA_INCOMP
 ## 10. T23 Parâmetros e notificações ✅
 
 - `GET /api/parametros` → `[{ chave, valor, tipo, descricao, atualizado_em }]`; `PATCH /api/parametros/{chave}` `{ valor }` (Admin).
+- Migração **0008** (2026-11-11) cria `TOLERANCIA_EXCESSO_RJ_INTEIRO_PCT` = 8 (T13, material inteiro do RJ, P22(a)) e `SA_JANELA_ANTES_DIAS` = 7 (confirmação do SA no Mega a partir de N dias antes da data do SA, P24; antes fixo no código).
 - `GET /api/notificacoes?somente_nao_lidas=` → `{ itens: [{ id, tipo, texto, link, criado_em, lida }], nao_lidas }`; `POST /api/notificacoes/{id}/lida`; `POST /api/notificacoes/lidas`. O `link` aponta para a rota de tela sugerida (`/fila-rj?solicitacao=7`, `/sa?cop=601`, `/cops/1`, `/recebimentos/1`, `/solicitacoes/7`).
 
 ## 10.1 Mega: sincronização e OP ✅ (2026-11-03, chat BANCO E TESTES)
@@ -270,7 +292,7 @@ A pendência é **por código Mega** e nasce/atualiza/fecha na sincronização (
 | `GET /api/entradas-mega/motivos` | `[{codigo, descricao}]` do "Não é entrada" |
 | `POST /api/entradas-mega/{id}/criar-lote/validar` e `POST .../criar-lote` | padrão prévia/gravação (§1.5) |
 | `POST /api/entradas-mega/{id}/nao-e-entrada` | `{motivo, justificativa}` |
-| `POST /api/entradas-mega/{id}/reabrir` | `{justificativa}` (Admin, só Descartada) |
+| `POST /api/entradas-mega/{id}/reabrir` | `{justificativa}` (Admin, só Descartada). Se já houver outra ABERTA do mesmo código (0008: só uma por código), a reaberta vira ENCERRADA e os kg voltam para a aberta |
 
 Item da lista: `id, codigo, descricao, situacao, saldo_mega_kg, soma_lotes_kg, diferenca_kg, criado_em` (1ª sincronização em que apareceu = "há quanto tempo"), `ultima_entrada {nf, data, kg, tpm}` (null se não houver), `etiquetas` (`CODIGO_NOVO`, `CODIGO_RETO`), `aviso` (só código RETO), `item {id, liga, formato, bitola, criado_pela_t15}` ou, no código novo, `item_sugerido {legivel, liga, formato, bitola, mensagem}` para o operador conferir, e nas tratadas `motivo`, `motivo_descricao`, `justificativa`, `tratada_por`, `tratada_em`.
 
@@ -278,7 +300,7 @@ Item da lista: `id, codigo, descricao, situacao, saldo_mega_kg, soma_lotes_kg, d
 
 **nao-e-entrada**: `motivo` = `ESTORNO_BAIXA_MEGA | ACERTO_INVENTARIO_MEGA | TRANSFERENCIA_CODIGOS | OUTRO`; `justificativa` com 10+ caracteres (400 "Escreva pelo menos 10 caracteres."). A pendência vira DESCARTADA e os kg ficam como diferença explicada (não volta; só o aumento posterior gera nova pendência). Pendência já tratada: 400 "Esta pendência já foi tratada por NOME às HH:MM. Atualize a lista."
 
-Estados: `ABERTA`, `RESOLVIDA`, `DESCARTADA`, `ENCERRADA` (o Mega voltou à tolerância sem ação).
+Estados: `ABERTA`, `RESOLVIDA`, `DESCARTADA`, `ENCERRADA` (o Mega voltou à tolerância sem ação). Desde a 0008 (R044) o banco garante: estados e motivos só da lista (CHECK) e **uma** ENTRADA ABERTA por código (índice único parcial).
 
 **Painel e T16.** `GET /api/painel/pendencias` ganha `entradas_mega_a_classificar {quantidade}` (null para Operação RJ) e, no grupo ESTOQUE, a pendência `ENTRADA_MEGA_A_CLASSIFICAR` (link `/entradas-mega`). Cada item de `GET /api/conciliacao` ganha `explicada_na_t15` (bool), `explicada_t15_kg`, `diferenca_nao_explicada_kg` e `explicacoes [{pendencia_id, kg, motivo, motivo_descricao, justificativa, usuario, em}]`; `diferenca_kg` continua sendo a total e `status` (OK / MEGA_MAIOR / MEGA_MENOR) é calculado sobre a **não explicada**: vermelho só para ela.
 
@@ -286,7 +308,7 @@ Estados: `ABERTA`, `RESOLVIDA`, `DESCARTADA`, `ENCERRADA` (o Mega voltou à tole
 
 `GET /api/lotes/reto-por-origem` (todos os perfis; Operação RJ com o estoque travado em `RJ_NO_RIO`). Filtros: `estoque`, `liga` (repetível), `bitola_origem` (texto, ex. `45x610`), `bitola_de`/`bitola_ate` (1ª medida da bitola de origem), `conteiner`, `codigo_mega`, `com_saldo` (padrão true), `incluir_sobras` (padrão false: só RETO), `criado_de`/`criado_ate`.
 
-Resposta: `{ligas [{liga, bitolas [{bitola_origem, total_kg, conteineres [{conteiner, conteiner_texto ("não informado" se só a bitola), estoque, classe, lotes, saldo_kg, reservado_kg, disponivel_kg, lotes_detalhe [{id, codigo, saldo_kg}]}]}], sem_origem {texto: "Sem origem identificada", lotes, saldo_kg, reservado_kg, disponivel_kg, por_estoque, lotes_detalhe} | null, totais}], totais, lotes [um por lote], vazio, mensagem_vazio, estoque_travado}`. `totais` = `{com_origem_kg, so_bitola_kg, sem_origem_kg, total_kg, lotes, reservado_kg, disponivel_kg}`; o `total_kg` geral é a soma dos saldos dos lotes RETO nos filtros (bate com a T04 filtrada por formato RETO). Classes: `COMPLETA` (bitola e contêiner da raiz da árvore), `SO_BITOLA` (medida anotada na carga, contêiner "não informado"), `SEM_ORIGEM` (linha própria por liga, nunca somada a uma bitola). Para Operação RJ: `mensagem_vazio = "Nenhum RETO no RJ no Rio"`.
+Resposta: `{ligas [{liga, bitolas [{bitola_origem, total_kg, conteineres [{conteiner, conteiner_texto ("não informado" se só a bitola), estoque, classe, lotes, saldo_kg, reservado_kg, disponivel_kg, lotes_detalhe [{id, codigo, saldo_kg}]}]}], sem_origem {texto: "Sem origem identificada", lotes, saldo_kg, reservado_kg, disponivel_kg, por_estoque, lotes_detalhe} | null, totais}], totais, lotes [um por lote], vazio, mensagem_vazio, estoque_travado}`. `totais` = `{com_origem_kg, so_bitola_kg, sem_origem_kg, total_kg, lotes, reservado_kg, disponivel_kg}`; o `total_kg` geral é a soma dos saldos dos lotes RETO nos filtros (bate com a T04 filtrada por formato RETO). Classes: `COMPLETA` (bitola e contêiner da raiz da árvore), `SO_BITOLA` (medida anotada na carga, contêiner "não informado"; desde 2026-11-11 a medida vem **normalizada** no formato da bitola do cadastro, R044: "IMP-D2 25X610MM" → `25X610`, "30,5x610" → `30,5X610`, liga diferente da do lote fica na frente, `D2 36X510`; faixa "45x510~610" fica em maiúsculo sem espaço), `SEM_ORIGEM` (linha própria por liga, nunca somada a uma bitola). Para Operação RJ: `mensagem_vazio = "Nenhum RETO no RJ no Rio"`.
 
 Excel: `GET /api/exportar/reto-por-origem.xlsx` (mesmos filtros), duas abas "Resumo" e "Lotes"; as 2 primeiras linhas trazem a data/hora e os filtros usados.
 

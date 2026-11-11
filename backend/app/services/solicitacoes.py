@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import Config
@@ -16,7 +16,7 @@ from app.domain import corte, regras
 from app.domain.formato import kg_br, pct_br
 from app.domain.validacao import Nivel, Ocorrencia, Resultado
 from app.integrations.mega.consultas import SITUACOES_OP
-from app.models import (CadastroSa, Conteiner, ItemMP, LiberacaoCorte, Liga, LigaEquivalente, Lote,
+from app.models import (CadastroSa, Conteiner, CorteItu, ItemMP, LiberacaoCorte, Liga, LigaEquivalente, Lote,
                         SolicitacaoCorte, Usuario)
 
 from . import auditoria, movimentos, ops
@@ -53,6 +53,8 @@ class SolicitacaoEntrada:
     observacao: str | None = None
     op_manual: dict[str, Any] | None = None
     confirmacoes: dict[str, str] = field(default_factory=dict)
+    # P26, opção A (decisão do Eduardo, 2026-11-11): parte do RJ de uma OP que também consome lote de Itu (T13)
+    consumo_misto: bool = False
 
 
 def _sufixo(r: Resultado, i: int) -> Resultado:
@@ -101,7 +103,8 @@ def _validar_liga(db: Session, liga_pedida: str | None, lote: Lote) -> Resultado
     return r
 
 
-def _validar_op(db: Session, dados: ops.DadosOp, ignorar_solicitacao: int | None = None) -> Resultado:
+def _validar_op(db: Session, dados: ops.DadosOp, ignorar_solicitacao: int | None = None,
+                consumo_misto: bool = False) -> Resultado:
     r = Resultado()
     if not dados.encontrada:
         return r.adicionar("OP_INEXISTENTE", Nivel.ERRO, "OP não encontrada no Mega.")
@@ -122,7 +125,16 @@ def _validar_op(db: Session, dados: ops.DadosOp, ignorar_solicitacao: int | None
                                           SolicitacaoCorte.situacao != "CANCELADA")
     if ignorar_solicitacao:
         q = q.where(SolicitacaoCorte.id != ignorar_solicitacao)
-    ja = db.scalar(q.limit(1)) or db.scalar(select(CadastroSa.id).where(CadastroSa.op == dados.numero).limit(1))
+    qsa = select(CadastroSa.id).where(CadastroSa.op == dados.numero)
+    if consumo_misto:
+        # P26 (opção A): a segunda parte de uma OP com consumo misto não gera OP_DUPLICADA quando a primeira também foi
+        # marcada (solicitação ou corte em Itu "consumo misto"); registro sem a marca continua gerando.
+        q = q.where(SolicitacaoCorte.consumo_misto.is_(False))
+        mistas = select(SolicitacaoCorte.id).where(SolicitacaoCorte.consumo_misto.is_(True))
+        cortes = select(CorteItu.id).where(CorteItu.consumo_misto.is_(True))
+        qsa = qsa.where(or_(CadastroSa.solicitacao_id.is_(None), CadastroSa.solicitacao_id.not_in(mistas)),
+                        or_(CadastroSa.corte_itu_id.is_(None), CadastroSa.corte_itu_id.not_in(cortes)))
+    ja = db.scalar(q.limit(1)) or db.scalar(qsa.limit(1))
     if ja:
         r.adicionar("OP_DUPLICADA", Nivel.CIENCIA,
                     "Já existe solicitação ou SA para esta OP. Confirme que é uma nova necessidade.")
@@ -198,7 +210,7 @@ def validar(db: Session, cfg: Config, e: SolicitacaoEntrada, *, ignorar_solicita
         dados.item_descricao = e.op_manual.get("item_descricao") or dados.item_descricao
         dados.cliente = e.op_manual.get("cliente") or dados.cliente
     previa = Previa()
-    previa.resultado.juntar(_validar_op(db, dados, ignorar_solicitacao))
+    previa.resultado.juntar(_validar_op(db, dados, ignorar_solicitacao, e.consumo_misto))
     itens = [_calcular_item(db, cfg, e, it, ignorar_solicitacao) for it in e.itens]
     frases = []
     for i, ic in enumerate(itens):
@@ -251,6 +263,7 @@ def _preencher(sol: SolicitacaoCorte, e: SolicitacaoEntrada, dados: ops.DadosOp,
     sol.instrucao, sol.instrucao_processo = ic.instrucao, ic.entrada.instrucao_processo
     sol.prazo = e.prazo or dados.data_entrega
     sol.observacao = e.observacao
+    sol.consumo_misto = e.consumo_misto
 
 
 def criar(db: Session, cfg: Config, e: SolicitacaoEntrada, *, enviar: bool, usuario: Usuario,
@@ -338,7 +351,7 @@ def entrada_de(sol: SolicitacaoCorte, *, lote_id: int | None = None) -> Solicita
     manual = None if sol.op_confirmada_mega else {"item_codigo": sol.item_codigo, "item_descricao": sol.item_descricao,
                                                   "cliente": sol.cliente}
     return SolicitacaoEntrada(op=sol.op, medida=medida, itens=[it], prazo=sol.prazo, observacao=sol.observacao,
-                              op_manual=manual, liga=sol.lote.item.liga.codigo)
+                              op_manual=manual, liga=sol.lote.item.liga.codigo, consumo_misto=sol.consumo_misto)
 
 
 # ---------------- ações da lista (T08) ----------------
@@ -555,6 +568,10 @@ def validar_corte(db: Session, cfg: Config, sol: SolicitacaoCorte, e: CorteEntra
         r.juntar(regras.validar_peso_real(previsto, peso, parametro(db, "TOLERANCIA_EXCESSO_PCT", cfg),
                                           parametro(db, "TOLERANCIA_FALTA_PCT", cfg)))
         previa.extra["previsto_kg"] = previsto
+    elif sol.modo == "TRAZER_INTEIRA" and pecas > 0:
+        previsto = round(float(sol.peso_previsto_kg) * pecas / sol.quantidade, 3)
+        r.juntar(regras.validar_barra_inteira(previsto, peso))
+        previa.extra["previsto_kg"] = previsto
     restante = falta - pecas
     previa.frase = (f"Corte de {pecas} peça(s), {kg_br(peso)} baixados de "
                     + ", ".join(x["lote"] for x in previa.efeitos)
@@ -630,7 +647,23 @@ def resumo(db: Session, sol: SolicitacaoCorte) -> dict[str, Any]:
         "encerrada_saldo_pendente": sol.encerrada_saldo_pendente, "motivo": sol.motivo, "dias_em_aberto": dias,
         "atraso": faixa, "cops": cops,
         "enviada_em": sol.enviada_em.isoformat() if sol.enviada_em else None,
+        "consumo_misto": marca_consumo_misto(db, sol.op) if sol.consumo_misto else None,
     }
+
+
+def marca_consumo_misto(db: Session, op: int) -> dict[str, Any]:
+    """T08: "OP com consumo misto: Itu x kg + RJ y kg" (P26, opção A). RJ = peso real já cortado das solicitações
+    marcadas da OP (ou o previsto, enquanto não cortadas); Itu = consumo dos cortes em Itu marcados da OP."""
+    rj = 0.0
+    q = select(SolicitacaoCorte).where(SolicitacaoCorte.op == op, SolicitacaoCorte.consumo_misto.is_(True),
+                                       SolicitacaoCorte.situacao != "CANCELADA")
+    for s in db.scalars(q):
+        real = sum(float(l.peso_real_kg) for l in s.liberacoes if not l.estornada)
+        rj += real if real > 0 else float(s.peso_previsto_kg or 0)
+    itu = float(db.scalar(select(func.coalesce(func.sum(CorteItu.consumo_kg), 0)).where(
+        CorteItu.op == op, CorteItu.consumo_misto.is_(True))) or 0)
+    return {"itu_kg": round(itu, 3), "rj_kg": round(rj, 3),
+            "texto": f"OP com consumo misto: Itu {kg_br(itu)} + RJ {kg_br(rj)}"}
 
 
 def detalhe(db: Session, sol: SolicitacaoCorte) -> dict[str, Any]:

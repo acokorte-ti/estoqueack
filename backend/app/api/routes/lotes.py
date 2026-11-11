@@ -14,6 +14,7 @@ from app.core.db import get_db
 from app.models import Destinacao, Lote, Nota, Usuario
 from app.services import auditoria, estoque
 from app.services import movimentos as mov
+from app.domain.medidas import chave_multiplo
 from app.services.base import lote_visivel, so_rj_no_rio
 from app.services.solicitacoes import ligas_equivalentes
 
@@ -100,9 +101,11 @@ def compativeis(liga: str, formato: Literal["RETANGULAR", "REDONDO"] = "RETANGUL
                 espessura: float | None = Query(None, gt=0), largura: float | None = Query(None, gt=0),
                 diametro: float | None = Query(None, gt=0), comprimento: float | None = Query(None, gt=0),
                 quantidade: int = Query(1, ge=1), estoque_: Estoque | None = Query(None, alias="estoque"),
+                peso_necessario_kg: float | None = Query(None, gt=0),
                 db: Session = Depends(get_db), u: Usuario = Depends(deps.usuario_liberado)) -> dict:
     """T07 passo 2: mesma liga (ou equivalente, com selo), bitola que comporta a peça e saldo disponível.
-    Ordem: menor sobremetal, depois o lote mais antigo."""
+    Ordem: menor sobremetal, depois o lote mais antigo. `grupos` (spec v3.5): por liga × bitola exatas (e múltiplo),
+    com Itu e RJ no Rio lado a lado e "necessário × disponível"."""
     from app.domain import corte as calc
     from app.models import Liga
     alvo = db.scalar(select(Liga).where(Liga.codigo == liga.strip().upper()))
@@ -132,11 +135,12 @@ def compativeis(liga: str, formato: Literal["RETANGULAR", "REDONDO"] = "RETANGUL
         c = calc.calcular(bitola=bitola, acabada=acabada, quantidade=quantidade, densidade=float(it.liga.densidade),
                           sobremetal_comprimento_mm=5, sobremetal_largura_mm=None)
         saida.append({**base, "disponivel_kg": disponivel, "liga_equivalente": it.liga_id != alvo.id,
+                      "multiplo": chave_multiplo(it.descricao, it.comprimento_fixado),
                       "peso_previsto_kg": c.peso_previsto_kg, "peso_peca_kg": c.peso_peca_kg,
                       "sobremetal_pct": c.sobremetal_pct, "substituido_por_id": it.substituido_por_id,
                       "criado_em": l.criado_em.isoformat()})
     saida.sort(key=lambda x: (x["sobremetal_pct"] if x["sobremetal_pct"] is not None else 1e9, x["criado_em"]))
-    return {"itens": saida, "total": len(saida)}
+    return {"itens": saida, "total": len(saida), "grupos": estoque.sugestao_por_bitola(saida, peso_necessario_kg)}
 
 
 @router.get("/{lote_id}")

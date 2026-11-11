@@ -395,14 +395,23 @@ def reabrir(db: Session, pid: int, justificativa: str, *, usuario: Usuario, ip: 
     if p.situacao != "DESCARTADA":
         raise ErroNegocio('Só uma pendência "Não é entrada" (Descartada) pode ser reaberta.')
     antes = {"situacao": p.situacao, "motivo": p.motivo, "kg": float(p.kg)}
-    p.situacao, p.resolvido_em, p.resolvido_por_id = "ABERTA", None, None
-    p.justificativa = f"Reaberta: {just}"[:500]
+    outra = db.scalar(select(PendenciaMega).where(PendenciaMega.tipo == "ENTRADA", PendenciaMega.situacao == "ABERTA",
+                                                  PendenciaMega.codigo == p.codigo, PendenciaMega.id != p.id))
+    if outra is not None:
+        # 0008 (R044): uma só ENTRADA ABERTA por código. A explicação sai do cálculo e os kg passam a fazer parte
+        # da pendência que já está aberta (atualizada logo abaixo); esta fica ENCERRADA.
+        p.situacao, p.resolvido_em, p.resolvido_por_id = "ENCERRADA", agora(), usuario.id
+        p.justificativa = f"Reaberta: {just} (somada à pendência aberta {outra.id})"[:500]
+    else:
+        p.situacao, p.resolvido_em, p.resolvido_por_id = "ABERTA", None, None
+        p.justificativa = f"Reaberta: {just}"[:500]
     db.flush()
     atualizar(db, p.codigo)                          # a diferença explicada volta ao cálculo
     auditoria.registrar(db, "T15_REABERTA", usuario_id=usuario.id, entidade="pendencia_mega", entidade_id=p.id,
-                        antes=antes, depois={"justificativa": just, "situacao": p.situacao}, ip=ip)
+                        antes=antes, depois={"justificativa": just, "situacao": p.situacao,
+                                             "somada_a": outra.id if outra is not None else None}, ip=ip)
     db.commit()
-    return pendencia_dict(db, p)
+    return pendencia_dict(db, outra if outra is not None else p)     # devolve a pendência que ficou ABERTA
 
 
 # ---------------- apoio à T16 ----------------

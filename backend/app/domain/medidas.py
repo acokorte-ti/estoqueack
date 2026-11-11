@@ -19,7 +19,8 @@ _APELIDOS = {
     "DIN 1.2344": "1.2344", "1.2344": "1.2344", "12344": "1.2344",
     "DIN 1.2360": "1.2360", "1.2360": "1.2360", "12360": "1.2360",
     "AISI-D2": "D2", "AISI D2": "D2", "AISI-D6": "D6", "AISI-O1": "O1",
-    "A8 MOD": "A8MOD", "A8MOD": "A8MOD", "CR8MOD": "CR8",
+    # CR8MOD é liga distinta de CR8 (P24, confirmada pelo Eduardo em 2026-11-10), como o A8 MOD do A8
+    "A8 MOD": "A8MOD", "A8MOD": "A8MOD", "CR8MOD": "CR8MOD", "CR8 MOD": "CR8MOD",
     "HGNI06": "HGNI06", "TENAX300IM": "TENAX300", "CPM-10V": "CPM10V", "CPM 10V": "CPM10V",
     "45CRNI4MO": "45CRNI4MO",
 }
@@ -112,3 +113,38 @@ def interpretar(descricao: str) -> Medida:
     if m:
         return Medida(liga, "REDONDO", diametro=_num(m.group(1)))
     return Medida(liga, "DESCONHECIDO")
+
+
+_RE_MULT = re.compile(r"\bMULT|M[ÚU]LTIPLO")
+_RE_MULT_COMPR = re.compile(r"(?:M[ÚU]LTIPLO\s*(?:DE)?|MULT\.?)\s*(\d+(?:[.,]\d+)?)")
+
+
+def chave_multiplo(descricao: str | None, comprimento_fixado: str | None = None) -> str | None:
+    """Múltiplo do item (§10.7, T07 v3.5: lote de múltiplo só se junta ao MESMO múltiplo). None = material comum.
+
+    Ex.: 'A8 MOD 21x204x1110 Múltiplo' → '1110'; 'D2 FLAT BAR 4,8X600 (MÚLTIPLO DE 2020MM)' → '2020';
+    comprimento fixado 'MULT. 1820' → '1820'; múltiplo sem comprimento legível → 'MULT'."""
+    textos = [(t or "").upper() for t in (descricao, comprimento_fixado)]
+    if not any(_RE_MULT.search(t) for t in textos):
+        return None
+    for t in textos:
+        m = _RE_MULT_COMPR.search(t)
+        if m:
+            return f"{_num(m.group(1)):g}"
+    c = interpretar(descricao or "").comprimento
+    return f"{c:g}" if c else "MULT"
+
+
+def bitola_de_origem(texto: str | None, liga_do_lote: str | None = None) -> str:
+    """Bitola de origem anotada (comentário do Estoque Geral) no mesmo formato da bitola do cadastro, para agrupar
+    na aba "RETO por origem" (R044): 'IMP-D2 25X610MM' e 'D2 25x610' → '25X610'; 'IMP-D2 30,5x610MM' → '30,5X610';
+    'Ø90' → 'Ø90'. Se a liga anotada for outra que a do lote, ela fica na frente ('D2 36X510'). Faixa ('45x510~610')
+    ou texto que não se lê: maiúsculo e sem espaço."""
+    t = (texto or "").strip()
+    if not t:
+        return ""
+    m = interpretar(t)
+    if "~" in t or m.formato not in ("RETANGULAR", "REDONDO") or m.bitola in ("RETANGULAR", "REDONDO"):
+        return re.sub(r"\s+", "", t.upper())
+    b = m.bitola.replace(".", ",")
+    return f"{m.liga} {b}" if m.liga and liga_do_lote and m.liga != normalizar_liga(liga_do_lote) else b

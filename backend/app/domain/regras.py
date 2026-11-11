@@ -42,12 +42,13 @@ def validar_saldo(saldo_kg: float, reservado_outros_kg: float, solicitado_kg: fl
 
 def validar_peso_real(previsto_kg: float, real_kg: float,
                       tolerancia_excesso_pct: float = 5.0,
-                      tolerancia_falta_pct: float = 20.0) -> Resultado:
+                      tolerancia_falta_pct: float = 20.0, limite_de: str | None = None) -> Resultado:
     """Compara peso real (balança) com o previsto.
 
     O previsto já é calculado com sobremetal, então o excedente aceito é pequeno.
     > previsto + 5 %   → CIÊNCIA obrigatória: o operador justifica o uso a mais de MP.
     < previsto − 20 %  → ALERTA (provável erro de digitação/pesagem).
+    `limite_de` entra na mensagem para dizer qual limite foi usado (T13, spec v3.5): "material inteiro do RJ".
     """
     r = validar_quantidade_kg(real_kg, "peso real")
     if r.erros or not previsto_kg or previsto_kg <= 0:
@@ -58,16 +59,30 @@ def validar_peso_real(previsto_kg: float, real_kg: float,
         r.adicionar("EXCESSO_TOLERANCIA", Nivel.CIENCIA,
                     f"Peso real {kg_br(real_kg)} está {pct_br(desvio_pct, 1)} acima do previsto "
                     f"({kg_br(previsto_kg)}). "
-                    f"Limite: {pct_br(tolerancia_excesso_pct)}. Justifique o uso de {kg_br(excedente)} a mais de "
-                    "matéria-prima.",
+                    f"Limite: {pct_br(tolerancia_excesso_pct)}"
+                    + (f" para {limite_de}" if limite_de else "")
+                    + f". Justifique o uso de {kg_br(excedente)} a mais de matéria-prima.",
                     excedente_kg=excedente, previsto_kg=previsto_kg, real_kg=real_kg,
-                    desvio_pct=round(desvio_pct, 2))
+                    desvio_pct=round(desvio_pct, 2), limite_pct=tolerancia_excesso_pct, limite_de=limite_de)
     elif -desvio_pct > tolerancia_falta_pct + EPS:
         r.adicionar("ABAIXO_PREVISTO", Nivel.ALERTA,
                     f"Peso real {kg_br(real_kg)} está {pct_br(-desvio_pct, 1)} abaixo do previsto "
                     f"({kg_br(previsto_kg)}). "
                     "Verifique a pesagem.",
                     previsto_kg=previsto_kg, real_kg=real_kg, desvio_pct=round(desvio_pct, 2))
+    return r
+
+
+def validar_barra_inteira(previsto_peca_kg: float | None, peso_barra_kg: float) -> Resultado:
+    """T10, peça inteira (P26 item 2a, decisão do Eduardo de 2026-11-11): a barra inteira NÃO passa pela faixa de 5 %
+    ou 8 % (é naturalmente maior que a peça), mas se pesar MENOS que o previsto da peça → aviso (não bloqueia)."""
+    r = Resultado()
+    if not previsto_peca_kg or previsto_peca_kg <= 0 or not peso_barra_kg or peso_barra_kg <= 0:
+        return r
+    if peso_barra_kg < previsto_peca_kg - EPS:
+        r.adicionar("BARRA_MAIS_LEVE_QUE_PECA", Nivel.ALERTA,
+                    f"A barra ({kg_br(peso_barra_kg)}) pesa menos do que a peça prevista ({kg_br(previsto_peca_kg)}); "
+                    "confira a pesagem ou a bitola.", previsto_kg=previsto_peca_kg, peso_barra_kg=peso_barra_kg)
     return r
 
 

@@ -18,6 +18,24 @@ ARQ_GERAL = "Materia Prima Geral 20out.xlsx"
 ARQ_CORTE = "CONTROLE DE CORTE - RIO DE JANEIRO.xlsx"
 ARQ_SA = "ATUAL_PLANILHA_CADASTRO PRODUTOS SEMI ACABADO .xlsx"
 ARQUIVOS = (ARQ_ESTOQUE, ARQ_GERAL, ARQ_CORTE, ARQ_SA)
+# O Estoque Geral muda de nome a cada versão ("Materia Prima Geral 20out", "Materia Prima Geral 05nov"…): a carga
+# aceita qualquer "Materia Prima Geral*.xlsx" na pasta, desde que seja UM só (spec v3.5 §10.8, R045).
+PADRAO_GERAL = "materia prima geral"
+
+
+def arquivo_geral(pasta: Path) -> str:
+    achados = sorted(p.name for p in pasta.glob("*.xlsx")
+                     if p.name.lower().startswith(PADRAO_GERAL) and not p.name.startswith("~$"))
+    if not achados:
+        raise EstruturaMudou(f"Arquivo não encontrado: {ARQ_GERAL} (ou outro \"Materia Prima Geral*.xlsx\")")
+    if len(achados) > 1:
+        raise EstruturaMudou("Mais de um Estoque Geral na pasta (" + "; ".join(achados) + "): deixe só o que vale")
+    return achados[0]
+
+
+def arquivos(pasta: Path) -> tuple[str, ...]:
+    """Nomes das 4 planilhas usadas (o do Estoque Geral é o que estiver na pasta)."""
+    return (ARQ_ESTOQUE, arquivo_geral(pasta), ARQ_CORTE, ARQ_SA)
 
 
 class EstruturaMudou(Exception):
@@ -237,16 +255,17 @@ def parcelas_de_sobra(texto: str | None) -> list[tuple[float, str]]:
 
 
 def ler_geral(pasta: Path) -> list[LinhaGeral]:
-    wb = _abrir(pasta, ARQ_GERAL)
-    ws = _aba(wb, "Estoque Geral", ARQ_GERAL)
+    arq = arquivo_geral(pasta)
+    wb = _abrir(pasta, arq)
+    ws = _aba(wb, "Estoque Geral", arq)
     r0, _ = _cabecalho(ws, {"item": "ITEM", "desc": "DESCRIÇÃO", "compr": "COMPR. FIXADOS (MM)",
                             "mega": "ESTOQUE MEGA", "rio": "ESTOQUE RJ (no Rio)", "itu": "ESTOQUE RJ (em Itu)",
-                            "uso": "CLIENTES / USO", "obs": "OBS:"}, ARQ_GERAL)
+                            "uso": "CLIENTES / USO", "obs": "OBS:"}, arq)
     cab = {c.column: _norm(c.value) for c in ws[r0] if c.value is not None}
     pos = {v: k for k, v in cab.items() if list(cab.values()).count(v) == 1}
     obs_cols = [k for k, v in cab.items() if v == "OBSERVACOES"]
     if len(obs_cols) != 2:
-        raise EstruturaMudou(f"{ARQ_GERAL}: esperava duas colunas OBSERVAÇÕES (RJ no Rio e RJ em Itu)")
+        raise EstruturaMudou(f"{arq}: esperava duas colunas OBSERVAÇÕES (RJ no Rio e RJ em Itu)")
     c = lambda nome: pos[_norm(nome)]  # noqa: E731
     out = []
     for r in range(r0 + 1, ws.max_row + 1):
@@ -261,7 +280,7 @@ def ler_geral(pasta: Path) -> list[LinhaGeral]:
             _num(ws.cell(r, c("ESTOQUE MEGA")).value), _num(ws.cell(r, c("ESTOQUE RJ (no Rio)")).value) or 0.0,
             _num(ws.cell(r, c("ESTOQUE RJ (em Itu)")).value) or 0.0, _texto(ws.cell(r, obs_cols[0]).value),
             _texto(ws.cell(r, obs_cols[1]).value), _texto(ws.cell(r, c("CLIENTES / USO")).value),
-            _texto(ws.cell(r, c("OBS:")).value), coms, ref(ARQ_GERAL, ws.title, r),
+            _texto(ws.cell(r, c("OBS:")).value), coms, ref(arq, ws.title, r),
             parcelas_de_sobra(com_itu), com_itu))
     return out
 

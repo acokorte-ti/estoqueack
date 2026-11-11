@@ -67,6 +67,7 @@ class SolicitacaoCorpo(BaseModel):
     observacao: str | None = Field(None, max_length=1000)
     op_manual: OpManual | None = Field(None, description="Só quando o Mega está fora do ar")
     enviar: bool = False
+    consumo_misto: bool = Field(False, description="OP com consumo nos dois estoques (parte de Itu pela T13) [P26]")
     confirmacoes: dict[str, str] = Field(default_factory=dict)
 
 
@@ -74,6 +75,7 @@ def _entrada(c: SolicitacaoCorpo) -> svc.SolicitacaoEntrada:
     return svc.SolicitacaoEntrada(
         op=c.op, liga=c.liga, medida=c.medida.model_dump(), prazo=c.prazo, observacao=c.observacao,
         op_manual=c.op_manual.model_dump() if c.op_manual else None, confirmacoes=c.confirmacoes,
+        consumo_misto=c.consumo_misto,
         itens=[svc.ItemEntrada(lote_id=i.lote_id, modo=i.modo, quantidade=i.quantidade,
                                sobremetal_comprimento_mm=i.sobremetal_comprimento_mm,
                                sobremetal_largura_mm=i.sobremetal_largura_mm,

@@ -1,6 +1,6 @@
 # Estado — BACKEND / TÉCNICO
 
-Atualizado: 2026-11-06 pelo TÉCNICO: correção da auditoria de 06/11 (commit local `591d583`, **push pendente**).
+Atualizado: 2026-11-11 pelo TÉCNICO: spec v3.5/v3.6 (R045, R047) e revisão da 0007 (R044), migração **0008**; recarga suspensa até a nova regra de paridade (ver §2).
 
 > Para retomar a parte técnica do zero: `estoqueack/docs/tecnico/00_RETOMAR_PROJETO.md` (inventário, onde fica cada segredo, operação, lições e incidentes; §7.2 e §7.3 = Fase 1).
 
@@ -14,6 +14,19 @@ Atualizado: 2026-11-06 pelo TÉCNICO: correção da auditoria de 06/11 (commit l
 - **Comigo daqui para frente:** recarregar a T25 quando o Fabiano devolver as correções do R032 (avisar antes no R033); campos da impressão da Fila RJ se o FUNCIONAL pedir; na implantação, a carga final (roteiro do BANCO E TESTES, em `deploy/implantacao/`). PDFs de romaneio e ficha do lote ficaram para a F1.1.
 
 ## 2. Feito
+
+### Spec v3.5/v3.6 (R045, R047) e R044, migração 0008 (2026-11-11)
+
+- **T13 tolerância por origem (P22(a)):** lote fiscal RJ em Itu (peça inteira recebida, sobra, RETO) usa `TOLERANCIA_EXCESSO_RJ_INTEIRO_PCT` = 8 %; Estoque Mega 5 %; mensagem "Limite: 8 % para material do RJ"; `resultado.tolerancia_excesso_pct`. Redondo igual. Sem SA complementar na peça inteira (P26 2b): o código já ligava o 1º corte ao SA do COP.
+- **T10 peça inteira:** `BARRA_MAIS_LEVE_QUE_PECA` (ALERTA) se a barra pesa menos que o previsto da peça (P26 2a).
+- **P24:** CR8MOD é liga distinta (leitor de medidas); `SA_JANELA_ANTES_DIAS` = 7 na T23 (antes fixo).
+- **T07 sugestão agrupada:** `GET /api/lotes/compativeis` ganha `grupos` (liga × bitola exatas × múltiplo; `ITU` e `RJ_NO_RIO` lado a lado; necessário × disponível) e `peso_necessario_kg`.
+- **Consumo misto (P26 opção A):** `consumo_misto` na solicitação e no corte em Itu; sem `OP_DUPLICADA` entre partes marcadas; marca `consumo_misto {itu_kg, rj_kg, texto}` na T08 e no Excel.
+- **Carga:** RETO do RJ em Itu sem lote-pai por candidato único (pendência `RETO_ORIGEM_SO_BITOLA`); Estoque Geral com nome variável (`Materia Prima Geral*.xlsx`, um só na pasta). Já estavam certos: D6 97X2660/101X2260 = chapa, CH39SH D2 Ø90 → 95199, 1.2767 RETO sem origem.
+- **R044 (0008):** índice único parcial `uq_pend_entrada_aberta`, CHECK `ck_pend_situacao`/`ck_pend_motivo`; reabrir com outra ABERTA do código soma nela; bitola de origem normalizada na aba RETO por origem.
+- Dry-run local (planilhas de 03/11, sem Mega): RETO do RJ em Itu 14 lotes, 10.836,8 kg; com pai 6 → 0, sem pai 8 → 14. CH39SH D2 Ø90 → 95199 pela paridade atual. Testes novos em `tests/test_v35_r045.py`.
+- Dry-run com `planilhas/2026-11-11/` (Estoque Geral de 11/11, ainda com o nome "20out"): RETO RJ em Itu 8 lotes, 10.144,8 kg, todos sem pai. **Diferenças na planilha:** o DC53 RETO (linha 347) **ainda** tem a parcela "IMP-D2 36X510MM" (182 kg); o D2 RETO (linha 281) caiu para 948 kg mas o comentário soma 1.027 kg → entra como um lote só sem origem (pendência `RETO_PARCELAS_MAIORES_QUE_SALDO`); o 1.2767 RETO (linha 525) está com 0 e o 1.2746 RETO (linha 526) tem 1.594 kg. Solicitações 796 → 829 (31 ativas), SAs 8.336.
+- **Recarga suspensa** (Eduardo, 11/11): a paridade RJ × Itu passa a ser só liga + bitola exatas, sem código Mega no material do RJ; a FUNCIONAL reespecifica. Hoje o código ainda liga material RJ a código Mega na carga (`plano._paridade`/`_item_rj`); não mexi.
 
 ### Auditoria de 06/11, parte 2 (T15 mínima, RETO por origem, P10; migração 0007)
 
@@ -110,6 +123,9 @@ Situação da solicitação é **derivada** dos fatos (`fluxo.recalcular_solicit
 | R030 | BANCO E TESTES → TÉCNICO | Regras de saldo/concorrência e migração 0005 | FECHADO em 04/11 (ciente; a carga só insere movimentos) |
 | R032 | TÉCNICO → FUNCIONAL | Revisar a prévia da carga com o Fabiano | ABERTO (marco 09/11) |
 | R033 | TÉCNICO → FRONTEND, BANCO E TESTES | Homologação com dados reais; a carga apaga e recria | ABERTO (aviso antes de cada recarga) |
+| R044, R045, R047 | BANCO E TESTES / FUNCIONAL → TÉCNICO | Revisão da 0007; spec v3.5/v3.6 | RESPONDIDOS em 11/11 (0008) |
+| R048 | TÉCNICO → BANCO E TESTES | Revisar a migração 0008 | ABERTO |
+| (novo) | FUNCIONAL → TÉCNICO | Paridade RJ × Itu só por liga + bitola, sem código Mega no RJ: ajustar carga e sugestão, relatório de paridade antes da recarga | AGUARDANDO a especificação |
 | R035 | TÉCNICO → FRONTEND | APIs do painel, T16, exportações e avisos | ABERTO |
 | R024 | TÉCNICO → FUNCIONAL | Decisões de código para confirmar na especificação | ABERTO (aguarda a perda de corte do Eduardo/Matheus) |
 | R025 | TÉCNICO → FRONTEND | APIs da Fase 1 no ar; telas em andamento | ABERTO (em andamento) |

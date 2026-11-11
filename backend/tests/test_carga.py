@@ -253,14 +253,14 @@ def test_reto_rj_em_itu_por_origem(base, tmp_path):
     reto = [lp for lp in pl.lotes if lp.estoque == "RJ_EM_ITU" and lp.tipo == "RETO"]
     assert sorted(lp.saldo for lp in reto) == [30.0, 40.5, 50.0]
     assert round(sum(lp.saldo for lp in reto), 3) == 120.5
-    com_pai = [lp for lp in reto if lp.pai is not None]
-    assert [lp.saldo for lp in com_pai] == [50.0] and com_pai[0].pai.conteiner == "CH33K"
+    # spec v3.5 §10.8 (Fabiano, 10/11): RETO do RJ em Itu NÃO ganha lote-pai por candidato único
+    assert [lp for lp in reto if lp.pai is not None] == []
     with SessionLocal() as db:
         lotes = list(db.scalars(select(Lote).where(Lote.tipo == "RETO", Lote.local_fisico == "ITU",
                                                    Lote.planta_fiscal == "RJ")))
         assert len(lotes) == 3
         filho = next(lo for lo in lotes if float(lo.saldo_kg) == 50.0)
-        assert filho.lote_pai_id is not None and filho.origem_identificada is True
+        assert filho.lote_pai_id is None and filho.origem_identificada is False
         assert filho.origem_ref["bitola_origem"] == "IMP-H13 33X105MM"
         outra = next(lo for lo in lotes if float(lo.saldo_kg) == 30.0)      # outra liga, sem lote: como veio
         assert outra.lote_pai_id is None and outra.origem_ref["bitola_origem"] == "IMP-D2 36X510MM"

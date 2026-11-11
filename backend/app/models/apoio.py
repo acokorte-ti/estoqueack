@@ -6,7 +6,7 @@ from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import (BigInteger, Boolean, CheckConstraint, Date, ForeignKey, Index, Integer, Numeric, String,
-                        UniqueConstraint)
+                        UniqueConstraint, text)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -92,7 +92,16 @@ class MegaMovimento(Base):
 class PendenciaMega(Base):
     """T15 (Mega com mais saldo → entrada a classificar) e T16 (divergência explicada)."""
     __tablename__ = "pendencia_mega"
-    __table_args__ = (CheckConstraint("tipo IN ('ENTRADA','DIVERGENCIA')", name="ck_pend_tipo"),)
+    __table_args__ = (
+        CheckConstraint("tipo IN ('ENTRADA','DIVERGENCIA')", name="ck_pend_tipo"),
+        # 0008 (R044): estados e motivos fechados; UMA pendência ENTRADA ABERTA por código (índice único parcial)
+        CheckConstraint("situacao IN ('ABERTA','RESOLVIDA','DESCARTADA','ENCERRADA')", name="ck_pend_situacao"),
+        CheckConstraint("motivo IS NULL OR motivo IN ('ESTORNO_BAIXA_MEGA','ACERTO_INVENTARIO_MEGA',"
+                        "'TRANSFERENCIA_CODIGOS','OUTRO')", name="ck_pend_motivo"),
+        Index("uq_pend_entrada_aberta", "codigo", unique=True,
+              postgresql_where=text("tipo = 'ENTRADA' AND situacao = 'ABERTA'"),
+              sqlite_where=text("tipo = 'ENTRADA' AND situacao = 'ABERTA'")),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tipo: Mapped[str] = mapped_column(String(12))

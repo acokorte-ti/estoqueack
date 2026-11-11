@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
+from app.domain.formato import kg_br
 from app.models import Conteiner, Destinacao, ItemMP, Liga, Lote, Movimento, Nota, Usuario
 
 from . import movimentos as mov
@@ -134,6 +135,54 @@ def agrupado(itens: list[dict]) -> list[dict]:
     return list(g.values())
 
 
+LADO_ITU, LADO_RJ = "ITU", "RJ_NO_RIO"
+
+
+def sugestao_por_bitola(itens: list[dict], peso_necessario_kg: float | None = None) -> list[dict]:
+    """T07 passo 2, spec v3.5 (Fabiano, 2026-11-10): lotes compatíveis agrupados por liga e bitola EXATAS (mesmo
+    formato e medidas; 21x202 e 21x203 nunca se juntam) e pelo múltiplo (lote de múltiplo só com o mesmo múltiplo).
+    Cada grupo tem os dois estoques lado a lado: "ITU" (Estoque Mega e RJ em Itu) e "RJ_NO_RIO", com o disponível,
+    o total e "necessário × disponível". Liga equivalente vem em grupo à parte (`liga_equivalente`). Nada é escolhido
+    sozinho: a escolha (um ou vários lotes, de estoques diferentes) é de quem monta a solicitação.
+
+    `peso_necessario_kg` (do passo 3) vale para todos os grupos; sem ele, usa o peso previsto estimado do grupo
+    (mesma bitola → mesmo previsto)."""
+    grupos: dict[tuple, dict] = {}
+    for i in itens:
+        k = (i["liga"], i["formato"], i["bitola"], i.get("multiplo"))
+        g = grupos.setdefault(k, {
+            "chave": "|".join(str(x or "") for x in k), "liga": k[0], "formato": k[1], "bitola": k[2],
+            "multiplo": k[3], "liga_equivalente": i["liga_equivalente"], "peso_previsto_kg": i["peso_previsto_kg"],
+            "sobremetal_pct": i["sobremetal_pct"], "criado_em": i["criado_em"],
+            "estoques": {LADO_ITU: {"disponivel_kg": 0.0, "lotes": []}, LADO_RJ: {"disponivel_kg": 0.0, "lotes": []}}})
+        lado = LADO_RJ if i["estoque"] == "RJ_NO_RIO" else LADO_ITU
+        g["estoques"][lado]["lotes"].append({k2: i[k2] for k2 in ("id", "codigo", "estoque", "conteiner", "codigo_mega",
+                                                                  "tipo", "saldo_kg", "reservado_kg", "disponivel_kg",
+                                                                  "indicadores")})
+        g["estoques"][lado]["disponivel_kg"] = round(g["estoques"][lado]["disponivel_kg"] + i["disponivel_kg"], 3)
+        g["criado_em"] = min(g["criado_em"], i["criado_em"])
+    out = []
+    for g in grupos.values():
+        total = round(sum(e["disponivel_kg"] for e in g["estoques"].values()), 3)
+        nec = peso_necessario_kg if peso_necessario_kg else g["peso_previsto_kg"]
+        g["total_disponivel_kg"] = total
+        g["peso_necessario_kg"] = round(nec, 3) if nec else None
+        g["falta_kg"] = round(max(nec - total, 0), 3) if nec else None
+        g["sobra_kg"] = round(max(total - nec, 0), 3) if nec else None
+        g["so_um_estoque"] = sum(1 for e in g["estoques"].values() if e["lotes"]) == 1
+        if nec:
+            g["frase"] = (f"Necessário {kg_br(nec)} × disponível {kg_br(total)}: "
+                          + (f"falta {kg_br(g['falta_kg'])}" if g["falta_kg"] > 0 else f"sobra {kg_br(g['sobra_kg'])}"))
+        else:
+            g["frase"] = f"Disponível {kg_br(total)}"
+        out.append(g)
+    out.sort(key=lambda g: (g["liga_equivalente"], g["sobremetal_pct"] if g["sobremetal_pct"] is not None else 1e9,
+                            g["criado_em"]))
+    for g in out:
+        del g["criado_em"]
+    return out
+
+
 def arvore(db: Session, lote: Lote, usuario: Usuario | None = None) -> dict:
     """Árvore de origem. [P10] Para a Operação RJ, lotes que não são do RJ no Rio (filhos em Itu) não aparecem, nem
     o saldo deles; a raiz passa a ser o ancestral mais alto ainda visível."""
@@ -226,6 +275,7 @@ def reto_por_origem(db: Session, f: dict[str, Any]) -> dict[str, Any]:
     Filtros: estoque, ligas (lista), bitola_origem (texto), bitola_de/bitola_ate (1ª medida: espessura ou diâmetro),
     conteiner, codigo_mega, com_saldo (padrão ligado), incluir_sobras, criado_de/criado_ate."""
     from app.domain.lotes import origem_do_reto
+    from app.domain.medidas import bitola_de_origem
     infos = lote_infos(db)
     tipos = ("RETO", "SOBRA") if f.get("incluir_sobras") else ("RETO",)
     lotes = [l for l in consulta_lotes(db, {"estoque": f.get("estoque"), "com_saldo": f.get("com_saldo", True),
@@ -249,6 +299,8 @@ def reto_por_origem(db: Session, f: dict[str, Any]) -> dict[str, Any]:
         if f.get("criado_ate") and l.criado_em.date() > f["criado_ate"]:
             continue
         bit, ct, classe = origem_do_reto(l.id, infos)
+        if classe == "SO_BITOLA" and infos[l.id].bitola_origem and bit == infos[l.id].bitola_origem:
+            bit = bitola_de_origem(bit, l.item.liga.codigo)      # R044: agrupa '25X610' com 'IMP-D2 25x610MM'
         if txt and txt not in _norm_medida(bit):
             continue
         n1 = _primeiro_numero(bit)

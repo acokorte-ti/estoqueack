@@ -95,12 +95,13 @@ def solicitacoes_xlsx(situacao: list[str] = Query(default=[]), op: int | None = 
                        f"{r['lote']['liga']} {r['lote']['bitola']}", r["lote"]["conteiner"], r["lote"]["codigo"],
                        r["modo"], r["quantidade"], r["pecas_cortadas"], r["peso_previsto_kg"], r["peso_real_kg"],
                        _d(r["prazo"]), r["situacao"], r["atraso"], r["dias_em_aberto"], ", ".join(map(str, r["cops"])),
-                       r["instrucao"], r["instrucao_processo"]])
+                       r["instrucao"], r["instrucao_processo"],
+                       r["consumo_misto"]["texto"] if r["consumo_misto"] else None])
     return _planilha("Solicitações de corte", ["Nº", "Data", "OP", "Item", "Descrição do item", "Cliente", "MP/bitola",
                                                "Contêiner", "Lote", "Modo", "Qtd", "Peças cortadas", "Peso previsto",
                                                "Peso real", "Prazo", "Situação", "Atraso", "Dias em aberto", "COP",
-                                               "Informações do corte", "Instrução de processo"],
-                     linhas, [10, 11, 9, 9, 30, 18, 14, 10, 10, 14, 6, 8, 11, 10, 11, 18, 10, 8, 8, 30, 24])
+                                               "Informações do corte", "Instrução de processo", "Consumo misto"],
+                     linhas, [10, 11, 9, 9, 30, 18, 14, 10, 10, 14, 6, 8, 11, 10, 11, 18, 10, 8, 8, 30, 24, 30])
 
 
 @router.get("/sas.xlsx")

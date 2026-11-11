@@ -144,6 +144,8 @@ def test_nao_e_entrada_nao_volta_e_reabrir(amb):
     ha = entrar(client, us["admin"])
     r = client.post(f"/api/entradas-mega/{pid}/reabrir", json={"justificativa": "Foi entrada mesmo, NF77"}, headers=ha)
     assert r.status_code == 200 and r.json()["situacao"] == "ABERTA"
+    # 0008 (R044): já havia uma ABERTA do código; a reaberta soma nela (uma só ABERTA por código)
+    assert r.json()["id"] != pid and r.json()["diferenca_kg"] == 1550
 
 
 def test_encerrada_pelo_mega(amb):

@@ -61,4 +61,5 @@ def test_reto_rj_em_itu_d2_e_dc53_somam_o_saldo_da_celula(base, tmp_path):  # no
         # a aba RETO por origem soma por liga: o RETO sem lote-pai aparece com a medida de origem
         r = estoque.reto_por_origem(db, {})
         d2 = next(lg for lg in r["ligas"] if lg["liga"] == "D2")
-        assert {b["bitola_origem"] for b in d2["bitolas"]} >= {"IMP-D2 25X610MM", "IMP-D2 45X510MM"}
+        # R044 (0008): a medida de origem vem normalizada no formato da bitola do cadastro
+        assert {b["bitola_origem"] for b in d2["bitolas"]} >= {"25X610", "45X510"}

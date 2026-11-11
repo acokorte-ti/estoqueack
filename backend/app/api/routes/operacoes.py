@@ -45,6 +45,7 @@ class CorteItuCorpo(BaseModel):
     data_corte: date | None = None
     observacao: str | None = Field(None, max_length=1000)
     op_manual: OpManual | None = None
+    consumo_misto: bool = Field(False, description="Parte de Itu de uma OP com consumo Itu + RJ [P26]")
     confirmacoes: dict[str, str] = Field(default_factory=dict)
 
 

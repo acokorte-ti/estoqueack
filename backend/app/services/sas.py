@@ -15,7 +15,7 @@ from app.integrations.mega import fabrica
 from app.models import CadastroSa, CopItem, Lote, NfTransferencia, SolicitacaoCorte, Usuario
 
 from . import auditoria
-from .base import ErroNegocio, NaoEncontrado, Previa, agora, exigir_sem_pendencias, notificar
+from .base import ErroNegocio, NaoEncontrado, Previa, agora, exigir_sem_pendencias, notificar, parametro
 from .estoque import bitola
 from .fluxo import recalcular_solicitacao
 
@@ -152,7 +152,7 @@ def validar_codigo(db: Session, sa: CadastroSa, codigo: int) -> Previa:
         p.resultado.adicionar("SA_CODIGO_TROCADO", Nivel.CIENCIA,
                               f"O item {sa.item_codigo} já usou o SA {sa.sa_codigo_sugerido}. Justifique a troca "
                               f"para {codigo}.", sugerido=sa.sa_codigo_sugerido, informado=codigo)
-    st = _ler_sa_mega(codigo, sa)
+    st = _ler_sa_mega(db, codigo, sa)
     if st is not None and not st.existe:
         p.resultado.adicionar("SA_NAO_ENCONTRADO_MEGA", Nivel.ALERTA,
                               f"O código {codigo} não existe no Mega. Confira a digitação.", sa_codigo=codigo)
@@ -200,10 +200,15 @@ def avisos(sa: CadastroSa) -> list[dict[str, Any]]:
     return out
 
 
-def _ler_sa_mega(codigo: int, sa: CadastroSa):
+def _janela(db: Session) -> int:
+    """P24 (10/11): entradas no Mega a partir de SA_JANELA_ANTES_DIAS (T23, padrão 7) antes da data do SA."""
+    return int(parametro(db, "SA_JANELA_ANTES_DIAS"))
+
+
+def _ler_sa_mega(db: Session, codigo: int, sa: CadastroSa):
     """Leitura do SA no Mega para a prévia. Mega fora do ar não bloqueia (devolve None)."""
     try:
-        return fabrica.obter().situacao_sa(codigo, sa.data - timedelta(days=7))
+        return fabrica.obter().situacao_sa(codigo, sa.data - timedelta(days=_janela(db)))
     except Exception:  # noqa: BLE001
         return None
 
@@ -226,7 +231,8 @@ def informar_codigo(db: Session, sa_id: int, codigo: int, confirmacoes: dict[str
 
 def verificar(db: Session, sas: list[CadastroSa]) -> dict[str, Any]:
     """'Verificar no Mega agora': o código existe, está ativo e recebeu a carga (entrada por compra na filial 13 ou
-    entrada na filial 3, em peças) a partir da data do SA − 7 dias. Ver consultas.SITUACAO_SA."""
+    entrada na filial 3, em peças) a partir da data do SA − SA_JANELA_ANTES_DIAS (7). Ver consultas.SITUACAO_SA."""
+    janela = _janela(db)
     try:
         g = fabrica.obter()
     except fabrica.MegaIndisponivel as e:
@@ -236,7 +242,7 @@ def verificar(db: Session, sas: list[CadastroSa]) -> dict[str, Any]:
         if sa.situacao != "AGUARDANDO_MEGA" or not sa.sa_codigo:
             continue
         try:
-            st = g.situacao_sa(sa.sa_codigo, sa.data - timedelta(days=7))
+            st = g.situacao_sa(sa.sa_codigo, sa.data - timedelta(days=janela))
         except Exception as e:  # noqa: BLE001
             return {"verificados": 0, "confirmados": confirmados, "erro": f"Erro no Mega ({type(e).__name__})"}
         sa.verificado_mega_em = agora()

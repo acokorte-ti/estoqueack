@@ -110,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
             if a.limpar:
                 gravar.limpar(db)
             resumo = gravar.gravar(db, pl, usuario_id=u.id if u else None,
-                                   arquivos={n: str(a.pasta / n) for n in planilhas.ARQUIVOS})
+                                   arquivos={n: str(a.pasta / n) for n in planilhas.arquivos(a.pasta)})
             db.flush()
             conf = gravar.conferencia_banco(db)
             db.commit()

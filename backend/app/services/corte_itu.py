@@ -34,6 +34,7 @@ class CorteItuEntrada:
     data_corte: date | None = None
     observacao: str | None = None
     op_manual: dict | None = None
+    consumo_misto: bool = False            # parte de Itu de uma OP com consumo Itu + RJ (P26, opção A)
     confirmacoes: dict[str, str] = field(default_factory=dict)
 
 
@@ -70,9 +71,15 @@ def validar(db: Session, cfg: Config, e: CorteItuEntrada) -> tuple[Previa, ops.D
                     f"O material usado ({kg_br(usado)}) é maior que o saldo do lote ({kg_br(saldo)}).")
     sol = _solicitacao_da_peca_inteira(db, lote, e.op)
     previsto = e.previsto_kg or (float(sol.peso_previsto_kg) if sol else None)
+    # P22(a) (spec v3.5): 8 % para material inteiro do RJ (lote fiscal RJ em Itu, inclusive a peça inteira recebida
+    # e o RETO RJ em Itu); 5 % para lote do Estoque Mega. A mensagem diz qual limite foi usado.
+    material_rj = lote.planta_fiscal == "RJ"
+    limite_pct = (parametro(db, "TOLERANCIA_EXCESSO_RJ_INTEIRO_PCT") if material_rj
+                  else parametro(db, "TOLERANCIA_EXCESSO_PCT", cfg))
     if previsto and e.consumo_kg > 0:
-        r.juntar(regras.validar_peso_real(previsto, e.consumo_kg, parametro(db, "TOLERANCIA_EXCESSO_PCT", cfg),
-                                          parametro(db, "TOLERANCIA_FALTA_PCT", cfg)))
+        r.juntar(regras.validar_peso_real(previsto, e.consumo_kg, limite_pct,
+                                          parametro(db, "TOLERANCIA_FALTA_PCT", cfg),
+                                          limite_de="material do RJ" if material_rj else "lote do Estoque Mega"))
     it = lote.item
     max_pct = parametro(db, "PERDA_CORTE_MAX_PCT")
     if e.consumo_kg > 0 and e.sobra_kg >= 0:
@@ -102,6 +109,7 @@ def validar(db: Session, cfg: Config, e: CorteItuEntrada) -> tuple[Previa, ops.D
     p.extra.update({"perda_kg": perda, "perda_pct": round(perda / usado * 100, 2) if usado > 0 else 0.0,
                     "perda_max_pct": max_pct, "perda_max_kg": round(usado * max_pct / 100, 3),
                     "peso_usado_kg": round(usado, 3), "previsto_kg": previsto,
+                    "tolerancia_excesso_pct": limite_pct, "consumo_misto": e.consumo_misto,
                     "gera_sa": gera_sa, "liga_solicitacao_id": sol.id if sol else None,
                     "instrucao_mega": instrucao_mega(lote, e.op, e.consumo_kg + perda, e.sobra_kg if reto else 0, db)
                     if lote.planta_fiscal == "ITU" else None})
@@ -133,7 +141,7 @@ def registrar(db: Session, cfg: Config, e: CorteItuEntrada, *, usuario: Usuario,
                  consumo_kg=round(e.consumo_kg, 3), sobra_kg=round(e.sobra_kg, 3), sobra_na_bitola=e.sobra_na_bitola,
                  perda_kg=perda, previsto_kg=previa.extra["previsto_kg"], observacao=e.observacao,
                  confirmacoes=conf or None, data_corte=e.data_corte or hoje(), usuario_id=usuario.id,
-                 instrucao_mega=previa.extra["instrucao_mega"])
+                 instrucao_mega=previa.extra["instrucao_mega"], consumo_misto=e.consumo_misto)
     db.add(c)
     db.flush()
     just = "; ".join(conf.values()) or None
@@ -171,7 +179,7 @@ def para_dict(db: Session, c: CorteItu) -> dict:
             "lote": c.lote.codigo, "solicitacao_id": c.solicitacao_id, "pecas": c.pecas,
             "peso_usado_kg": c.peso_usado_kg,
             "consumo_kg": c.consumo_kg, "sobra_kg": c.sobra_kg, "sobra_na_bitola": c.sobra_na_bitola,
-            "perda_kg": c.perda_kg, "previsto_kg": c.previsto_kg,
+            "perda_kg": c.perda_kg, "previsto_kg": c.previsto_kg, "consumo_misto": c.consumo_misto,
             "lote_reto": {"id": reto.id, "codigo": reto.codigo} if reto else None,
             "sa_id": sa.id if sa else None, "instrucao_mega": c.instrucao_mega,
             "data_corte": c.data_corte.isoformat()}

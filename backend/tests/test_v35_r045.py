@@ -35,6 +35,17 @@ def test_chave_multiplo():
     assert chave_multiplo("IMP-A8 21X203MM") is None
 
 
+def test_chave_material_p28():
+    from app.domain.medidas import chave_material
+    def k(d):
+        return chave_material(interpretar(d), d)
+    assert k("1.2344 45,0 x 610mm") == k("IMP-H13 45X610MM")              # 1.2344 = H13, escrita não conta
+    assert k("IMP-D2 RED 90X2425MM") != k("D2 Ø90")                       # comprimento informado diferencia
+    assert k("A8 MOD 21x203") != k("IMP-A8 21X203MM")                     # MOD é outra liga
+    assert k("H13 45X610") != k("H13 45X600") and k("D6 19x76,2") != k("D6 19,05x76,20")
+    assert k("A8 21X204X1110MM MULT.") != k("A8 21X204X1110MM")           # múltiplo diferencia
+
+
 def test_bitola_de_origem_normalizada():
     assert bitola_de_origem("IMP-D2 25X610MM", "D2") == bitola_de_origem("d2 25 x 610", "D2") == "25X610"
     assert bitola_de_origem("IMP-D2 30,5x610MM", "D2") == "30,5X610"
@@ -115,14 +126,15 @@ def test_sugestao_agrupada_por_liga_e_bitola(amb):
     h = entrar(client, u["itu"])
     r = client.get("/api/lotes/compativeis", headers=h,
                    params={"liga": "H13", "formato": "RETANGULAR", "espessura": 30, "largura": 100,
-                           "comprimento": 250, "quantidade": 12, "peso_necessario_kg": 1700}).json()
-    g = next(x for x in r["grupos"] if x["liga"] == "H13" and x["bitola"] == "33X105")
-    assert g["estoques"]["RJ_NO_RIO"]["disponivel_kg"] == 1400 and g["estoques"]["ITU"]["disponivel_kg"] == 200
-    assert g["total_disponivel_kg"] == 1600 and g["falta_kg"] == 100 and "falta 100,0 kg" in g["frase"]
+                           "comprimento": 250, "quantidade": 12, "peso_necessario_kg": 2000}).json()
+    # P28 (2026-11-11): 1.2344 = H13 na mesma linha; o lote equivalente vem marcado dentro do grupo
+    g = next(x for x in r["grupos"] if x["chave"] == "H13 33X105")
+    assert g["estoques"]["RJ_NO_RIO"]["disponivel_kg"] == 1700 and g["estoques"]["ITU"]["disponivel_kg"] == 200
+    assert g["total_disponivel_kg"] == 1900 and g["falta_kg"] == 100 and "falta 100,0 kg" in g["frase"]
     assert {x["conteiner"] for x in g["estoques"]["RJ_NO_RIO"]["lotes"]} == {"CH33K", "CH40SH"}
-    eq = next(x for x in r["grupos"] if x["liga"] == "1.2344")
-    assert eq["liga_equivalente"] is True and r["grupos"][-1]["liga_equivalente"] is True
-    assert {x["bitola"] for x in r["grupos"] if x["liga"] == "H13"} >= {"33X105", "70X610"}   # nunca se juntam
+    assert g["liga_equivalente"] is False
+    assert [x["liga"] for x in g["estoques"]["RJ_NO_RIO"]["lotes"] if x["liga_equivalente"]] == ["1.2344"]
+    assert {x["chave"] for x in r["grupos"]} >= {"H13 33X105", "H13 70X610"}       # bitolas nunca se juntam
 
 
 def test_consumo_misto_sem_op_duplicada_e_marca(amb):

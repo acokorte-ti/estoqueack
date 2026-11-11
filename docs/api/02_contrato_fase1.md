@@ -31,8 +31,8 @@ Parâmetros: `liga` (obrigatório), `formato` (`RETANGULAR`/`REDONDO`), `espessu
                   "RJ_NO_RIO": { "disponivel_kg": 100.0, "lotes": [ ... ] } } } ] }
 ```
 
-- Grupo = **liga e bitola exatas** (mesmo formato e medidas; 21x202 e 21x203 nunca se juntam) **e o mesmo múltiplo**. `ITU` junta Estoque Mega e RJ em Itu (cada lote traz `codigo_mega`); `RJ_NO_RIO` lista por contêiner. Estoque sem lote vem com `lotes: []`.
-- Liga equivalente (1.2344 ≈ H13) vem em grupo próprio com `liga_equivalente: true`, depois dos grupos da liga pedida. A8MOD e **CR8MOD** são ligas distintas (P24): não aparecem no grupo de A8/CR8.
+- Grupo = **liga e bitola exatas** (mesmo formato e medidas; 21x202 e 21x203 nunca se juntam), **o mesmo comprimento informado e o mesmo múltiplo** (P28, 2026-11-11: D2 Ø90 ≠ D2 Ø90X2425). `chave` é o texto da linha (ex.: `"H13 33X105"`); o código do Mega não entra. **1.2344 = H13 e 1.2379 = D2 ficam no mesmo grupo** (P28(1)); o lote de liga equivalente vem com `liga_equivalente: true` dentro do grupo (selo e "estou ciente" continuam, P18), e o grupo só tem `liga_equivalente: true` se todos os lotes forem equivalentes. Cada lote do grupo traz `liga`, `liga_equivalente` e `descricao`. `ITU` junta Estoque Mega e RJ em Itu (cada lote traz `codigo_mega`); `RJ_NO_RIO` lista por contêiner. Estoque sem lote vem com `lotes: []`.
+- A8MOD e **CR8MOD** são ligas distintas (P24, P28): nunca entram no grupo de A8/CR8. `codigo_mega` dos lotes vem só no Estoque Mega (o RJ não tem código, spec v3.7 §1.4).
 - `peso_necessario_kg` ausente → usa o `peso_previsto_kg` estimado do grupo. `falta_kg`/`sobra_kg` = necessário − total disponível. Nada é escolhido sozinho: a tela deixa marcar lotes de um ou dos dois estoques (ver "Consumo misto").
 
 ### Passos 3 e 4: `POST /api/solicitacoes/validar` e `POST /api/solicitacoes` ✅
@@ -269,7 +269,7 @@ Respondem um arquivo `.xlsx` (download direto; `Content-Disposition: attachment`
 | Botão | Endpoint | Filtros |
 |---|---|---|
 | T04 "Exportar para Excel" (por lote) | `GET /api/exportar/lotes.xlsx` | os de `GET /api/lotes` |
-| T04 (agrupado por item) | `GET /api/exportar/lotes-agrupado.xlsx` | os de `GET /api/lotes` |
+| T04 (agrupado por liga × bitola, 2026-11-11) | `GET /api/exportar/lotes-agrupado.xlsx` (colunas "Liga × bitola" e "Código(s) Itu") | os de `GET /api/lotes` |
 | T08 "Exportar" | `GET /api/exportar/solicitacoes.xlsx` | os de `GET /api/solicitacoes` |
 | T14 "Exportar pedidos selecionados" | `GET /api/exportar/sas.xlsx?ids=3&ids=4` | `ids`, ou os de `GET /api/sas` |
 

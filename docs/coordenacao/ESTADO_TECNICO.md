@@ -15,6 +15,12 @@ Atualizado: 2026-11-11 pelo TÉCNICO: spec v3.5/v3.6 (R045, R047) e revisão da 
 
 ## 2. Feito
 
+### Paridade RJ × Itu por liga × bitola (R049, P28 do Eduardo, 2026-11-11)
+
+- **Carga:** lote RJ (no Rio e em Itu) **sem código do Mega**, item próprio por liga real + formato + seção + comprimento + múltiplo (`medidas.chave_material`; 1.2344 = H13 e 1.2379 = D2 na mesma linha; MOD diferente). Linha do Estoque Geral sem código não vira item. Restrição das colunas RJ vai só para lote RJ do mesmo material. RETO criado de lote RJ (T13) e entrada NF (T06) usam item sem código.
+- **Relatório de paridade** (local, planilhas de 11/11, sem Mega): `carga\relatorios\paridade_rj_itu_previa_20261111_1609.xlsx`, aba "Paridade RJ x Itu". RJ no Rio 183 materiais / 236.172,0 kg: mesma linha 61 (60 iguais + 1 liga equivalente, 60.237 kg); só no RJ 122 (27 bitola igual/liga diferente, 5 comprimento diferente, 9 liga igual/bitola diferente, 81 sem nada parecido). RJ em Itu 30 linhas / 27.743,8 kg: 18 mesma linha, 12 só no RJ. 62 materiais com diferença ESTOQUE 2026 × "RJ no Rio" do Geral > 5 kg. CH39SH D2 Ø90 (1.944 kg) fica sem código e em linha diferente do 95199 (D2 RED 90X2425: comprimento). **Recarga só depois do ok do Eduardo e do Fabiano.**
+- **API:** T04 agrupado por `chave` com `codigos_itu`; sugestão T07 pela mesma chave (equivalente no mesmo grupo, com selo por lote); `codigo_mega` só no Estoque Mega (filtro e resposta). Pedido R050 ao FRONTEND.
+
 ### Spec v3.5/v3.6 (R045, R047) e R044, migração 0008 (2026-11-11)
 
 - **T13 tolerância por origem (P22(a)):** lote fiscal RJ em Itu (peça inteira recebida, sobra, RETO) usa `TOLERANCIA_EXCESSO_RJ_INTEIRO_PCT` = 8 %; Estoque Mega 5 %; mensagem "Limite: 8 % para material do RJ"; `resultado.tolerancia_excesso_pct`. Redondo igual. Sem SA complementar na peça inteira (P26 2b): o código já ligava o 1º corte ao SA do COP.

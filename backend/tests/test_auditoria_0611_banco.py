@@ -37,18 +37,23 @@ def test_reto_rj_em_itu_d2_e_dc53_somam_o_saldo_da_celula(base, tmp_path):  # no
     _planilhas(tmp_path)
     _com_reto_d2_dc53(tmp_path)
     pl, conf = _rodar(tmp_path)
+    # spec v3.7 (2026-11-11): o lote RJ em Itu não tem código do Mega; a linha do Estoque Geral identifica a célula
+    from app.carga import planilhas as P
+    linha_cod = {g.linha: g.codigo for g in P.ler_geral(tmp_path)}
     por_cod = {}
     for lp in pl.lotes:
         if lp.estoque == "RJ_EM_ITU" and lp.tipo == "RETO":
-            por_cod.setdefault(lp.item[1], []).append(round(lp.saldo, 3))
+            assert pl.itens[lp.item].codigo_mega is None
+            por_cod.setdefault(linha_cod[lp.origem["linha"]], []).append(round(lp.saldo, 3))
     assert sorted(por_cod[90101]) == [54.0, 381.0, 665.0] and round(sum(por_cod[90101]), 3) == 1100.0
     assert sorted(por_cod[90102]) == [400.0, 622.0] and round(sum(por_cod[90102]), 3) == 1022.0
     assert por_cod[90103] == [77.0]                         # sem comentário: um lote só, sem origem
     with SessionLocal() as db:
         for cod, total in ((90101, 1100.0), (90102, 1022.0), (90103, 77.0)):
-            lotes = list(db.scalars(select(Lote).join(ItemMP, Lote.item_mp_id == ItemMP.id)
-                                    .where(ItemMP.codigo_mega == cod, Lote.local_fisico == "ITU",
-                                           Lote.planta_fiscal == "RJ")))
+            lotes = [lo for lo in db.scalars(select(Lote).join(ItemMP, Lote.item_mp_id == ItemMP.id)
+                                             .where(ItemMP.codigo_mega.is_(None), Lote.local_fisico == "ITU",
+                                                    Lote.planta_fiscal == "RJ"))
+                     if linha_cod.get((lo.origem_ref or {}).get("linha")) == cod]
             assert all(lo.tipo == "RETO" for lo in lotes)                    # marcado RETO, não ORIGINAL
             assert round(sum(float(lo.saldo_kg) for lo in lotes), 3) == total
             for lo in lotes:                                                # saldo = soma dos movimentos

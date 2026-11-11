@@ -106,7 +106,7 @@ def test_exportacoes_excel(amb):
     client, u, ids = amb
     _cop_fechado(client, u, ids)
     entrar(client, u["itu"])
-    for url, cab0 in (("/api/exportar/lotes.xlsx", "Lote"), ("/api/exportar/lotes-agrupado.xlsx", "Liga"),
+    for url, cab0 in (("/api/exportar/lotes.xlsx", "Lote"), ("/api/exportar/lotes-agrupado.xlsx", "Liga × bitola"),
                       ("/api/exportar/solicitacoes.xlsx", "Nº"), ("/api/exportar/sas.xlsx", "DATA")):
         r = client.get(url)
         assert r.status_code == 200, url

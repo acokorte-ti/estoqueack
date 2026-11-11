@@ -110,7 +110,7 @@ def test_carga_completa_e_reexecutavel(base, tmp_path):
     _planilhas(tmp_path)
     pl, conf = _rodar(tmp_path)
     tipos = {p.tipo for p in pl.pendencias}
-    assert {"SEM_OP", "SOLICITACAO_SEM_LOTE", "OP_MAL_DIGITADA", "RJ_EM_ITU_SEM_ORIGEM", "PARIDADE_SEM_CM",
+    assert {"SEM_OP", "SOLICITACAO_SEM_LOTE", "OP_MAL_DIGITADA", "RJ_EM_ITU_SEM_ORIGEM", "PARIDADE_SO_NO_RJ",
             "RESTRICAO_A_REVISAR"} <= tipos
     par = {p["descricao_rj"]: p for p in pl.paridades}
     assert par["A8 MOD 21x204x1110 Múltiplo"]["cm"] is None      # medidas não se juntam (§10.7): só no RJ
@@ -221,7 +221,10 @@ def test_r038_revisao_do_fabiano(base, tmp_path):
     pl = plano.montar(ctx, e, h, planilhas.ler_geral(tmp_path), planilhas.ler_corte(tmp_path),
                       planilhas.ler_sa(tmp_path))
     par = {p["descricao_rj"]: p for p in pl.paridades}
-    assert par["A8 MOD 21x203"]["cm"] == 4244                              # comum → comum, nunca o múltiplo 4243
+    # spec v3.7 + P28 (2026-11-11): o RJ não ganha código; A8 MOD é outra liga, então fica só no RJ
+    assert par["A8 MOD 21x203"]["cm"] is None and par["A8 MOD 21x203"]["situacao"] == "SÓ NO RJ"
+    assert par["A8 MOD 21x203"]["motivo"] == "bitola igual, liga diferente"
+    assert all(pl.itens[lp.item].codigo_mega is None for lp in pl.lotes if lp.planta == "RJ")
     entraram = {k["codigo"]: k for k in pl.kardex_entraram}
     assert set(entraram) == {90001, 90003}
     assert entraram[90001]["liga"] == "BRONZE" and entraram[90001]["densidade"] == 8.8

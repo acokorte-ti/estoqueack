@@ -57,7 +57,8 @@ def _item(db: Session, i: ItemNf, *, criar: bool) -> tuple[ItemMP | None, Liga |
     q = select(ItemMP).where(ItemMP.liga_id == liga.id, ItemMP.formato == i.formato, ItemMP.ativo.is_(True))
     q = q.where(ItemMP.diametro == i.diametro) if i.formato == "REDONDO" else q.where(
         ItemMP.espessura == i.espessura, ItemMP.largura == i.largura)
-    item = db.scalar(q.order_by(ItemMP.codigo_mega.is_(None), ItemMP.id))
+    # spec v3.7 §1.4: lote do RJ não tem código do Mega → só item sem código (o com código é do Estoque Mega)
+    item = db.scalar(q.where(ItemMP.codigo_mega.is_(None)).order_by(ItemMP.id))
     if item is None and criar:
         med = f"Ø{i.diametro:g}" if i.formato == "REDONDO" else f"{i.espessura:g}X{i.largura:g}"
         item = ItemMP(descricao=f"{liga.codigo} {med}", liga_id=liga.id, formato=i.formato, espessura=i.espessura,

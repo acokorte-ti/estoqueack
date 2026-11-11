@@ -72,12 +72,13 @@ def lotes(f: dict = Depends(filtros), db: Session = Depends(get_db),
 def lotes_agrupado(f: dict = Depends(filtros), db: Session = Depends(get_db),
                    u: Usuario = Depends(deps.usuario_liberado)) -> StreamingResponse:
     g = estoque.agrupado(estoque.lote_resumo(db, estoque.consulta_lotes(db, _visivel(f, u))))
-    linhas = [[a["liga"], a["formato"], a["bitola"], a["lotes"], a["por_estoque"]["ESTOQUE_MEGA"],
-               a["por_estoque"]["RJ_NO_RIO"], a["por_estoque"]["RJ_EM_ITU"], a["saldo_kg"], a["reservado_kg"],
-               a["disponivel_kg"]] for a in g]
-    return _planilha("Estoque por item", ["Liga", "Formato", "Bitola", "Lotes", "Estoque Mega kg", "RJ no Rio kg",
-                                          "RJ em Itu kg", "Total kg", "Reservado kg", "Disponível kg"],
-                     linhas, [9, 12, 11, 7, 14, 13, 13, 12, 12, 13])
+    linhas = [[a["chave"], a["formato"], a["bitola"], ", ".join(map(str, a["codigos_itu"])) or None, a["lotes"],
+               a["por_estoque"]["ESTOQUE_MEGA"], a["por_estoque"]["RJ_NO_RIO"], a["por_estoque"]["RJ_EM_ITU"],
+               a["saldo_kg"], a["reservado_kg"], a["disponivel_kg"]] for a in g]
+    return _planilha("Estoque por liga x bitola", ["Liga × bitola", "Formato", "Bitola", "Código(s) Itu", "Lotes",
+                                                   "Estoque Mega kg", "RJ no Rio kg", "RJ em Itu kg", "Total kg",
+                                                   "Reservado kg", "Disponível kg"],
+                     linhas, [24, 12, 11, 16, 7, 14, 13, 13, 12, 12, 13])
 
 
 @router.get("/solicitacoes.xlsx")

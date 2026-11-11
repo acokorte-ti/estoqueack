@@ -67,10 +67,13 @@ def criar_lote(db: Session, *, item: ItemMP, planta_fiscal: str, local_fisico: s
     return lote
 
 
-def item_reto(db: Session, liga_id: int) -> ItemMP:
-    """Item RETO da liga (prefere o que tem código Mega, ex.: 1698 H13 RETO). Cria um item só-RJ se não existir."""
-    item = db.scalar(select(ItemMP).where(ItemMP.liga_id == liga_id, ItemMP.formato == "RETO", ItemMP.ativo.is_(True))
-                     .order_by(ItemMP.codigo_mega.is_(None), ItemMP.id))
+def item_reto(db: Session, liga_id: int, *, com_codigo: bool = True) -> ItemMP:
+    """Item RETO da liga. Estoque Mega (`com_codigo`): prefere o que tem código Mega (ex.: 1698 H13 RETO). Lote do RJ
+    (spec v3.7 §1.4: o RJ não tem código do Mega): só item RETO sem código. Cria um item sem código se não existir."""
+    q = select(ItemMP).where(ItemMP.liga_id == liga_id, ItemMP.formato == "RETO", ItemMP.ativo.is_(True))
+    if not com_codigo:
+        q = q.where(ItemMP.codigo_mega.is_(None))
+    item = db.scalar(q.order_by(ItemMP.codigo_mega.is_(None), ItemMP.id))
     if item is None:
         liga = db.get(Liga, liga_id)
         item = ItemMP(descricao=f"{liga.codigo} RETO", liga_id=liga_id, formato="RETO")

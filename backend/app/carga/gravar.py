@@ -185,6 +185,8 @@ def gravar(db: Session, pl: Plano, *, usuario_id: int | None, arquivos: dict[str
             db.add(Destinacao(lote_id=lote.id, tipo=tipo, descricao=desc, criado_por_id=usuario_id))
     vistas = set()
     for p in pl.paridades:
+        if p.get("estoque", "RJ_NO_RIO") != "RJ_NO_RIO":      # a tabela guarda o material da ESTOQUE 2026
+            continue
         d = p["descricao_rj"][:200]
         if d in vistas:
             continue

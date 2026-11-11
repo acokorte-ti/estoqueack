@@ -148,3 +148,52 @@ def bitola_de_origem(texto: str | None, liga_do_lote: str | None = None) -> str:
         return re.sub(r"\s+", "", t.upper())
     b = m.bitola.replace(".", ",")
     return f"{m.liga} {b}" if m.liga and liga_do_lote and m.liga != normalizar_liga(liga_do_lote) else b
+
+
+# P28 (Eduardo, 2026-11-11): 1.2344 = H13 e 1.2379 = D2 contam como a MESMA liga na mesma linha Itu × RJ;
+# ligas MOD (A8MOD, CR8MOD) são diferentes de A8 e CR8.
+LIGA_MESMA_LINHA = {"1.2344": "H13", "1.2379": "D2"}
+
+
+@dataclass(frozen=True)
+class ChaveMaterial:
+    """Identidade do material para pôr Itu e RJ na mesma linha (spec v3.7 §1.4 + P28 do Eduardo, 2026-11-11):
+    liga (com 1.2344 = H13 e 1.2379 = D2), formato, seção, comprimento informado e múltiplo. A escrita não conta
+    (espaço, 'mm', ',0', 'IMP-', x/X/×), a medida conta (45X610 ≠ 45X600; Ø90 ≠ Ø90X2425)."""
+    liga: str | None
+    formato: str
+    espessura: float | None
+    largura: float | None
+    diametro: float | None
+    comprimento: float | None
+    multiplo: bool
+
+    @property
+    def secao(self) -> tuple:
+        return (self.formato, self.espessura, self.largura, self.diametro)
+
+    @property
+    def texto(self) -> str:
+        if self.formato == "REDONDO":
+            b = f"Ø{self.diametro:g}"
+        elif self.formato == "RETANGULAR":
+            b = f"{self.espessura:g}X{self.largura:g}"
+        else:
+            b = self.formato
+        b = b.replace(".", ",")
+        if self.comprimento:
+            b += f"X{self.comprimento:g}".replace(".", ",")
+        return f"{self.liga or '?'} {b}" + (" MULT" if self.multiplo else "")
+
+
+def chave_material(m: Medida, descricao: str | None = None, comprimento_fixado: str | None = None) -> ChaveMaterial:
+    mult = chave_multiplo(descricao, comprimento_fixado)
+    compr = m.comprimento
+    if compr is None and mult and mult != "MULT":
+        compr = float(mult)
+    liga = LIGA_MESMA_LINHA.get(m.liga, m.liga) if m.liga else None
+    if m.formato == "REDONDO":
+        return ChaveMaterial(liga, "REDONDO", None, None, m.diametro, compr, bool(mult))
+    if m.formato == "RETANGULAR":
+        return ChaveMaterial(liga, "RETANGULAR", m.espessura, m.largura, None, compr, bool(mult))
+    return ChaveMaterial(liga, m.formato, None, None, None, None, False)

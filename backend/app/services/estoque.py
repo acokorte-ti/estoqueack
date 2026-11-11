@@ -9,6 +9,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.domain.formato import kg_br
+from app.domain.medidas import LIGA_MESMA_LINHA, ChaveMaterial, chave_material, interpretar
 from app.models import Conteiner, Destinacao, ItemMP, Liga, Lote, Movimento, Nota, Usuario
 
 from . import movimentos as mov
@@ -80,7 +81,8 @@ def consulta_lotes(db: Session, f: dict[str, Any]):
     if f.get("conteiner"):
         q = q.where(Conteiner.codigo == f["conteiner"].strip().upper())
     if f.get("codigo_mega") is not None:
-        q = q.where(ItemMP.codigo_mega == f["codigo_mega"])
+        # spec v3.7 §1.4: código do Mega só existe no lote do Estoque Mega (o RJ não tem código)
+        q = q.where(ItemMP.codigo_mega == f["codigo_mega"], Lote.planta_fiscal == "ITU", Lote.local_fisico == "ITU")
     if f.get("com_saldo", True):
         q = q.where(Lote.saldo_kg > 0)
     if f.get("origem_nao_identificada"):
@@ -94,6 +96,18 @@ def consulta_lotes(db: Session, f: dict[str, Any]):
         com = _com_destinacao(db, [l.id for l in lotes])
         lotes = [l for l in lotes if l.id in com]
     return lotes
+
+
+def chave_lote(item: ItemMP) -> ChaveMaterial:
+    """Mesma linha Itu × RJ (spec v3.7 §1.4 + P28, 2026-11-11): liga (1.2344 = H13, 1.2379 = D2; MOD diferente),
+    formato, seção do cadastro, comprimento informado na descrição e múltiplo. O código do Mega não entra."""
+    k = chave_material(interpretar(item.descricao or ""), item.descricao, item.comprimento_fixado)
+    liga = LIGA_MESMA_LINHA.get(item.liga.codigo, item.liga.codigo)
+    if item.formato == "REDONDO":
+        return ChaveMaterial(liga, "REDONDO", None, None, item.diametro, k.comprimento, k.multiplo)
+    if item.formato == "RETANGULAR":
+        return ChaveMaterial(liga, "RETANGULAR", item.espessura, item.largura, None, k.comprimento, k.multiplo)
+    return ChaveMaterial(liga, item.formato, None, None, None, None, False)
 
 
 def lote_resumo(db: Session, lotes: list[Lote]) -> list[dict]:
@@ -110,7 +124,9 @@ def lote_resumo(db: Session, lotes: list[Lote]) -> list[dict]:
         saida.append({
             "id": l.id, "codigo": l.codigo, "conteiner": l.conteiner.codigo if l.conteiner else None,
             "liga": l.item.liga.codigo, "formato": l.item.formato, "bitola": bitola(l.item),
-            "descricao": l.item.descricao, "codigo_mega": l.item.codigo_mega,
+            "descricao": l.item.descricao,
+            "codigo_mega": l.item.codigo_mega if (l.planta_fiscal, l.local_fisico) == ("ITU", "ITU") else None,
+            "chave_material": chave_lote(l.item).texto,
             "estoque": BALDE.get((l.planta_fiscal, l.local_fisico)), "tipo": l.tipo,
             "saldo_kg": round(l.saldo_kg, 3), "reservado_kg": reservado,
             "disponivel_kg": round(l.saldo_kg - reservado, 3), "origem": origem,
@@ -121,17 +137,25 @@ def lote_resumo(db: Session, lotes: list[Lote]) -> list[dict]:
 
 
 def agrupado(itens: list[dict]) -> list[dict]:
-    g: dict[tuple, dict] = {}
+    """T04 "agrupado por liga × bitola" (spec v3.7 §1.4 + P28): Estoque Mega, RJ em Itu e RJ no Rio na mesma linha
+    quando liga, bitola, comprimento e múltiplo coincidem; `codigos_itu` = códigos do Estoque Mega da linha."""
+    g: dict[str, dict] = {}
     for i in itens:
-        k = (i["liga"], i["formato"], i["bitola"])
-        a = g.setdefault(k, {"liga": k[0], "formato": k[1], "bitola": k[2], "lotes": 0, "saldo_kg": 0.0,
-                             "reservado_kg": 0.0, "disponivel_kg": 0.0, "por_estoque": defaultdict(float)})
+        k = i["chave_material"]
+        a = g.setdefault(k, {"chave": k, "liga": k.split(" ", 1)[0], "formato": i["formato"], "bitola": i["bitola"],
+                             "lotes": 0, "saldo_kg": 0.0, "reservado_kg": 0.0, "disponivel_kg": 0.0,
+                             "por_estoque": defaultdict(float), "codigos_itu": set(), "ligas": set()})
         a["lotes"] += 1
         for c in ("saldo_kg", "reservado_kg", "disponivel_kg"):
             a[c] = round(a[c] + i[c], 3)
         a["por_estoque"][i["estoque"]] = round(a["por_estoque"][i["estoque"]] + i["saldo_kg"], 3)
+        a["ligas"].add(i["liga"])
+        if i["codigo_mega"]:
+            a["codigos_itu"].add(i["codigo_mega"])
     for a in g.values():
         a["por_estoque"] = {b: a["por_estoque"].get(b, 0.0) for b in BALDE.values()}
+        a["codigos_itu"] = sorted(a["codigos_itu"])
+        a["ligas"] = sorted(a["ligas"])
     return list(g.values())
 
 
@@ -140,7 +164,8 @@ LADO_ITU, LADO_RJ = "ITU", "RJ_NO_RIO"
 
 def sugestao_por_bitola(itens: list[dict], peso_necessario_kg: float | None = None) -> list[dict]:
     """T07 passo 2, spec v3.5 (Fabiano, 2026-11-10): lotes compatíveis agrupados por liga e bitola EXATAS (mesmo
-    formato e medidas; 21x202 e 21x203 nunca se juntam) e pelo múltiplo (lote de múltiplo só com o mesmo múltiplo).
+    formato e medidas; 21x202 e 21x203 nunca se juntam), comprimento informado e múltiplo (P28, 2026-11-11:
+    1.2344 = H13 e 1.2379 = D2 ficam na mesma linha; MOD é outra liga). O código do Mega não entra na chave.
     Cada grupo tem os dois estoques lado a lado: "ITU" (Estoque Mega e RJ em Itu) e "RJ_NO_RIO", com o disponível,
     o total e "necessário × disponível". Liga equivalente vem em grupo à parte (`liga_equivalente`). Nada é escolhido
     sozinho: a escolha (um ou vários lotes, de estoques diferentes) é de quem monta a solicitação.
@@ -149,16 +174,19 @@ def sugestao_por_bitola(itens: list[dict], peso_necessario_kg: float | None = No
     (mesma bitola → mesmo previsto)."""
     grupos: dict[tuple, dict] = {}
     for i in itens:
-        k = (i["liga"], i["formato"], i["bitola"], i.get("multiplo"))
+        k = i["chave_material"]
         g = grupos.setdefault(k, {
-            "chave": "|".join(str(x or "") for x in k), "liga": k[0], "formato": k[1], "bitola": k[2],
-            "multiplo": k[3], "liga_equivalente": i["liga_equivalente"], "peso_previsto_kg": i["peso_previsto_kg"],
+            "chave": k, "liga": k.split(" ", 1)[0], "formato": i["formato"], "bitola": i["bitola"],
+            "multiplo": i.get("multiplo"), "liga_equivalente": i["liga_equivalente"],
+            "peso_previsto_kg": i["peso_previsto_kg"],
             "sobremetal_pct": i["sobremetal_pct"], "criado_em": i["criado_em"],
             "estoques": {LADO_ITU: {"disponivel_kg": 0.0, "lotes": []}, LADO_RJ: {"disponivel_kg": 0.0, "lotes": []}}})
         lado = LADO_RJ if i["estoque"] == "RJ_NO_RIO" else LADO_ITU
         g["estoques"][lado]["lotes"].append({k2: i[k2] for k2 in ("id", "codigo", "estoque", "conteiner", "codigo_mega",
-                                                                  "tipo", "saldo_kg", "reservado_kg", "disponivel_kg",
+                                                                  "liga", "liga_equivalente", "descricao", "tipo",
+                                                                  "saldo_kg", "reservado_kg", "disponivel_kg",
                                                                   "indicadores")})
+        g["liga_equivalente"] = g["liga_equivalente"] and i["liga_equivalente"]
         g["estoques"][lado]["disponivel_kg"] = round(g["estoques"][lado]["disponivel_kg"] + i["disponivel_kg"], 3)
         g["criado_em"] = min(g["criado_em"], i["criado_em"])
     out = []

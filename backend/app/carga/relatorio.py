@@ -48,12 +48,18 @@ def gerar(pl: Plano, destino: Path, *, titulo: str, conferencia_banco: list[dict
          [[p.tipo, p.gravidade, p.descricao, p.sugestao, (p.origem or {}).get("arquivo"), (p.origem or {}).get("aba"),
            (p.origem or {}).get("linha"), (p.origem or {}).get("celula")] for p in pl.pendencias],
          [26, 11, 100, 50, 34, 18, 10, 8], cor_col=1)
-    _aba(wb, "Paridade RJ x CM", ["Material RJ (ESTOQUE 2026)", "Código Mega", "Descrição no Estoque Geral",
-                                  "kg ESTOQUE 2026", "kg RJ no Rio (Geral)", "Situação", "Outros candidatos",
-                                  "Confirmado pelo Fabiano (S/N)", "Correção"],
-         [[p["descricao_rj"], p["cm"], p.get("descricao_geral"), p["kg_rj_planilha"], p["kg_rj_geral"],
-           p["situacao"], p.get("outros_candidatos") or None, None, None] for p in pl.paridades],
-         [40, 12, 42, 14, 14, 16, 60, 14, 30])
+    # R049 / P28: paridade RJ × Itu por liga + bitola (sem ligar código), para o Eduardo e o Fabiano conferirem
+    _aba(wb, "Paridade RJ x Itu", ["Material RJ", "Estoque RJ", "kg RJ", "Liga × bitola (chave)", "Situação",
+                                   "Motivo", "Código(s) Itu", "Descrição Itu", "kg Itu (Estoque Mega)",
+                                   "kg RJ no Rio (Estoque Geral)", "Diferença ESTOQUE 2026 × Geral",
+                                   "Escritas no RJ", "Arquivo", "Linha", "Confere (S/N)", "Correção"],
+         [[p["descricao_rj"], p["estoque"], p["kg_rj"], p["chave"], p["situacao"], p["motivo"],
+           "; ".join(str(x["codigo"]) for x in p["itu"]) or None,
+           "; ".join(x["descricao"] for x in p["itu"]) or None,
+           sum(x["kg"] or 0 for x in p["itu"]) if p["itu"] else None, p["kg_rj_geral"], p["diferenca_kg"],
+           "; ".join(p.get("descricoes_rj") or []) or None, (p.get("origem") or {}).get("arquivo"),
+           (p.get("origem") or {}).get("linha"), None, None] for p in pl.paridades],
+         [36, 12, 12, 26, 14, 34, 16, 50, 14, 14, 14, 50, 30, 8, 10, 30])
     lot = []
     for n, l in enumerate(pl.lotes, start=1):
         it = pl.itens[l.item]

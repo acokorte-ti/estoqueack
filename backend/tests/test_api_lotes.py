@@ -54,7 +54,8 @@ def test_lista_e_filtros(client, dados):
     assert client.get("/api/lotes?com_saldo=false").json()["total"] == 3
     assert client.get("/api/lotes?largura_de=600&largura_ate=620").json()["total"] == 1
     assert client.get("/api/lotes?com_destinacao=true").json()["total"] == 1
-    assert client.get("/api/lotes?codigo_mega=1698").json()["itens"][0]["codigo"] == "L-000003"
+    # spec v3.7 §1.4: o filtro por código do Mega só alcança lote do Estoque Mega (L-000003 é RJ em Itu)
+    assert client.get("/api/lotes?codigo_mega=1698").json()["total"] == 0
 
 
 def test_agrupado(client, dados):

@@ -153,7 +153,8 @@ def registrar(db: Session, cfg: Config, e: CorteItuEntrada, *, usuario: Usuario,
         movimentos.lancar(db, lote, "PERDA_CORTE", -perda, **comum)
     if reto:
         movimentos.lancar(db, lote, "GERA_RETO", -e.sobra_kg, **comum)
-        novo = movimentos.criar_lote(db, item=movimentos.item_reto(db, lote.item.liga_id),
+        novo = movimentos.criar_lote(db, item=movimentos.item_reto(db, lote.item.liga_id,
+                                                                     com_codigo=lote.planta_fiscal == "ITU"),
                                      planta_fiscal=lote.planta_fiscal, local_fisico=lote.local_fisico, tipo="RETO",
                                      pai=lote, peso_inicial_kg=e.sobra_kg, usuario_id=usuario.id)
         movimentos.lancar(db, novo, "GERA_RETO", e.sobra_kg, **comum)

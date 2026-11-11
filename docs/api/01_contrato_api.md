@@ -158,10 +158,17 @@ Cada item da lista:
 
 ### `GET /api/lotes/agrupado` ✅
 
-Mesmos filtros, agrupado por liga + formato + bitola, como no Estoque Geral de hoje:
+Mesmos filtros. **Desde 2026-11-11 (spec v3.7 §1.4 + P28, R049): agrupado por liga × bitola**, com Estoque Mega,
+RJ no Rio e RJ em Itu na mesma linha quando liga (1.2344 = H13, 1.2379 = D2; A8 MOD e CR8MOD são outras ligas),
+formato, seção, comprimento informado na descrição e múltiplo coincidem. Campos novos: `chave` (ex.: `"H13 45X610"`,
+`"D2 Ø90X2425"`, `"A8MOD 21X204X1110 MULT"`), `codigos_itu` (códigos dos lotes do Estoque Mega da linha; o RJ não tem
+código) e `ligas` (ligas reais dos lotes, ex.: `["1.2344", "H13"]`). Cada lote de `GET /api/lotes` ganha
+`chave_material`, e `codigo_mega` passa a vir só em lote do Estoque Mega (null no RJ). O filtro `codigo_mega` só
+alcança lote do Estoque Mega.
 
 ```json
-{ "itens": [ { "liga": "H13", "formato": "RETO", "bitola": "RETO", "lotes": 7,
+{ "itens": [ { "chave": "H13 RETO", "liga": "H13", "formato": "RETO", "bitola": "RETO", "lotes": 7,
+               "codigos_itu": [1698], "ligas": ["H13"],
                "saldo_kg": 7897.8, "reservado_kg": 0.0, "disponivel_kg": 7897.8,
                "por_estoque": { "ESTOQUE_MEGA": 2240.0, "RJ_NO_RIO": 0.0, "RJ_EM_ITU": 5657.8 } } ],
   "total": 1, "pagina": 1, "por_pagina": 50 }

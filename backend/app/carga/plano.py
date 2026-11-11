@@ -6,9 +6,11 @@ O plano é o que vai para a prévia (relatório) e, depois de aprovado, para `gr
   uma SAIDA_CORTE_RJ com OP e data do comentário. Confere com a coluna TOTAL EM ESTOQUE (AN).
 - **Lotes esgotados**: contêiner + material do HISTORICO que não está mais na ESTOQUE 2026. Entram com a entrada e
   uma baixa "saídas anteriores ao sistema" até zero, só para consulta e para ligar o histórico de cortes.
-- **Paridade RJ ↔ CM [P06]**: material RJ (liga + bitola) ligado à linha do Estoque Geral de mesma bitola e mesma
-  família de liga (1.2344→H13, A8 MOD→A8, 1.2379→D2). Sempre "a confirmar" pelo Fabiano.
-- **RJ em Itu**: coluna "ESTOQUE RJ (em Itu)" do Estoque Geral, um lote por item, origem não identificada [P07].
+- **Paridade RJ × Itu (spec v3.7 §1.4 + P28, 2026-11-11)**: o lote do RJ (no Rio e em Itu) NÃO recebe código do Mega;
+  fica num item próprio sem código. A carga só classifica: mesma linha de Itu quando liga (1.2344 = H13, 1.2379 = D2;
+  MOD diferente), formato, seção, comprimento informado e múltiplo são iguais (`medidas.chave_material`). O relatório
+  "Paridade RJ x Itu" é conferido pelo Eduardo e pelo Fabiano antes da recarga.
+- **RJ em Itu**: coluna "ESTOQUE RJ (em Itu)" do Estoque Geral, item sem código, origem não identificada [P07].
 - **Estoque Mega**: saldo do Mega no dia (tabela mega_saldo da sincronização), um lote por código, origem não
   identificada. Código RETO vira lote RETO.
 - **Histórico**: Controle de Corte → solicitações, cortes (liberações) e COPs; planilha de SA → SAs confirmados.
@@ -22,7 +24,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
-from app.domain.medidas import interpretar
+from app.domain.medidas import ChaveMaterial, chave_material, interpretar
 
 from . import planilhas as P
 
@@ -201,6 +203,11 @@ def chave_familia(desc: str) -> tuple:
     return chave_item(liga, m)[1:]
 
 
+def chave_mat(desc: str, comprimento_fixado: str | None = None) -> ChaveMaterial:
+    """Identidade do material para a mesma linha Itu × RJ (P28)."""
+    return chave_material(medida(desc), desc, comprimento_fixado)
+
+
 def _formato_valido(m) -> str:
     return m.formato if m.formato in ("RETANGULAR", "REDONDO", "RETO") else "RETANGULAR"
 
@@ -234,27 +241,6 @@ def _liga(plano: Plano, ctx: Contexto, codigo: str | None, origem, densidade: fl
     return codigo
 
 
-def _multiplo(desc: str) -> bool:
-    return bool(re.search(r"\bMULT|M[ÚU]LTIPLO", (desc or "").upper()))
-
-
-def _compr_multiplo(desc: str) -> float | None:
-    m = re.search(r"M[ÚU]LTIPLO DE\s*(\d+(?:[.,]\d+)?)", (desc or "").upper())
-    if m:
-        return float(m.group(1).replace(",", "."))
-    return medida(desc).comprimento
-
-
-def _mult_compativel(desc_rj: str, desc_geral: str) -> bool:
-    """§10.7: material comum só com código comum; múltiplo só com o MESMO múltiplo (mesmo comprimento)."""
-    if _multiplo(desc_rj) != _multiplo(desc_geral):
-        return False
-    if _multiplo(desc_rj):
-        a, b = _compr_multiplo(desc_rj), _compr_multiplo(desc_geral)
-        return a is None or b is None or abs(a - b) < 0.5
-    return True
-
-
 def montar(ctx: Contexto, estoque: list[P.LinhaEstoque2026], historico: list[dict], geral: list[P.LinhaGeral],
            corte: list[P.LinhaCorte], sas: list[P.LinhaSa]) -> Plano:
     pl = Plano(data_mega=ctx.data_mega)
@@ -262,7 +248,7 @@ def montar(ctx: Contexto, estoque: list[P.LinhaEstoque2026], historico: list[dic
     lotes_rj = _lotes_rj_no_rio(pl, ctx, estoque, historico)
     _paridade(pl, estoque, geral)
     _esgotados_historico(pl, ctx, estoque, historico, lotes_rj)
-    _rj_em_itu(pl, geral)
+    _rj_em_itu(pl, ctx, geral)
     _estoque_mega(pl, ctx, geral)
     _ligar_reto_origem(pl)
     _restricoes_e_avisos(pl, geral)
@@ -285,7 +271,9 @@ def _catalogo_geral(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None
         if m.formato == "DESCONHECIDO":
             pl.pend("DESCRICAO_NAO_INTERPRETADA", "REVISAR", f"Não deu para ler a bitola de \"{g.descricao}\".",
                     g.origem)
-        ch = ("CM", g.codigo) if g.codigo else ("GERAL", g.linha)
+        if not g.codigo:
+            continue        # linha sem código = só material do RJ: o item é criado sem código pelo lote RJ (v3.7)
+        ch = ("CM", g.codigo)
         uso = "; ".join(x for x in (g.clientes_uso, g.obs) if x) or None
         pl.itens[ch] = ItemP(ch, g.descricao.strip()[:200], liga, _formato_valido(m), m.espessura, m.largura,
                              m.diametro, g.codigo, g.comprimento_fixado, uso[:500] if uso else None, origem=g.origem)
@@ -293,21 +281,18 @@ def _catalogo_geral(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None
             vistos[g.codigo] = g.linha
 
 
-def _item_rj(pl: Plano, ctx: Contexto, desc: str, origem) -> tuple:
-    """Item do lote RJ: o do Estoque Geral de mesma liga e bitola (exata) ou um item só do RJ."""
+def _item_rj(pl: Plano, ctx: Contexto, desc: str, origem, comprimento_fixado: str | None = None) -> tuple:
+    """Item do lote RJ (no Rio e em Itu): SEMPRE sem código do Mega (spec v3.7 §1.4, decisão de 2026-11-11). Um item
+    por liga real + formato + seção + comprimento + múltiplo (P28); a escrita da descrição não conta."""
     m = medida(desc)
     liga = _liga(pl, ctx, m.liga, origem)
-    alvo = chave_item(liga, m)[1:]
-    cands = [it for it in pl.itens.values() if (it.liga, it.formato, it.espessura, it.largura, it.diametro) == alvo
-             and _mult_compativel(desc, it.descricao)]
-    if cands:
-        cands.sort(key=lambda it: (it.codigo_mega is None, it.chave[1] if it.chave[0] == "GERAL" else 0))
-        return cands[0].chave
-    ch = chave_item(liga, m)
+    k = chave_mat(desc, comprimento_fixado)
+    ch = ("RJ", liga, k.formato, k.espessura, k.largura, k.diametro, k.comprimento, k.multiplo)
     if ch not in pl.itens:
-        nome = f"{liga} " + (f"Ø{m.diametro:g}" if m.formato == "REDONDO" else
-                             f"{m.espessura:g}X{m.largura:g}" if m.formato == "RETANGULAR" else m.formato)
-        pl.itens[ch] = ItemP(ch, nome, liga, _formato_valido(m), m.espessura, m.largura, m.diametro, origem=origem)
+        nome = desc.strip()[:200] or f"{liga} {k.texto}"
+        cf = comprimento_fixado if k.multiplo else None
+        pl.itens[ch] = ItemP(ch, nome, liga, _formato_valido(m), k.espessura, k.largura, k.diametro,
+                             comprimento_fixado=cf, origem=origem)
     return ch
 
 
@@ -370,66 +355,100 @@ def _lotes_rj_no_rio(pl: Plano, ctx: Contexto, estoque: list[P.LinhaEstoque2026]
     return idx
 
 
-def _paridade(pl: Plano, estoque: list[P.LinhaEstoque2026], geral: list[P.LinhaGeral]) -> None:
-    geral_fam: dict[tuple, list[P.LinhaGeral]] = defaultdict(list)
+def _itu_por_chave(geral: list[P.LinhaGeral]) -> dict[ChaveMaterial, list[P.LinhaGeral]]:
+    """Linhas de Itu = linhas do Estoque Geral com código do Mega."""
+    idx: dict[ChaveMaterial, list[P.LinhaGeral]] = defaultdict(list)
     for g in geral:
-        geral_fam[chave_familia(g.descricao)].append(g)
-    rj: dict[tuple, dict[str, Any]] = {}
+        if g.codigo:
+            idx[chave_mat(g.descricao, g.comprimento_fixado)].append(g)
+    return idx
+
+
+def _motivo_sem_par(k: ChaveMaterial, itu: dict[ChaveMaterial, list[P.LinhaGeral]]) -> tuple[str, list[P.LinhaGeral]]:
+    """Por que o material RJ não tem linha igual em Itu (para o relatório), com a linha de Itu mais parecida."""
+    if k.formato not in ("RETANGULAR", "REDONDO"):
+        return "só no RJ", []                  # RETO / medida ilegível: não há bitola para comparar
+    mesma_secao = [(c, gs) for c, gs in itu.items() if c.secao == k.secao]
+    mesma = [(c, gs) for c, gs in mesma_secao if c.liga == k.liga]
+    if mesma:
+        c, gs = mesma[0]
+        return ("múltiplo diferente" if c.multiplo != k.multiplo else "comprimento diferente"), gs
+    so_liga = [(c, gs) for c, gs in mesma_secao if c.comprimento == k.comprimento and c.multiplo == k.multiplo]
+    if so_liga:
+        return "bitola igual, liga diferente", so_liga[0][1]
+    prox = []
+    for c, gs in itu.items():
+        if c.liga != k.liga or c.formato != k.formato:
+            continue
+        if k.formato == "REDONDO" and c.diametro and k.diametro and abs(c.diametro - k.diametro) <= 2:
+            prox.append((abs(c.diametro - k.diametro), gs))
+        elif (k.formato == "RETANGULAR" and c.espessura and k.espessura and c.largura and k.largura
+              and abs(c.espessura - k.espessura) <= 2 and abs(c.largura - k.largura) <= 2):
+            prox.append((abs(c.espessura - k.espessura) + abs(c.largura - k.largura), gs))
+    if prox:
+        return "liga igual, bitola diferente", sorted(prox, key=lambda x: x[0])[0][1]
+    return "só no RJ", []
+
+
+def _linha_paridade(desc_rj: str, estoque: str, k: ChaveMaterial, kg: float, kg_geral: float | None,
+                    itu: dict[ChaveMaterial, list[P.LinhaGeral]], item_rj: tuple | None, origem) -> dict[str, Any]:
+    iguais = itu.get(k, [])
+    liga_rj = medida(desc_rj).liga
+    if iguais:
+        ligas_itu = {medida(g.descricao).liga for g in iguais}
+        motivo = ("liga e bitola iguais" if liga_rj in ligas_itu
+                  else f"liga equivalente ({liga_rj} = {', '.join(sorted(x or '?' for x in ligas_itu))})")
+        sit, ref = "MESMA LINHA", iguais
+    else:
+        motivo, ref = _motivo_sem_par(k, itu)
+        sit = "SÓ NO RJ"
+    return {"descricao_rj": desc_rj, "estoque": estoque, "chave": k.texto, "kg_rj": round(kg, 3),
+            "kg_rj_geral": None if kg_geral is None else round(kg_geral, 3),
+            "diferenca_kg": None if kg_geral is None else round(kg - kg_geral, 3),
+            "item_mp": item_rj, "situacao": sit, "motivo": motivo,
+            "itu": [{"codigo": g.codigo, "descricao": g.descricao, "kg": g.estoque_mega} for g in ref],
+            "cm": ref[0].codigo if (ref and sit == "MESMA LINHA") else None, "origem": origem}
+
+
+def _paridade(pl: Plano, estoque: list[P.LinhaEstoque2026], geral: list[P.LinhaGeral]) -> None:
+    """Relatório de paridade RJ × Itu (spec v3.7 §1.4, P28; R049). Não liga nada a código: só classifica.
+    RJ no Rio: um registro por material da ESTOQUE 2026 (liga × bitola), com a diferença de kg contra a coluna
+    "RJ no Rio" do Estoque Geral (§10.2). RJ em Itu: um registro por linha do Estoque Geral com saldo RJ em Itu."""
+    itu = _itu_por_chave(geral)
+    geral_rio: dict[ChaveMaterial, float] = defaultdict(float)
+    for g in geral:
+        if g.rj_no_rio:
+            geral_rio[chave_mat(g.descricao, g.comprimento_fixado)] += g.rj_no_rio
+    rj: dict[ChaveMaterial, dict[str, Any]] = {}
     for e in estoque:
-        k = chave_familia(e.material)
+        k = chave_mat(e.material)
         a = rj.setdefault(k, {"descricoes": Counter(), "kg": 0.0, "origem": e.origem})
         a["descricoes"][e.material] += 1
         a["kg"] += e.total_estoque
-    usados = set()
+    itens_rj = {it.chave: it for it in pl.itens.values() if it.chave[0] == "RJ"}
     for k, a in rj.items():
         desc_rj = a["descricoes"].most_common(1)[0][0]
-        cands = [g for g in geral_fam.get(k, []) if _mult_compativel(desc_rj, g.descricao)]
-        if not cands:
-            prox = _proximos(k, geral_fam)
-            sug = "; ".join(f"{g.codigo or '-'} {g.descricao}" for g in prox[:3])
-            pl.paridades.append({"descricao_rj": desc_rj, "chave": k, "item_mp": None, "cm": None,
-                                 "kg_rj_planilha": round(a["kg"], 3), "kg_rj_geral": None, "situacao": "SÓ NO RJ",
-                                 "outros_candidatos": [f"(bitola próxima) {x}" for x in sug.split("; ") if x]})
-            if a["kg"] > 0:
-                pl.pend("PARIDADE_SEM_CM", "INFO", f"Material RJ \"{desc_rj}\" ({a['kg']:.1f} kg) sem igual em Itu: "
-                        "fica sem código Mega, só no RJ (revisão do Fabiano, §10.7).", a["origem"])
-            continue
-        cands = sorted(cands, key=lambda g: (-(g.rj_no_rio or 0), g.codigo is None))
-        esc = cands[0]
-        usados.update(id(c) for c in cands)
-        kg_geral = round(sum(c.rj_no_rio for c in cands), 3)
-        sit = "OK" if abs(kg_geral - a["kg"]) <= TOL_KG else "TOTAL DIFERENTE"
-        ch_item = ("CM", esc.codigo) if esc.codigo else ("GERAL", esc.linha)
-        pl.paridades.append({"descricao_rj": desc_rj, "chave": k, "item_mp": ch_item, "cm": esc.codigo,
-                             "descricao_geral": esc.descricao, "kg_rj_planilha": round(a["kg"], 3),
-                             "kg_rj_geral": kg_geral, "situacao": sit,
-                             "outros_candidatos": [f"{c.codigo or '-'} {c.descricao}" for c in cands[1:]]})
-        if sit != "OK":
+        ch = next((c for c, it in itens_rj.items() if chave_mat(it.descricao, it.comprimento_fixado) == k), None)
+        p = _linha_paridade(desc_rj, "RJ_NO_RIO", k, a["kg"], geral_rio.get(k, 0.0), itu, ch, a["origem"])
+        p["descricoes_rj"] = sorted(a["descricoes"])
+        pl.paridades.append(p)
+        if p["situacao"] != "MESMA LINHA" and a["kg"] > 0:
+            pl.pend("PARIDADE_SO_NO_RJ", "INFO", f"Material RJ \"{desc_rj}\" ({a['kg']:.1f} kg): {p['motivo']} "
+                    "(sem linha igual em Itu; fica só no RJ, sem código).", a["origem"])
+        if p["diferenca_kg"] is not None and abs(p["diferenca_kg"]) > TOL_KG:
             pl.pend("PARIDADE_TOTAL_DIFERENTE", "INFO",
-                    f"{desc_rj}: ESTOQUE 2026 soma {a['kg']:.1f} kg e o Estoque Geral (RJ no Rio) {kg_geral:.1f} kg "
-                    f"(diferença {a['kg'] - kg_geral:+.1f} kg). Vale a ESTOQUE 2026, mesmo código (§10.7).",
+                    f"{k.texto}: ESTOQUE 2026 soma {a['kg']:.1f} kg e o Estoque Geral (RJ no Rio) "
+                    f"{p['kg_rj_geral']:.1f} kg (diferença {p['diferenca_kg']:+.1f} kg). Vale a ESTOQUE 2026 (§10.7).",
                     a["origem"])
-        if len(cands) > 1:
-            pl.pend("PARIDADE_AMBIGUA", "INFO", f"{desc_rj}: {len(cands)} linhas do Estoque Geral com a mesma "
-                    f"bitola; escolhida {esc.codigo or '-'} {esc.descricao}.", a["origem"])
     for g in geral:
-        if g.codigo and id(g) not in usados and g.rj_no_rio > TOL_KG:
-            pl.pend("CM_SEM_MATERIAL_RJ", "INFO", f"{g.codigo} {g.descricao}: {g.rj_no_rio:.1f} kg em \"RJ no Rio\" "
-                    "no Estoque Geral, sem material igual na ESTOQUE 2026.", g.origem)
-
-
-def _proximos(k: tuple, geral_fam: dict[tuple, list]) -> list:
-    """Linhas do Estoque Geral da mesma família e formato com bitola até 2 mm de diferença."""
-    liga, formato, e, l, d = k
-    out = []
-    for (lg, fm, e2, l2, d2), gs in geral_fam.items():
-        if lg != liga or fm != formato:
-            continue
-        if formato == "REDONDO" and d and d2 and abs(d - d2) <= 2:
-            out.append((abs(d - d2), gs))
-        elif formato == "RETANGULAR" and e and l and e2 and l2 and abs(e - e2) <= 2 and abs(l - l2) <= 2:
-            out.append((abs(e - e2) + abs(l - l2), gs))
-    return [g for _, gs in sorted(out, key=lambda x: x[0]) for g in gs]
+        if g.rj_em_itu and g.rj_em_itu > 0:
+            k = chave_mat(g.descricao, g.comprimento_fixado)
+            pl.paridades.append(_linha_paridade(g.descricao, "RJ_EM_ITU", k, g.rj_em_itu, None, itu, None, g.origem))
+    for k, kg in geral_rio.items():
+        if k not in rj and kg > TOL_KG:
+            gs = [g for g in geral if g.rj_no_rio and chave_mat(g.descricao, g.comprimento_fixado) == k]
+            pl.pend("CM_SEM_MATERIAL_RJ", "INFO", f"{k.texto}: {kg:.1f} kg em \"RJ no Rio\" no Estoque Geral, sem "
+                    "material igual na ESTOQUE 2026.", gs[0].origem if gs else None)
 
 
 def _esgotados_historico(pl: Plano, ctx: Contexto, estoque, historico: list[dict],
@@ -482,16 +501,14 @@ def _esgotados_historico(pl: Plano, ctx: Contexto, estoque, historico: list[dict
         idx[(ct, k)].append(lote)
 
 
-def _rj_em_itu(pl: Plano, geral: list[P.LinhaGeral]) -> None:
+def _rj_em_itu(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
     """RJ em Itu. Linha RETO entra como tipo RETO (auditoria 06/11, B02). Se a célula tem comentário com as parcelas
     de sobra ("381kg de sobra (MEDIDA ORIGINAL IMP-D2 25X610MM)"), vira um sub-lote RETO por parcela, com a medida
     de origem guardada em origem_ref["bitola_origem"] (sem lote-pai: ver _ligar_reto_origem);
     o que sobra do saldo da célula fica num lote "sem origem". A soma dos sub-lotes é sempre o saldo da célula."""
     for g in geral:
         if g.rj_em_itu and g.rj_em_itu > 0:
-            ch = ("CM", g.codigo) if g.codigo and ("CM", g.codigo) in pl.itens else ("GERAL", g.linha)
-            if ch not in pl.itens:
-                continue
+            ch = _item_rj(pl, ctx, g.descricao, g.origem, g.comprimento_fixado)      # sem código (v3.7)
             reto = pl.itens[ch].formato == "RETO"
             tipo = "RETO" if reto else "ORIGINAL"
             parcelas = list(g.parcelas_itu) if reto else []
@@ -609,18 +626,20 @@ def _estoque_mega(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
 
 
 def _restricoes_e_avisos(pl: Plano, geral: list[P.LinhaGeral]) -> None:
-    por_item: dict[tuple, list[LoteP]] = defaultdict(list)
+    por_chave: dict[tuple, list[LoteP]] = defaultdict(list)       # (chave P28, estoque) → lotes RJ (sem código)
     for l in pl.lotes:
-        por_item[l.item].append(l)
+        if l.item[0] == "RJ":
+            it = pl.itens[l.item]
+            por_chave[(chave_mat(it.descricao, it.comprimento_fixado), l.estoque)].append(l)
     for g in geral:
-        ch = ("CM", g.codigo) if g.codigo else ("GERAL", g.linha)
-        if ch not in pl.itens:
-            continue
+        ch = ("CM", g.codigo) if g.codigo else None
         for texto, estoque in ((g.obs_rj, "RJ_NO_RIO"), (g.obs_itu, "RJ_EM_ITU")):
             if not texto:
                 continue
             up = texto.upper()
             sub = re.search(r"SUBSTITU[IÍ]DO POR (.+)", texto, re.I)
+            if sub and ch not in pl.itens:
+                continue
             if sub:
                 alvo = chave_familia(sub.group(1))
                 achou = [it for it in pl.itens.values() if (FAMILIA.get(it.liga, it.liga), it.formato, it.espessura,
@@ -632,7 +651,13 @@ def _restricoes_e_avisos(pl: Plano, geral: list[P.LinhaGeral]) -> None:
                             "encontrado no catálogo.", g.origem)
                 continue
             if any(t in up for t in TERMOS_RESTRICAO):
-                alvos = [l for l in por_item.get(ch, []) if l.estoque == estoque] or por_item.get(ch, [])
+                # observação das colunas RJ vale só para os lotes RJ (sem código) do mesmo material e estoque
+                # (a linha do Estoque Geral é de um código de Itu; se ela tem comprimento/múltiplo e o RJ não, vale a
+                # mesma liga e seção sem o comprimento: a observação é do material RJ anotado nessa linha)
+                k = chave_mat(g.descricao, g.comprimento_fixado)
+                alvos = (por_chave.get((k, estoque)) or
+                         por_chave.get((ChaveMaterial(k.liga, k.formato, k.espessura, k.largura, k.diametro, None,
+                                                      False), estoque), []))
                 for l in alvos:
                     l.destinacoes.append(("RESTRICAO", texto[:300]))
                 pl.pend("RESTRICAO_A_REVISAR", "INFO", f"{g.descricao}: \"{texto}\" vira restrição em "

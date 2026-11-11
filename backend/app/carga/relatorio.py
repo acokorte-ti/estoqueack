@@ -82,6 +82,9 @@ def gerar(pl: Plano, destino: Path, *, titulo: str, conferencia_banco: list[dict
                                           "Entrada no HISTORICO", "kg da entrada", "Linha HISTORICO",
                                           "Soma do HISTORICO", "Situação", "Linha de Itu", "Linha ESTOQUE 2026"],
          lin, [10, 40, 18, 14, 14, 40, 12, 10, 12, 14, 60, 10])
+    _aba(wb, "Correções aplicadas", ["Linha do Estoque Geral", "kg", "Na planilha", "Corrigido para", "Fonte"],
+         [[c["linha"], c["kg"], c["antes"], c["depois"], c["fonte"]] for c in pl.correcoes_aplicadas],
+         [30, 10, 30, 30, 50])
     lot = []
     for n, l in enumerate(pl.lotes, start=1):
         it = pl.itens[l.item]

@@ -52,9 +52,6 @@ LIGAS_POR_TEXTO = (("METAL DURO", "METAL-DURO"), ("INOX 316", "INOX-316"), ("INO
 SITUACAO_REVISADA = {94394: "CONCLUIDA", 94429: "CONCLUIDA", 94528: "CONCLUIDA", 94529: "CONCLUIDA",
                      92756: "CANCELADA", 93620: "CANCELADA", 94356: "CANCELADA", 94646: "CANCELADA",
                      96111: "CANCELADA", 96674: "CANCELADA", 96772: "CANCELADA", 97662: "CANCELADA"}
-# parcelas de RETO com origem de outra liga já explicadas pelo Fabiano mas ainda não corrigidas na planilha (não se
-# corrige à mão: registra como veio, com a observação). Chave: (liga da linha RETO, medida da parcela, normalizada)
-ORIGEM_A_CORRIGIR = {("DC53", "IMP-D236X510MM"): "Fabiano disse que é DC53; planilha ainda não corrigida (10/11)"}
 # "RESERVADO CPR" era só observação da planilha (decisão do Eduardo, 04/11): não entra
 TERMOS_RESTRICAO = ("NAO USAR", "NÃO USAR", "SOMENTE", "DESTINA", "EXCLUSIV", "LIBERACAO DE VENDAS",
                     "LIBERAÇÃO DE VENDAS", "SO PARA", "SÓ PARA", "P/ DESFOLHADEIRA", "CONTRATO")
@@ -171,6 +168,7 @@ class Plano:
     paridades: list[dict[str, Any]] = field(default_factory=list)
     # P29: linha da ESTOQUE 2026 sem comprimento → comprimento do HISTORICO do mesmo contêiner (texto, linhas)
     compr_hist: dict[int, tuple[str, list[dict[str, Any]]]] = field(default_factory=dict)
+    correcoes_aplicadas: list[dict[str, Any]] = field(default_factory=list)
     solicitacoes: list[SolP] = field(default_factory=list)
     cops: dict[int, dict[str, Any]] = field(default_factory=dict)
     sas: list[SaP] = field(default_factory=list)
@@ -254,6 +252,9 @@ class Contexto:
     hoje: date
     # códigos (entre os pedidos) com movimento no kardex do Mega nos últimos 2 anos; None = não deu para consultar
     kardex: Callable[[list[int]], set[int] | None] = lambda _codigos: None
+    # correções respondidas pelo Fabiano/Eduardo que a planilha não vai receber, lidas de um arquivo FORA do repositório
+    # (`python -m app.carga --correcoes arquivo.json`). Formato em `docs/tecnico/04_carga_inicial.md` §5.
+    correcoes: dict[str, Any] = field(default_factory=dict)
 
 
 def _liga(plano: Plano, ctx: Contexto, codigo: str | None, origem, densidade: float | None = None) -> str:
@@ -550,7 +551,7 @@ def _rj_em_itu(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
             ch = _item_rj(pl, ctx, g.descricao, g.origem, g.comprimento_fixado)      # sem código (v3.7)
             reto = pl.itens[ch].formato == "RETO"
             tipo = "RETO" if reto else "ORIGINAL"
-            parcelas = list(g.parcelas_itu) if reto else []
+            parcelas = _corrigir_parcelas(pl, ctx, g, list(g.parcelas_itu)) if reto else []
             if parcelas and sum(k for k, _ in parcelas) > g.rj_em_itu + 0.0005:
                 pl.pend("RETO_PARCELAS_MAIORES_QUE_SALDO", "REVISAR", f"{g.descricao}: o comentário da célula soma "
                         f"{sum(k for k, _ in parcelas):.1f} kg, mais que o saldo ({g.rj_em_itu:.1f} kg). Entra um lote "
@@ -569,8 +570,11 @@ def _rj_em_itu(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
                 lote.movimentos.append(MovP("SALDO_INICIAL", kg, documento="Carga Estoque Geral (RJ em Itu)",
                                             origem=origem))
                 if desc_origem:
+                    corr = next((c for c in pl.correcoes_aplicadas if c["linha"] == g.descricao and c["kg"] == kg
+                                 and c["depois"] == desc_origem), None)
                     lote.notas.append(f"Parcela de sobra anotada no Estoque Geral: {kg:g} kg, medida original "
-                                      f"{desc_origem}." + _obs_origem(g.descricao, desc_origem))
+                                      f"{desc_origem}." + (f" Corrigido pela resposta registrada ({corr['fonte']}); "
+                                                           f"na planilha: {corr['antes']}." if corr else ""))
                 elif parcelas:
                     lote.notas.append("Saldo da célula RJ em Itu sem origem anotada no comentário (parcelas "
                                       f"anotadas: {sum(k for k, _ in parcelas):g} kg de {g.rj_em_itu:g} kg).")
@@ -585,17 +589,38 @@ def _rj_em_itu(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
                     pl.pend("RETO_ORIGEM_DE_OUTRA_LIGA", "REVISAR", f"{g.descricao}: parcela com medida de origem de "
                             "outra liga (" + "; ".join(f"{k:g} kg {d}" for k, d in parcelas
                                                        if chave_familia(d)[0] != chave_familia(g.descricao)[0]) +
-                            "). Registrada como veio na planilha." + "".join(
-                                _obs_origem(g.descricao, d) for _, d in parcelas), g.origem,
-                            "Perguntar ao Fabiano: erro ou mistura?")
+                            "). Registrada como veio na planilha.", g.origem,
+                            "Perguntar ao Fabiano: erro ou mistura? (resposta vai no arquivo --correcoes)")
             else:
                 pl.pend("RJ_EM_ITU_SEM_ORIGEM", "INFO", f"{g.descricao}: {g.rj_em_itu:.1f} kg RJ em Itu entram com "
                         "origem não identificada [P07].", g.origem, "Atribuir origem (T05) quando souber o contêiner")
 
 
-def _obs_origem(desc_linha: str, desc_origem: str) -> str:
-    k = (medida(desc_linha).liga, re.sub(r"\s+", "", (desc_origem or "").upper()))
-    return f" Origem {desc_origem}: {ORIGEM_A_CORRIGIR[k]}." if k in ORIGEM_A_CORRIGIR else ""
+def _sem_espaco(t: str | None) -> str:
+    return re.sub(r"\s+", "", (t or "").upper())
+
+
+def _corrigir_parcelas(pl: Plano, ctx: Contexto, g: P.LinhaGeral, parcelas: list[tuple[float, str]]
+                       ) -> list[tuple[float, str]]:
+    """Aplica `correcoes["origem_reto"]`: [{linha_descricao, origem_planilha, origem_correta, kg?, fonte}]. A planilha
+    fica como está; a correção vai para a nota do lote e para a lista de pendências (INFO)."""
+    regras = ctx.correcoes.get("origem_reto") or []
+    out = []
+    for kg, d in parcelas:
+        novo = d
+        for c in regras:
+            if (_sem_espaco(c.get("linha_descricao")) == _sem_espaco(g.descricao)
+                    and _sem_espaco(c.get("origem_planilha")) == _sem_espaco(d)
+                    and (c.get("kg") is None or abs(float(c["kg"]) - kg) < 0.0005)):
+                novo = c["origem_correta"]
+                fonte = c.get("fonte") or "arquivo de correções"
+                pl.pend("CORRECAO_APLICADA", "INFO", f"{g.descricao}: parcela de {kg:g} kg com origem \"{d}\" na "
+                        f"planilha corrigida para \"{novo}\" ({fonte}).", g.origem)
+                pl.correcoes_aplicadas.append({"linha": g.descricao, "kg": kg, "antes": d, "depois": novo,
+                                               "fonte": fonte})
+                break
+        out.append((kg, novo))
+    return out
 
 
 def _ligar_reto_origem(pl: Plano) -> None:

@@ -205,3 +205,24 @@ def test_p29_comprimento_do_historico_e_faixa():
     assert m[7][0] == "2425" and [x["linha"] for x in m[7][1]] == [3]             # só o mesmo contêiner
     assert chave_mat("D2 Ø90", comprimento=m[7][0]) == chave_mat("IMP-D2 RED 90X2425MM")
     assert chave_mat("H13 55x610x2800-6000") != chave_mat("H13 55x610x2800-5000")  # faixa diferente
+
+
+def test_correcoes_da_carga_por_arquivo(tmp_path):
+    """Correção respondida (fora do repo, `--correcoes`) troca a origem da parcela; a planilha fica como está."""
+    from datetime import date
+
+    from app.carga import planilhas as P
+    from app.carga import plano
+    from tests.test_auditoria_0611_banco import _com_reto_d2_dc53
+    from tests.test_carga import _planilhas
+    _planilhas(tmp_path)
+    _com_reto_d2_dc53(tmp_path)
+    corr = {"origem_reto": [{"linha_descricao": "IMP-DC53 RETO", "origem_planilha": "IMP-DC53 30X500MM",
+                             "origem_correta": "IMP-DC53 31X500MM", "kg": 400, "fonte": "teste"}]}
+    ctx = plano.Contexto({}, {}, None, lambda _o: None, date(2026, 11, 11), correcoes=corr)
+    e, h = P.ler_estoque_2026(tmp_path)
+    pl = plano.montar(ctx, e, h, P.ler_geral(tmp_path), P.ler_corte(tmp_path), P.ler_sa(tmp_path))
+    lote = next(lp for lp in pl.lotes if (lp.origem or {}).get("bitola_origem") == "IMP-DC53 31X500MM")
+    assert lote.saldo == 400 and any("na planilha: IMP-DC53 30X500MM" in n for n in lote.notas)
+    assert pl.correcoes_aplicadas[0]["antes"] == "IMP-DC53 30X500MM"
+    assert any(p.tipo == "CORRECAO_APLICADA" for p in pl.pendencias)

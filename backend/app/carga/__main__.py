@@ -48,14 +48,15 @@ def _verificador_op():
     return existe
 
 
-def contexto(db, conferir_ops: bool) -> plano.Contexto:
+def contexto(db, conferir_ops: bool, correcoes: dict | None = None) -> plano.Contexto:
     # ligas criadas por uma carga anterior continuam aparecendo como "liga nova" na lista de pendências
     ligas = {l.codigo: float(l.densidade) for l in db.scalars(select(Liga)) if not l.nome.endswith("(criada na carga)")}
     mega = {m.codigo: {"saldo_kg": m.saldo_kg, "descricao": m.descricao, "peso_especifico": m.peso_especifico}
             for m in db.scalars(select(MegaSaldo))}
     quando = db.scalar(select(func.max(MegaSaldo.atualizado_em)))
     return plano.Contexto(ligas, mega, quando.strftime("%Y-%m-%d %H:%M") if quando else None,
-                          _verificador_op() if conferir_ops else (lambda _op: None), date.today(), _kardex())
+                          _verificador_op() if conferir_ops else (lambda _op: None), date.today(), _kardex(),
+                          correcoes or {})
 
 
 def _kardex():
@@ -78,6 +79,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--limpar", action="store_true", help="Apaga os dados operacionais antes de gravar")
     ap.add_argument("--confirmo-producao", action="store_true")
     ap.add_argument("--sem-conferir-ops", action="store_true", help="Não consulta as OPs no Mega")
+    ap.add_argument("--correcoes", type=Path, help="JSON com as correções respondidas (fora do repositório)")
     ap.add_argument("--usuario", default="eduardo.macedo", help="Login gravado como autor da carga")
     a = ap.parse_args(argv)
     cfg = get_config()
@@ -92,8 +94,16 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     log.info("planilhas lidas em %.1f s", time.time() - t0)
     carimbo = datetime.now().strftime("%Y%m%d_%H%M")
+    correcoes = {}
+    if a.correcoes:
+        import json
+        try:
+            correcoes = json.loads(a.correcoes.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            log.error("PAROU: arquivo de correções ilegível (%s): %s", a.correcoes, e)
+            return 2
     with SessionLocal() as db:
-        pl = plano.montar(contexto(db, not a.sem_conferir_ops), est, hist, geral, corte, sas)
+        pl = plano.montar(contexto(db, not a.sem_conferir_ops, correcoes), est, hist, geral, corte, sas)
         log.info("plano: %s", pl.contagens)
         if not a.importar:
             p = relatorio.gerar(pl, a.saida / f"carga_previa_{carimbo}.xlsx", titulo=f"PRÉVIA {carimbo} (nada gravado)")

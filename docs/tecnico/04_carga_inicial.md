@@ -57,3 +57,23 @@ Gravidade: **BLOQUEIA** (a linha não entra), **REVISAR** (entra, mas o Fabiano 
 - (b) total RJ no Rio × ESTOQUE 2026 (linha a linha e total) e, como informação, × Estoque Geral;
 - (c) total RJ em Itu × Estoque Geral;
 - (d) solicitações, cortes, COPs e SAs importados × linhas das planilhas (as diferenças estão nas pendências).
+
+## 5. Paridade RJ × Itu e arquivo de correções (2026-11-11, R049, P28, P29)
+
+- **Paridade:** o lote RJ (no Rio e em Itu) entra **sem código do Mega**. A carga só classifica cada material RJ contra as linhas de Itu (Estoque Geral com código) pela chave `medidas.chave_material`: liga (1.2344 = H13, 1.2379 = D2; MOD é outra liga), formato, seção, comprimento informado (com faixa) e múltiplo. Linha da ESTOQUE 2026 sem comprimento usa o comprimento do HISTORICO do mesmo contêiner (P29). Relatório: abas "Paridade RJ x Itu", "Comprimento do HISTORICO" e "Correções aplicadas".
+- **Estoque Geral:** qualquer `Materia Prima Geral*.xlsx` na pasta (um só).
+- **Correções respondidas que a planilha não vai receber:** arquivo JSON **fora do repositório** (no PC: `Documents\projeto-controle_mp\carga\correcoes_carga.json`; no servidor, junto das planilhas), passado com `--correcoes`:
+
+```json
+{ "origem_reto": [ { "linha_descricao": "<descrição da linha RETO no Estoque Geral>",
+                     "origem_planilha": "<medida de origem como está no comentário>",
+                     "origem_correta": "<medida correta>", "kg": 0, "fonte": "<quem respondeu e quando>" } ] }
+```
+
+  `kg` é opcional (sem ele, vale para qualquer parcela com essa origem). Cada correção aplicada vai para a nota do lote, para a pendência `CORRECAO_APLICADA` e para a aba "Correções aplicadas". Arquivo ilegível → a carga para (código 2).
+
+```bash
+docker compose exec -T api python -m app.carga --pasta /tmp/carga/planilhas --saida /tmp/carga/relatorios \
+    --correcoes /tmp/carga/correcoes_carga.json
+```
+

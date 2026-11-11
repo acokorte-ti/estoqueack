@@ -1,9 +1,10 @@
 # Estado — FUNCIONAL
 
-Atualizado: 2026-11-11 (P26 respondida, especificação v3.6)
+Atualizado: 2026-11-11 (paridade por liga × bitola, especificação v3.7)
 
 ## No ar
 
+- **Especificação v3.7:** paridade RJ × Itu por **liga + bitola exatamente iguais** (novo §1.4); RJ sem código do Mega na carga (código só pelo SA); Itu e RJ na mesma linha na T04 ("agrupado por liga × bitola") e na T07; 7 pares do B04 = não; P19, família de liga (§10.7 item 1) e CH39SH = 95199 substituídos; T13/T14/T15/T16 dizem o que muda. **P28** aberta (ligas equivalentes, comprimento, escrita da medida, recarga do zero), spec escrita com as propostas "[proposta, P28]"; pergunta em `carga/perguntas_eduardo_2026-11-11c.txt`. Pedidos **R049** (TÉCNICO: carga + relatório de paridade antes da recarga) e **R050** (FRONTEND). Exemplo OP real do §2.2 e do doc 04 trocado por fictício.
 - **Especificação v3.6:** P26 aplicada (consumo misto opção A na F1; peça inteira do RJ sem SA complementar; justificativa de sobremetal > 20 % mantida; redondo inteiro do RJ com a mesma lógica). P26(2a) = sim (aviso de barra mais leve, só aviso). **P27** aberta (a regra sem SA complementar vale para o B2?), em `carga/perguntas_eduardo_2026-11-11b.txt`. Pedido **R047** (TÉCNICO, FRONTEND).
 - **Especificação v3.5** (`estoqueack/docs/03_especificacao_funcional.md`).
   - **P19 a P25 fechadas** (§12); §9.1 sem "a confirmar" (CR8MOD é liga distinta).
@@ -15,15 +16,15 @@ Atualizado: 2026-11-11 (P26 respondida, especificação v3.6)
 
 ## Próximo
 
-- Aplicar as respostas do Fabiano (7 pares) em §10.7 e avisar o TÉCNICO.
+- Aplicar a P28 quando o Eduardo responder; conferir com ele e o Fabiano o relatório de paridade do R049 antes da recarga.
 - Aplicar a P27 quando o Eduardo responder.
 - Depois da implantação: lista do BLOCO 2 (OPs mal digitadas, SEM OP, cortes sem peso, solicitações sem lote), contêiner digitado errado, comentário com várias OPs, corte dividido entre contêineres, "PESO INICIAL" (B05 a B08).
 
 ## Aguardando
 
-- **Eduardo:** P27. Avisar o Fabiano sobre o IPI do NCM 82089000 (se ainda não foi).
-- **Fabiano:** 7 pares do B04.
-- **TÉCNICO / FRONTEND:** R045, R046, R047.
+- **Eduardo:** P27, P28. Avisar o Fabiano sobre o IPI do NCM 82089000 (se ainda não foi).
+- **Fabiano:** conferir o relatório de paridade (R049).
+- **TÉCNICO / FRONTEND:** R045, R046, R047, R049, R050.
 
 ## Instruções permanentes desta frente
 
@@ -55,4 +56,4 @@ Atualizado: 2026-11-11 (P26 respondida, especificação v3.6)
 9. **Quando eu gerar uma lista para o Fabiano revisar:** Excel com aba "Leia-me", colunas amarelas só para ele preencher, sugestão minha em coluna separada e o arquivo em `carga/` (fora do repositório).
 10. **Pedidos (`PEDIDOS.md`):**
     - Ao responder, mudar o status e escrever no máximo ~5 linhas, sem quebra de linha na célula. O detalhe vai na especificação ou neste ESTADO.
-    - Próximo número de pedido: o maior R0xx em `PEDIDOS.md` + 1 (em 11/11 o último era R047).
+    - Próximo número de pedido: o maior R0xx em `PEDIDOS.md` + 1 (em 11/11 o último era R050).

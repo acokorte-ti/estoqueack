@@ -84,7 +84,7 @@ Itu: marca "RECEBIDO ACK?"
 | NFs só de SAs sem corte RJ (corte em Itu, transferência só fiscal) | 151 (2025–2026) |
 | Séries de NF | < 1000 até o início de 2026 e ≥ 1000 depois. A hipótese é que sejam emitentes diferentes (Médio Vale × Fio Certo), mas falta confirmar |
 
-**Achado extra:** algumas OPs de peça inteira têm um **segundo SA** semanas depois do envio, com outra NF (ex.: OP 99125: 195 kg em 22/07 e 117 kg em 14/09; OP 99834: 112 kg e 113 kg; OP 96897: 214 kg e 22 kg). Isso é consumo complementar da barra em Itu (Caminho B2) para a mesma OP.
+**Achado extra:** algumas OPs de peça inteira têm um **segundo SA** semanas depois do envio, com outra NF (exemplos fictícios do padrão encontrado: OP 90001, 200 kg no envio e 120 kg dois meses depois; OP 90002, 110 kg e 110 kg). Isso é consumo complementar da barra em Itu (Caminho B2) para a mesma OP.
 
 **O que muda na especificação:**
 

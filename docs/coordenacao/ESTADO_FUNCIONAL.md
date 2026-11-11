@@ -1,10 +1,10 @@
 # Estado — FUNCIONAL
 
-Atualizado: 2026-11-11 (P26 respondida em parte, especificação v3.6)
+Atualizado: 2026-11-11 (P26 respondida, especificação v3.6)
 
 ## No ar
 
-- **Especificação v3.6:** P26 aplicada (consumo misto opção A na F1; peça inteira do RJ sem SA complementar; justificativa de sobremetal > 20 % mantida; redondo inteiro do RJ com a mesma lógica). P26(2a) (aviso de barra mais leve) segue proposta. **P27** aberta (a regra sem SA complementar vale para o B2?), em `carga/perguntas_eduardo_2026-11-11b.txt`. Pedido **R047** (TÉCNICO, FRONTEND).
+- **Especificação v3.6:** P26 aplicada (consumo misto opção A na F1; peça inteira do RJ sem SA complementar; justificativa de sobremetal > 20 % mantida; redondo inteiro do RJ com a mesma lógica). P26(2a) = sim (aviso de barra mais leve, só aviso). **P27** aberta (a regra sem SA complementar vale para o B2?), em `carga/perguntas_eduardo_2026-11-11b.txt`. Pedido **R047** (TÉCNICO, FRONTEND).
 - **Especificação v3.5** (`estoqueack/docs/03_especificacao_funcional.md`).
   - **P19 a P25 fechadas** (§12); §9.1 sem "a confirmar" (CR8MOD é liga distinta).
   - **P22(a) reescrita** (§2.2, T13, §9, T23): material inteiro do RJ com previsto pela peça acabada e oscilação de **8 %**; 5 % segue no corte RJ e no Estoque Mega. P22(b): vale o SA mais recente.
@@ -16,12 +16,12 @@ Atualizado: 2026-11-11 (P26 respondida em parte, especificação v3.6)
 ## Próximo
 
 - Aplicar as respostas do Fabiano (7 pares) em §10.7 e avisar o TÉCNICO.
-- Aplicar P26(2a) e P27 quando o Eduardo responder.
+- Aplicar a P27 quando o Eduardo responder.
 - Depois da implantação: lista do BLOCO 2 (OPs mal digitadas, SEM OP, cortes sem peso, solicitações sem lote), contêiner digitado errado, comentário com várias OPs, corte dividido entre contêineres, "PESO INICIAL" (B05 a B08).
 
 ## Aguardando
 
-- **Eduardo:** P26(2a), P27. Avisar o Fabiano sobre o IPI do NCM 82089000 (se ainda não foi).
+- **Eduardo:** P27. Avisar o Fabiano sobre o IPI do NCM 82089000 (se ainda não foi).
 - **Fabiano:** 7 pares do B04.
 - **TÉCNICO / FRONTEND:** R045, R046, R047.
 

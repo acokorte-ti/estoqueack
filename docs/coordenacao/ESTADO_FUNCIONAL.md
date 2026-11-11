@@ -1,9 +1,10 @@
 # Estado — FUNCIONAL
 
-Atualizado: 2026-11-11 (P28 respondida, especificação v3.8)
+Atualizado: 2026-11-11 (P27 e P29 respondidas, especificação v3.9)
 
 ## No ar
 
+- **Especificação v3.9:** P27 (peso pesado substitui o previsto na peça inteira do RJ, também acima de 8 %; B2 gera SA normal com dados do Fabiano) e P29 (comprimento do HISTORICO vale; faixa igual = mesma linha; CH39SH = 95199). **P30** aberta (SA complementar dos kg a mais; sobra RJ em Itu sem OP), em `carga/perguntas_eduardo_2026-11-12.txt`. Pedido **R052**. OP 100092 trocada por fictícia.
 - **Especificação v3.8:** P28 respondida (MOD é liga diferente; 1.2344 = H13 e 1.2379 = D2 na mesma linha; comprimento informado e múltiplo diferenciam; normalização da escrita; recarga do zero após o relatório de paridade). CH39SH ("D2 Ø90", sem comprimento na ESTOQUE 2026; HISTORICO diz Ø90×2425) não fica na linha do 95199. **P29** aberta (comprimento só no HISTORICO; faixa de comprimento). Pedido **R051**.
 - **Especificação v3.7:** paridade RJ × Itu por **liga + bitola exatamente iguais** (novo §1.4); RJ sem código do Mega na carga (código só pelo SA); Itu e RJ na mesma linha na T04 ("agrupado por liga × bitola") e na T07; 7 pares do B04 = não; P19, família de liga (§10.7 item 1) e CH39SH = 95199 substituídos; T13/T14/T15/T16 dizem o que muda. **P28** aberta (ligas equivalentes, comprimento, escrita da medida, recarga do zero), spec escrita com as propostas "[proposta, P28]"; pergunta em `carga/perguntas_eduardo_2026-11-11c.txt`. Pedidos **R049** (TÉCNICO: carga + relatório de paridade antes da recarga) e **R050** (FRONTEND). Exemplo OP real do §2.2 e do doc 04 trocado por fictício.
 - **Especificação v3.6:** P26 aplicada (consumo misto opção A na F1; peça inteira do RJ sem SA complementar; justificativa de sobremetal > 20 % mantida; redondo inteiro do RJ com a mesma lógica). P26(2a) = sim (aviso de barra mais leve, só aviso). **P27** aberta (a regra sem SA complementar vale para o B2?), em `carga/perguntas_eduardo_2026-11-11b.txt`. Pedido **R047** (TÉCNICO, FRONTEND).
@@ -17,15 +18,15 @@ Atualizado: 2026-11-11 (P28 respondida, especificação v3.8)
 
 ## Próximo
 
-- Aplicar a P29 quando responderem; conferir com ele e o Fabiano o relatório de paridade do R049 antes da recarga.
+- Aplicar a P30 quando o Eduardo responder; conferir com ele e o Fabiano o relatório de paridade do R049 antes da recarga.
 - Aplicar a P27 quando o Eduardo responder.
 - Depois da implantação: lista do BLOCO 2 (OPs mal digitadas, SEM OP, cortes sem peso, solicitações sem lote), contêiner digitado errado, comentário com várias OPs, corte dividido entre contêineres, "PESO INICIAL" (B05 a B08).
 
 ## Aguardando
 
-- **Eduardo:** P27, P29. **Fabiano:** 55322 é A8 ou A8 MOD (`carga/perguntas_fabiano_2026-11-11.txt`). Avisar o Fabiano sobre o IPI do NCM 82089000 (se ainda não foi).
+- **Eduardo:** P30. **Fabiano:** 55322 é A8 ou A8 MOD (`carga/perguntas_fabiano_2026-11-11.txt`). Avisar o Fabiano sobre o IPI do NCM 82089000 (se ainda não foi).
 - **Fabiano:** conferir o relatório de paridade (R049).
-- **TÉCNICO / FRONTEND:** R045, R046, R047, R049, R050, R051.
+- **TÉCNICO / FRONTEND:** R045, R046, R047, R049, R050, R051, R052.
 
 ## Instruções permanentes desta frente
 
@@ -57,4 +58,4 @@ Atualizado: 2026-11-11 (P28 respondida, especificação v3.8)
 9. **Quando eu gerar uma lista para o Fabiano revisar:** Excel com aba "Leia-me", colunas amarelas só para ele preencher, sugestão minha em coluna separada e o arquivo em `carga/` (fora do repositório).
 10. **Pedidos (`PEDIDOS.md`):**
     - Ao responder, mudar o status e escrever no máximo ~5 linhas, sem quebra de linha na célula. O detalhe vai na especificação ou neste ESTADO.
-    - Próximo número de pedido: o maior R0xx em `PEDIDOS.md` + 1 (em 11/11 o último era R051).
+    - Próximo número de pedido: o maior R0xx em `PEDIDOS.md` + 1 (em 11/11 o último era R052).

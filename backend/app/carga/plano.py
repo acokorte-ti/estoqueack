@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
-from app.domain.medidas import ChaveMaterial, chave_material, interpretar
+from app.domain.medidas import ChaveMaterial, chave_material, comprimento_texto, interpretar
 
 from . import planilhas as P
 
@@ -52,6 +52,9 @@ LIGAS_POR_TEXTO = (("METAL DURO", "METAL-DURO"), ("INOX 316", "INOX-316"), ("INO
 SITUACAO_REVISADA = {94394: "CONCLUIDA", 94429: "CONCLUIDA", 94528: "CONCLUIDA", 94529: "CONCLUIDA",
                      92756: "CANCELADA", 93620: "CANCELADA", 94356: "CANCELADA", 94646: "CANCELADA",
                      96111: "CANCELADA", 96674: "CANCELADA", 96772: "CANCELADA", 97662: "CANCELADA"}
+# parcelas de RETO com origem de outra liga já explicadas pelo Fabiano mas ainda não corrigidas na planilha (não se
+# corrige à mão: registra como veio, com a observação). Chave: (liga da linha RETO, medida da parcela, normalizada)
+ORIGEM_A_CORRIGIR = {("DC53", "IMP-D236X510MM"): "Fabiano disse que é DC53; planilha ainda não corrigida (10/11)"}
 # "RESERVADO CPR" era só observação da planilha (decisão do Eduardo, 04/11): não entra
 TERMOS_RESTRICAO = ("NAO USAR", "NÃO USAR", "SOMENTE", "DESTINA", "EXCLUSIV", "LIBERACAO DE VENDAS",
                     "LIBERAÇÃO DE VENDAS", "SO PARA", "SÓ PARA", "P/ DESFOLHADEIRA", "CONTRATO")
@@ -166,6 +169,8 @@ class Plano:
     ligas_novas: dict[str, float] = field(default_factory=dict)
     lotes: list[LoteP] = field(default_factory=list)
     paridades: list[dict[str, Any]] = field(default_factory=list)
+    # P29: linha da ESTOQUE 2026 sem comprimento → comprimento do HISTORICO do mesmo contêiner (texto, linhas)
+    compr_hist: dict[int, tuple[str, list[dict[str, Any]]]] = field(default_factory=dict)
     solicitacoes: list[SolP] = field(default_factory=list)
     cops: dict[int, dict[str, Any]] = field(default_factory=dict)
     sas: list[SaP] = field(default_factory=list)
@@ -203,9 +208,35 @@ def chave_familia(desc: str) -> tuple:
     return chave_item(liga, m)[1:]
 
 
-def chave_mat(desc: str, comprimento_fixado: str | None = None) -> ChaveMaterial:
-    """Identidade do material para a mesma linha Itu × RJ (P28)."""
-    return chave_material(medida(desc), desc, comprimento_fixado)
+def chave_mat(desc: str, comprimento_fixado: str | None = None, comprimento: str | None = None) -> ChaveMaterial:
+    """Identidade do material para a mesma linha Itu × RJ (P28; `comprimento` = P29, do HISTORICO)."""
+    return chave_material(medida(desc), desc, comprimento_fixado, comprimento)
+
+
+def _comprimentos_historico(estoque: list[P.LinhaEstoque2026], historico: list[dict]
+                            ) -> dict[int, tuple[str, list[dict[str, Any]]]]:
+    """P29 (Eduardo, 2026-11-11): a ESTOQUE 2026 não traz comprimento e o HISTORICO (packing list) do mesmo contêiner
+    traz → vale o do HISTORICO (ex.: CH39SH D2 Ø90 → Ø90X2425). Mesma liga e seção. Vários comprimentos diferentes
+    no HISTORICO viram uma chave com todos ('2810-4035/3070-4330'): leitura literal, a confirmar (R051)."""
+    por_ct: dict[str, list[dict]] = defaultdict(list)
+    for h in historico or []:
+        por_ct[h["conteiner"]].append(h)
+    out = {}
+    for e in estoque:
+        m = medida(e.material)
+        if m.formato not in ("RETANGULAR", "REDONDO") or comprimento_texto(e.material, m.formato) or m.comprimento:
+            continue
+        hs = []
+        for h in por_ct.get(e.conteiner, []):
+            mh = medida(h["descricao"])
+            if (mh.liga, mh.formato, mh.espessura, mh.largura, mh.diametro) == (m.liga, m.formato, m.espessura,
+                                                                               m.largura, m.diametro):
+                c = comprimento_texto(h["descricao"], mh.formato)
+                if c:
+                    hs.append({**h, "comprimento": c})
+        if hs:
+            out[e.linha] = ("/".join(sorted({h["comprimento"] for h in hs})), hs)
+    return out
 
 
 def _formato_valido(m) -> str:
@@ -244,6 +275,7 @@ def _liga(plano: Plano, ctx: Contexto, codigo: str | None, origem, densidade: fl
 def montar(ctx: Contexto, estoque: list[P.LinhaEstoque2026], historico: list[dict], geral: list[P.LinhaGeral],
            corte: list[P.LinhaCorte], sas: list[P.LinhaSa]) -> Plano:
     pl = Plano(data_mega=ctx.data_mega)
+    pl.compr_hist = _comprimentos_historico(estoque, historico)
     _catalogo_geral(pl, ctx, geral)
     lotes_rj = _lotes_rj_no_rio(pl, ctx, estoque, historico)
     _paridade(pl, estoque, geral)
@@ -281,15 +313,17 @@ def _catalogo_geral(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None
             vistos[g.codigo] = g.linha
 
 
-def _item_rj(pl: Plano, ctx: Contexto, desc: str, origem, comprimento_fixado: str | None = None) -> tuple:
+def _item_rj(pl: Plano, ctx: Contexto, desc: str, origem, comprimento_fixado: str | None = None,
+             comprimento: str | None = None) -> tuple:
     """Item do lote RJ (no Rio e em Itu): SEMPRE sem código do Mega (spec v3.7 §1.4, decisão de 2026-11-11). Um item
     por liga real + formato + seção + comprimento + múltiplo (P28); a escrita da descrição não conta."""
     m = medida(desc)
     liga = _liga(pl, ctx, m.liga, origem)
-    k = chave_mat(desc, comprimento_fixado)
+    k = chave_mat(desc, comprimento_fixado, comprimento)
     ch = ("RJ", liga, k.formato, k.espessura, k.largura, k.diametro, k.comprimento, k.multiplo)
     if ch not in pl.itens:
-        nome = desc.strip()[:200] or f"{liga} {k.texto}"
+        # P29: o comprimento do HISTORICO entra na descrição do item (é ela que a T04/T07 leem para a mesma linha)
+        nome = (f"{desc.strip()} X{comprimento}" if comprimento else desc.strip())[:200] or f"{liga} {k.texto}"
         cf = comprimento_fixado if k.multiplo else None
         pl.itens[ch] = ItemP(ch, nome, liga, _formato_valido(m), k.espessura, k.largura, k.diametro,
                              comprimento_fixado=cf, origem=origem)
@@ -319,7 +353,7 @@ def _lotes_rj_no_rio(pl: Plano, ctx: Contexto, estoque: list[P.LinhaEstoque2026]
             k = (h["conteiner"], chave_familia(h["descricao"]))
             entrada[k] = min(entrada.get(k, h["data"]), h["data"])
     for e in estoque:
-        item = _item_rj(pl, ctx, e.material, e.origem)
+        item = _item_rj(pl, ctx, e.material, e.origem, comprimento=(pl.compr_hist.get(e.linha) or (None,))[0])
         lote = LoteP(item, "RJ", "RJ", e.conteiner, e.peso_inicial, pecas=e.pecas, custo_kg=e.valor_unitario,
                      conferencia_kg=e.total_estoque, origem=e.origem, estoque="RJ_NO_RIO")
         lote.notas.append(f"Material na planilha: {e.material}")
@@ -421,16 +455,21 @@ def _paridade(pl: Plano, estoque: list[P.LinhaEstoque2026], geral: list[P.LinhaG
             geral_rio[chave_mat(g.descricao, g.comprimento_fixado)] += g.rj_no_rio
     rj: dict[ChaveMaterial, dict[str, Any]] = {}
     for e in estoque:
-        k = chave_mat(e.material)
-        a = rj.setdefault(k, {"descricoes": Counter(), "kg": 0.0, "origem": e.origem})
+        ch_hist = pl.compr_hist.get(e.linha)
+        k = chave_mat(e.material, comprimento=ch_hist[0] if ch_hist else None)
+        a = rj.setdefault(k, {"descricoes": Counter(), "kg": 0.0, "origem": e.origem, "hist": False})
         a["descricoes"][e.material] += 1
         a["kg"] += e.total_estoque
+        a["hist"] = a["hist"] or bool(ch_hist)
     itens_rj = {it.chave: it for it in pl.itens.values() if it.chave[0] == "RJ"}
     for k, a in rj.items():
         desc_rj = a["descricoes"].most_common(1)[0][0]
         ch = next((c for c, it in itens_rj.items() if chave_mat(it.descricao, it.comprimento_fixado) == k), None)
         p = _linha_paridade(desc_rj, "RJ_NO_RIO", k, a["kg"], geral_rio.get(k, 0.0), itu, ch, a["origem"])
         p["descricoes_rj"] = sorted(a["descricoes"])
+        p["comprimento_historico"] = a["hist"]
+        if a["hist"]:
+            p["motivo"] += " (comprimento do HISTORICO)"
         pl.paridades.append(p)
         if p["situacao"] != "MESMA LINHA" and a["kg"] > 0:
             pl.pend("PARIDADE_SO_NO_RJ", "INFO", f"Material RJ \"{desc_rj}\" ({a['kg']:.1f} kg): {p['motivo']} "
@@ -531,7 +570,7 @@ def _rj_em_itu(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
                                             origem=origem))
                 if desc_origem:
                     lote.notas.append(f"Parcela de sobra anotada no Estoque Geral: {kg:g} kg, medida original "
-                                      f"{desc_origem}.")
+                                      f"{desc_origem}." + _obs_origem(g.descricao, desc_origem))
                 elif parcelas:
                     lote.notas.append("Saldo da célula RJ em Itu sem origem anotada no comentário (parcelas "
                                       f"anotadas: {sum(k for k, _ in parcelas):g} kg de {g.rj_em_itu:g} kg).")
@@ -546,10 +585,17 @@ def _rj_em_itu(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
                     pl.pend("RETO_ORIGEM_DE_OUTRA_LIGA", "REVISAR", f"{g.descricao}: parcela com medida de origem de "
                             "outra liga (" + "; ".join(f"{k:g} kg {d}" for k, d in parcelas
                                                        if chave_familia(d)[0] != chave_familia(g.descricao)[0]) +
-                            "). Registrada como veio na planilha.", g.origem, "Perguntar ao Fabiano: erro ou mistura?")
+                            "). Registrada como veio na planilha." + "".join(
+                                _obs_origem(g.descricao, d) for _, d in parcelas), g.origem,
+                            "Perguntar ao Fabiano: erro ou mistura?")
             else:
                 pl.pend("RJ_EM_ITU_SEM_ORIGEM", "INFO", f"{g.descricao}: {g.rj_em_itu:.1f} kg RJ em Itu entram com "
                         "origem não identificada [P07].", g.origem, "Atribuir origem (T05) quando souber o contêiner")
+
+
+def _obs_origem(desc_linha: str, desc_origem: str) -> str:
+    k = (medida(desc_linha).liga, re.sub(r"\s+", "", (desc_origem or "").upper()))
+    return f" Origem {desc_origem}: {ORIGEM_A_CORRIGIR[k]}." if k in ORIGEM_A_CORRIGIR else ""
 
 
 def _ligar_reto_origem(pl: Plano) -> None:

@@ -89,7 +89,7 @@ _RE_DIAM_COMP = re.compile(r"(\d+(?:[.,]\d+)?)\s*X\s*(\d+(?:[.,]\d+)?)(?!\s*X)")
 def interpretar(descricao: str) -> Medida:
     """Extrai liga e bitola de uma descrição livre."""
     liga = normalizar_liga(descricao)
-    t = (descricao or "").upper()
+    t = (descricao or "").upper().replace("×", "X")     # P28(3): x, X e × são o mesmo separador (HISTORICO usa ×)
     # Faixa de largura 'X(400-600)' → usa o maior valor (capacidade máxima da bitola)
     t = re.sub(r"\((\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)\)", lambda m: m.group(2), t)
     if re.search(r"\bRETO\b", t):
@@ -165,7 +165,7 @@ class ChaveMaterial:
     espessura: float | None
     largura: float | None
     diametro: float | None
-    comprimento: float | None
+    comprimento: str | None     # texto normalizado: '2425', '2800-6000' (faixa), '2810-4035/3070-4330' (vários)
     multiplo: bool
 
     @property
@@ -182,15 +182,38 @@ class ChaveMaterial:
             b = self.formato
         b = b.replace(".", ",")
         if self.comprimento:
-            b += f"X{self.comprimento:g}".replace(".", ",")
+            b += f"X{self.comprimento}"
         return f"{self.liga or '?'} {b}" + (" MULT" if self.multiplo else "")
 
 
-def chave_material(m: Medida, descricao: str | None = None, comprimento_fixado: str | None = None) -> ChaveMaterial:
+_NUM = r"\d+(?:[.,]\d+)?"
+_RE_COMPR_RET = re.compile(rf"{_NUM}\s*X\s*{_NUM}\s*X\s*({_NUM}(?:\s*[-~/]\s*{_NUM})*)")
+_RE_COMPR_RED = re.compile(rf"(?:Ø|\bRED\b\.?|\bROUND\b[A-Z ]*?)\s*Ø?\s*{_NUM}\s*X\s*({_NUM}(?:\s*[-~/]\s*{_NUM})*)")
+
+
+def _n(x: str) -> str:
+    return f"{_num(x):g}".replace(".", ",")
+
+
+def comprimento_texto(descricao: str | None, formato: str) -> str | None:
+    """Comprimento informado na descrição, com faixa (P29: '2800-6000' = faixa; faixa igual = mesma linha)."""
+    t = (descricao or "").upper().replace("×", "X")
+    m = (_RE_COMPR_RED if formato == "REDONDO" else _RE_COMPR_RET).search(t)
+    if not m:
+        return None
+    partes = re.split(r"\s*([-~/])\s*", m.group(1))
+    return "".join(_n(x) if i % 2 == 0 else ("-" if x == "~" else x) for i, x in enumerate(partes))
+
+
+def chave_material(m: Medida, descricao: str | None = None, comprimento_fixado: str | None = None,
+                   comprimento: str | None = None) -> ChaveMaterial:
+    """`comprimento` (opcional) substitui o da descrição: P29, comprimento do HISTORICO do mesmo contêiner."""
     mult = chave_multiplo(descricao, comprimento_fixado)
-    compr = m.comprimento
+    compr = comprimento or (comprimento_texto(descricao, m.formato) if descricao else None)
+    if compr is None and m.comprimento:
+        compr = _n(str(m.comprimento))
     if compr is None and mult and mult != "MULT":
-        compr = float(mult)
+        compr = mult
     liga = LIGA_MESMA_LINHA.get(m.liga, m.liga) if m.liga else None
     if m.formato == "REDONDO":
         return ChaveMaterial(liga, "REDONDO", None, None, m.diametro, compr, bool(mult))

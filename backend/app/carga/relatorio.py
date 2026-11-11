@@ -60,6 +60,28 @@ def gerar(pl: Plano, destino: Path, *, titulo: str, conferencia_banco: list[dict
            "; ".join(p.get("descricoes_rj") or []) or None, (p.get("origem") or {}).get("arquivo"),
            (p.get("origem") or {}).get("linha"), None, None] for p in pl.paridades],
          [36, 12, 12, 26, 14, 34, 16, 50, 14, 14, 14, 50, 30, 8, 10, 30])
+    # P29: linha a linha dos materiais RJ que pegaram o comprimento do HISTORICO (ex.: CH39SH D2 Ø90)
+    from .plano import chave_mat
+    itu = {p["chave"]: p for p in pl.paridades if p["estoque"] == "RJ_NO_RIO"}
+    lin = []
+    for linha, (compr, hs) in sorted(pl.compr_hist.items()):
+        lp = next((x for x in pl.lotes if (x.origem or {}).get("linha") == linha
+                   and (x.origem or {}).get("aba") == "ESTOQUE 2026"), None)
+        it = pl.itens[lp.item] if lp else None
+        par = itu.get(chave_mat(it.descricao).texto) if it else None
+        base = [lp.conteiner if lp else None, it.descricao if it else None, compr,
+                lp.peso_inicial if lp else None, lp.conferencia_kg if lp else None]
+        tot = round(sum(h["entrada"] or 0 for h in hs), 3)
+        for n, h in enumerate(hs):
+            lin.append(base + [h["descricao"], h["entrada"], h["linha"], tot if n == 0 else None,
+                               (par or {}).get("situacao") if n == 0 else None,
+                               "; ".join(f"{x['codigo']} {x['descricao']} ({x['kg'] or 0:g} kg Mega na planilha)"
+                                         for x in (par or {}).get("itu", [])) if n == 0 else None, linha])
+    _aba(wb, "Comprimento do HISTORICO", ["Contêiner", "Material RJ (com o comprimento usado)", "Comprimento usado",
+                                          "Peso inicial (ESTOQUE 2026)", "Total em estoque (ESTOQUE 2026)",
+                                          "Entrada no HISTORICO", "kg da entrada", "Linha HISTORICO",
+                                          "Soma do HISTORICO", "Situação", "Linha de Itu", "Linha ESTOQUE 2026"],
+         lin, [10, 40, 18, 14, 14, 40, 12, 10, 12, 14, 60, 10])
     lot = []
     for n, l in enumerate(pl.lotes, start=1):
         it = pl.itens[l.item]

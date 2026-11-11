@@ -189,3 +189,19 @@ def test_uma_entrada_aberta_por_codigo(client):
         db.add(PendenciaMega(tipo="ENTRADA", codigo=4243, kg=12, situacao="XPTO"))
         with pytest.raises(IntegrityError):
             db.commit()
+
+
+def test_p29_comprimento_do_historico_e_faixa():
+    from app.carga import planilhas as P
+    from app.carga.plano import _comprimentos_historico, chave_mat
+    from app.domain.medidas import comprimento_texto
+    assert interpretar("D2 Ø90×2425mm").comprimento == 2425                      # × = X
+    assert comprimento_texto("H13 55x610x2800-6000", "RETANGULAR") == "2800-6000"
+    assert comprimento_texto("A8 MOD 7.2x86x3230-4080mm", "RETANGULAR") == "3230-4080"
+    e = P.LinhaEstoque2026(7, "CT01X", "D2 Ø90", None, 2, 300.0, 250.0, [], None, {"linha": 7})
+    h = [{"linha": 3, "conteiner": "CT01X", "descricao": "D2 Ø90×2425mm", "entrada": 300.0},
+         {"linha": 4, "conteiner": "CT02X", "descricao": "D2 Ø90×3000mm", "entrada": 10.0}]
+    m = _comprimentos_historico([e], h)
+    assert m[7][0] == "2425" and [x["linha"] for x in m[7][1]] == [3]             # só o mesmo contêiner
+    assert chave_mat("D2 Ø90", comprimento=m[7][0]) == chave_mat("IMP-D2 RED 90X2425MM")
+    assert chave_mat("H13 55x610x2800-6000") != chave_mat("H13 55x610x2800-5000")  # faixa diferente

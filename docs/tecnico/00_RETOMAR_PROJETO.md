@@ -131,6 +131,12 @@ curl -s http://127.0.0.1:8090/api/saude               # saúde da API
 - **Ponta a ponta:** `deploy/e2e/rodar_e2e.sh` no system-lab copia o banco para `estoqueack_e2e`, roda os 5 caminhos (`app/jobs/e2e_caminhos.py`) com o Mega real e apaga a cópia. 1º ensaio em 04/11 com a carga: 5 caminhos OK, saldo = soma dos movimentos em todos os lotes.
 - **Aceite:** `docs/tecnico/03_roteiro_aceite.md`. **Volume:** `VOLUME=1 … pytest tests/test_volume.py -s`.
 
+## 7.5 Situação em 2026-11-12 (chat BANCO E TESTES, R048)
+
+- **PostgreSQL local sem Docker** (máquina do Eduardo): `pip install --target <tmp> pgserver` (wheel Windows) e `pgserver.get_server(<pasta>)` dá um PostgreSQL 16 em 127.0.0.1; depois `TEST_DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:<porta>/<banco> pytest` (o banco é APAGADO). Fora do repo e do venv.
+- **Migração 0008** revisada (sobe/desce/sobe, índice único parcial `uq_pend_entrada_aberta`, CHECKs). Aplicada na homologação. A próxima é a **0009**.
+- **Ponta a ponta** (`app/jobs/e2e_caminhos.py`) confere também 8 % no corte em Itu do RJ em Itu (B), consumo misto sem `OP_DUPLICADA` (B2, só prévia), lote da entrada NF sem código do Mega (D) e `lotes_rj_com_codigo_mega = 0`. **Só passa depois da recarga do zero** (em 12/11 a homologação ainda tinha 198 lotes RJ com código da carga antiga).
+
 ## 8. Registro de incidentes
 
 **2026-10-29, senha do backup publicada no GitHub.** O commit `ea2b71b (antigo 3422e54)` (13h04), feito pelo chat TÉCNICO com `git add -A`, incluiu `pass_bkp/pass.txt`, uma anotação local do Eduardo com a senha GPG dos backups, num repositório **público**.

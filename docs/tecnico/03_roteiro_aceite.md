@@ -6,10 +6,10 @@ Escrito em 2026-11-03 pelo chat BANCO E TESTES. Usado no aceite com **Fabiano, M
 
 | # | Item | Quem | Ok |
 |---|---|---|---|
-| 0.1 | Carga T25 feita na homologação e conferida pelo Fabiano (soma dos lotes por código = saldo Mega ± 5 kg; total RJ = ESTOQUE 2026) | TÉCNICO + Fabiano | ☐ |
+| 0.1 | Carga T25 feita na homologação (recarga do zero depois do ok do Eduardo e do Fabiano no relatório de paridade RJ × Itu) e conferida pelo Fabiano (soma dos lotes do Estoque Mega por código = saldo Mega ± 5 kg; total RJ = ESTOQUE 2026; nenhum lote do RJ com código do Mega, v3.7) | TÉCNICO + Fabiano | ☐ |
 | 0.2 | Usuários reais criados (T21): `fabiano.camargo`, `matheus.almeida`, `marcello.teixeira`, `renato.pinto`, cada um com e-mail e perfil certo (Estoque Itu, Estoque Itu, Operação RJ, Análise) | Eduardo | ☐ |
 | 0.3 | Cada um entrou uma vez e trocou a senha temporária | cada um | ☐ |
-| 0.4 | Ponta a ponta automático dos 5 caminhos rodado sem erro (`deploy/e2e/rodar_e2e.sh`; 1º ensaio OK em 04/11; repetir antes do aceite) | BANCO E TESTES | ☐ |
+| 0.4 | Ponta a ponta automático dos 5 caminhos rodado sem erro (`deploy/e2e/rodar_e2e.sh`; 1º ensaio OK em 04/11; repetir depois da recarga e antes do aceite). Desde 12/11 confere também: 8 % no corte em Itu do lote RJ em Itu (B), consumo misto sem `OP_DUPLICADA` (B2), lote da entrada NF sem código do Mega (D) e zero lote do RJ com código | BANCO E TESTES | ☐ |
 | 0.5 | "Mega atualizado em …" de hoje no Painel (sincronização das 06h OK) | — | ☐ |
 | 0.6 | Escolher **OPs reais abertas** para o aceite (uma por caminho) e os lotes da carga que vão ser usados. Ficam anotadas na tabela do §6 | Fabiano + BANCO E TESTES | ☐ |
 
@@ -48,7 +48,7 @@ Como registrar um problema: anote na tabela do §7 **a tela, o que fez, o que es
 | 2 | (depois do Marcelo separar a barra, fechar o COP e enviar) T14: o SA vem com o **peso previsto** | SA com o previsto, não com o peso da barra | ☐ |
 | 3 | T12: receber | Nasce um lote **RJ em Itu** com o peso da barra; solicitação **Aguardando corte em Itu** | ☐ |
 | 4 | **T13 Corte em Itu**: consumo, sobra e se a sobra ficou na bitola | Perda calculada; sobra fora da bitola vira lote **RETO**; solicitação **Concluída** | ☐ |
-| 5 | Pôr um consumo **mais de 5 %** acima do previsto | Pede justificativa (amarelo); com justificativa, grava | ☐ |
+| 5 | Pôr um consumo **até 8 %** acima do previsto (lote RJ em Itu) e depois **mais de 8 %** | Até 8 % grava direto; acima pede justificativa (amarelo) dizendo "Limite: 8 % para material do RJ"; com justificativa, grava | ☐ |
 
 ### 1.4 Caminho B2 — corte em Itu de material RJ que já está em Itu
 
@@ -56,6 +56,7 @@ Como registrar um problema: anote na tabela do §7 **a tela, o que fez, o que es
 |---|---|---|---|
 | 1 | T13 com a OP do §6 (caminho B2) e um lote **RJ em Itu** da carga | Consumo baixa o lote; aparece a linha nova na **fila de SA** | ☐ |
 | 2 | T14: informar o código do SA e a **NF só fiscal** | SA com a NF; aviso cinza se a NF for diferente da entrada no Mega | ☐ |
+| 3 | **Consumo misto** (P26, opção A): numa OP que usa material de Itu e do RJ, marcar "consumo nos dois estoques" no corte em Itu e na solicitação ao RJ da mesma OP | A segunda parte **não** pede "OP duplicada"; a T08 mostra "OP com consumo misto: Itu x kg + RJ y kg". Sem a marca, o aviso de OP duplicada continua | ☐ |
 
 ### 1.5 Caminho C — material Mega
 
@@ -63,6 +64,7 @@ Como registrar um problema: anote na tabela do §7 **a tela, o que fez, o que es
 |---|---|---|---|
 | 1 | T13 com a OP do §6 (caminho C) e um lote **Estoque Mega** | Instrução "**Fazer no Mega**" pronta (baixar X kg do código na OP; transferir a sobra para o código RETO) | ☐ |
 | 2 | Copiar a instrução e fazer no Mega como hoje | Na sincronização seguinte (ou "Sincronizar agora"), o saldo Mega bate com o lote | ☐ |
+| 3 | Pôr um consumo **mais de 5 %** acima do previsto (lote Estoque Mega) | Pede justificativa dizendo "Limite: 5 % para lote do Estoque Mega" (o limite de 8 % é só para material do RJ) | ☐ |
 
 ### 1.6 Rede de segurança
 
@@ -79,12 +81,12 @@ Como registrar um problema: anote na tabela do §7 **a tela, o que fez, o que es
 | Passo | O que fazer | O que deve ver | Ok |
 |---|---|---|---|
 | 1 | Entrar no tablet/computador do RJ | Menu só com as telas do RJ; **só lotes RJ no Rio** | ☐ |
-| 2 | **T06 Entrada por NF** (caminho D): NF de teste com 1 item | Nasce um lote RJ no Rio com o saldo informado; NF repetida é bloqueada | ☐ |
+| 2 | **T06 Entrada por NF** (caminho D): NF de teste com 1 item | Nasce um lote RJ no Rio com o saldo informado, **sem código do Mega** (v3.7); NF repetida é bloqueada | ☐ |
 | 3 | **T09 Fila RJ**: abrir a solicitação do caminho A do Fabiano | Aparece com prazo, OP, lote, quantidade e instrução de corte | ☐ |
 | 4 | **T10 Registrar corte**: peças e peso real | Baixa o lote; solicitação **Cortada**; o Fabiano recebe aviso no sino | ☐ |
 | 5 | Repetir com **"Usar outro lote / dividir"** (dois lotes) | Pede justificativa; os dois lotes são baixados | ☐ |
 | 6 | Pôr um peso **mais de 5 %** acima do previsto | Pede justificativa | ☐ |
-| 7 | Caminho B: separar a barra e informar o **peso da barra inteira** | Aceita sem a regra dos 5 % | ☐ |
+| 7 | Caminho B: separar a barra e informar o **peso da barra inteira** | Aceita sem a regra dos 5 %/8 %; se a barra pesar **menos** que a peça prevista, só avisa ("A barra pesa menos do que a peça prevista") e deixa gravar | ☐ |
 | 8 | **T11 COP**: novo COP, adicionar os cortes prontos, **Fechar COP** | Os SAs vão para a fila do Fabiano; "SAs confirmados X de N" | ☐ |
 | 9 | Tentar **Enviar** antes de todos os SAs confirmados | Bloqueia ("SA pendente") | ☐ |
 | 10 | Com os SAs confirmados: informar a **NF** (uma para o COP) e **Enviar** | COP **Enviado**; solicitações **Em trânsito** | ☐ |

@@ -5,8 +5,14 @@ Executa pela API (dentro do processo, sem rede), com OPs reais abertas e o Mega 
   B  peça inteira → COP → SA (previsto) → envio → recebimento (lote RJ em Itu) → corte em Itu → Concluída
   B2 corte em Itu de lote RJ em Itu → linha de SA → código + NF só fiscal
   C  corte em Itu de lote do Estoque Mega → instrução "Fazer no Mega"
-  D  entrada por NF no RJ → lote novo
-e confere no fim: nenhum saldo negativo e, em todo lote, saldo = soma dos movimentos.
+  D  entrada por NF no RJ → lote novo (sem código do Mega, spec v3.7 §1.4)
+e confere no fim: nenhum saldo negativo, em todo lote saldo = soma dos movimentos e nenhum lote do RJ (no Rio ou em
+Itu) com código do Mega (v3.7: o código só existe no Estoque Mega; vale depois da recarga do zero).
+
+Regras novas conferidas sem gravar nada a mais (só prévias, rodada de 2026-11-12):
+  B   tolerância de 8 % no corte em Itu do lote RJ em Itu (P22(a)): 7 % passa, 9 % pede justificativa com "8 %"
+  B2  corte em Itu marcado "consumo misto" (P26, opção A): a solicitação ao RJ marcada da mesma OP não avisa
+      OP_DUPLICADA; a mesma solicitação sem a marca avisa
 
 O Mega é só lido. A ÚNICA simulação é a confirmação do SA: um SA que o teste informou e que não teve carga real no
 Mega é tratado como confirmado (no aceite real, o Fabiano faz a carga no Mega).
@@ -241,6 +247,13 @@ def caminho_b(c: Cliente, u: dict, lote, op: int, mega: MegaE2E, num_cop: int) -
     st, sug = c.req("GET", f"/api/cortes-itu/sugestao?op={op}")
     esperar(st == 200 and sug.get("lote_id"), f"B: sem lote RJ em Itu sugerido ({st} {sug})")
     sobra = round(barra - previsto - 1, 3)
+    base = {"op": op, "lote_id": sug["lote_id"], "sobra_kg": 0, "pecas": 1, "previsto_kg": previsto,
+            "peso_usado_kg": barra}
+    sete = _codigos(c, "/api/cortes-itu/validar", {**base, "consumo_kg": round(previsto * 1.07, 3)})
+    esperar("EXCESSO_TOLERANCIA" not in sete, f"B: 7 % acima no RJ em Itu não deveria pedir justificativa ({sete})")
+    st, v = c.req("POST", "/api/cortes-itu/validar", {**base, "consumo_kg": round(previsto * 1.09, 3)})
+    exc = [o["mensagem"] for o in v.get("ocorrencias", []) if o["codigo"].startswith("EXCESSO_TOLERANCIA")]
+    esperar(exc and "8 %" in exc[0], f"B: 9 % acima deveria pedir justificativa com o limite de 8 % ({exc})")
     corte = gravar(c, "/api/cortes-itu/validar", "/api/cortes-itu",
                    {"op": op, "lote_id": sug["lote_id"], "consumo_kg": previsto, "sobra_kg": max(sobra, 0.5),
                     "sobra_na_bitola": False, "pecas": 1, "observacao": "TESTE E2E caminho B"})
@@ -248,16 +261,33 @@ def caminho_b(c: Cliente, u: dict, lote, op: int, mega: MegaE2E, num_cop: int) -
             "lote_reto": (corte.get("lote_reto") or {}).get("codigo"), "situacao_final": _situacao(c, u, sol["id"])}
 
 
-def caminho_b2(c: Cliente, u: dict, lote, op: int, mega: MegaE2E) -> dict:
+def caminho_b2(c: Cliente, u: dict, lote, op: int, mega: MegaE2E, lote_rj=None) -> dict:
     c.entrar(u["itu"])
     corte = gravar(c, "/api/cortes-itu/validar", "/api/cortes-itu",
                    {"op": op, "lote_id": lote.id, "consumo_kg": 10, "sobra_kg": 9.5, "sobra_na_bitola": True,
-                    "peso_usado_kg": 20, "pecas": 1, "observacao": "TESTE E2E caminho B2"})
+                    "peso_usado_kg": 20, "pecas": 1, "consumo_misto": True, "observacao": "TESTE E2E caminho B2"})
     esperar(corte.get("sa_id"), "B2: corte em lote fiscal RJ deveria gerar linha de SA")
+    esperar(corte.get("consumo_misto") is True, "B2: o corte deveria voltar marcado como consumo misto")
     _sa_confirmar(c, u, op, mega, sa_id=corte["sa_id"])
     st, d = c.req("POST", "/api/sas/nf", {"ids": [corte["sa_id"]], "numero": "E2EB2", "emitente": "OUTRO"})
     esperar(st == 200, f"B2: NF só fiscal {st} {d}")
-    return {"corte_itu": corte["id"], "sa": corte["sa_id"]}
+    out = {"corte_itu": corte["id"], "sa": corte["sa_id"]}
+    if lote_rj is not None:      # P26 opção A: a parte do RJ da mesma OP (só prévia, nada gravado)
+        c.entrar(u["itu"])
+        corpo = {"op": op, "liga": lote_rj.item.liga.codigo, "medida": medida_para(lote_rj),
+                 "itens": [{"lote_id": lote_rj.id, "modo": "CORTAR_RJ", "quantidade": 1}], "enviar": True}
+        com = _codigos(c, "/api/solicitacoes/validar", {**corpo, "consumo_misto": True})
+        sem = _codigos(c, "/api/solicitacoes/validar", corpo)
+        esperar("OP_DUPLICADA" not in com, f"B2: consumo misto marcado ainda avisa OP_DUPLICADA ({com})")
+        esperar("OP_DUPLICADA" in sem, f"B2: solicitação sem a marca deveria avisar OP_DUPLICADA ({sem})")
+        out["consumo_misto"] = "OK: com a marca sem OP_DUPLICADA; sem a marca com OP_DUPLICADA"
+    return out
+
+
+def _codigos(c: Cliente, url: str, corpo: dict) -> list[str]:
+    st, v = c.req("POST", url, corpo)
+    esperar(st == 200, f"{url}: {st} {v}")
+    return [o["codigo"].split("#")[0] for o in v.get("ocorrencias", [])]
 
 
 def caminho_c(c: Cliente, u: dict, lote, op: int) -> dict:
@@ -278,6 +308,9 @@ def caminho_d(c: Cliente, u: dict, liga: str) -> dict:
                 "itens": [{"liga": liga, "formato": "RETANGULAR", "espessura": 50, "largura": 610, "pecas": 1,
                            "peso_kg": 100, "descricao_nf": "TESTE E2E caminho D"}]})
     esperar(len(d["itens"]) == 1, "D: entrada deveria criar 1 lote")
+    st, lote = c.req("GET", f"/api/lotes/{d['itens'][0]['lote_id']}")
+    esperar(st == 200 and lote["estoque"] == "RJ_NO_RIO" and lote["codigo_mega"] is None,
+            f"D: lote do RJ deveria ficar sem código do Mega ({st} {lote})")
     st, v = c.req("POST", "/api/entradas-nf/validar", {"numero": numero, "data": date.today().isoformat(),
                                                        "fornecedor": "TESTE E2E", "conteiner": "E2ETESTE",
                                                        "itens": [{"liga": liga, "formato": "RETANGULAR",
@@ -330,8 +363,11 @@ def conferir_saldos(db) -> dict:
         SELECT l.codigo, l.saldo_kg, COALESCE(SUM(m.kg), 0) AS soma
           FROM lote l LEFT JOIN movimento m ON m.lote_id = l.id
          GROUP BY l.id, l.codigo, l.saldo_kg HAVING abs(l.saldo_kg - COALESCE(SUM(m.kg), 0)) > 0.001""")).all()
+    # spec v3.7 §1.4: lote do RJ (no Rio ou em Itu) não tem código do Mega
+    rj_cod = db.execute(text("SELECT count(*) FROM lote l JOIN item_mp i ON i.id = l.item_mp_id "
+                             "WHERE l.planta_fiscal = 'RJ' AND i.codigo_mega IS NOT NULL")).scalar()
     return {"negativos": neg, "saldo_diferente_da_soma": [tuple(map(str, r)) for r in dif[:20]],
-            "qtd_diferentes": len(dif)}
+            "qtd_diferentes": len(dif), "lotes_rj_com_codigo_mega": rj_cod}
 
 
 # ---------------------------------------------------------------- orquestração
@@ -356,7 +392,7 @@ def executar(app, sessao, gateway, ops_informadas: list[int] | None = None) -> d
     c = Cliente(app)
     passos = [("A", lambda: caminho_a(c, u, la, ops[0], mega, base_cop)),
               ("B", lambda: caminho_b(c, u, lb, ops[1], mega, base_cop + 1)),
-              ("B2", lambda: caminho_b2(c, u, lb2, ops[2], mega)),
+              ("B2", lambda: caminho_b2(c, u, lb2, ops[2], mega, la)),
               ("C", lambda: caminho_c(c, u, lc, ops[3])),
               ("D", lambda: caminho_d(c, u, la.item.liga.codigo))]
     for nome, f in passos:
@@ -373,7 +409,7 @@ def executar(app, sessao, gateway, ops_informadas: list[int] | None = None) -> d
         rel["conferencia"] = conferir_saldos(db)
     rel["sa_confirmacao_simulada"] = sorted(set(mega.simulados))
     rel["ok"] = all(r.get("ok") for r in rel["caminhos"].values()) and rel["conferencia"]["negativos"] == 0 \
-        and rel["conferencia"]["qtd_diferentes"] == 0
+        and rel["conferencia"]["qtd_diferentes"] == 0 and rel["conferencia"]["lotes_rj_com_codigo_mega"] == 0
     return rel
 
 

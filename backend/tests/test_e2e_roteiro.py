@@ -41,5 +41,8 @@ def test_roteiro_e2e_cinco_caminhos(client):
     assert rel["caminhos"]["A"]["situacao_final"] == "CONCLUIDA"
     assert rel["caminhos"]["B"]["situacao_final"] == "CONCLUIDA" and rel["caminhos"]["B"]["lote_reto"]
     assert "Baixar" in rel["caminhos"]["C"]["instrucao_mega"]
-    assert rel["conferencia"] == {"negativos": 0, "saldo_diferente_da_soma": [], "qtd_diferentes": 0}
+    assert rel["conferencia"] == {"negativos": 0, "saldo_diferente_da_soma": [], "qtd_diferentes": 0,
+                                  "lotes_rj_com_codigo_mega": 0}
+    assert rel["caminhos"]["B2"]["consumo_misto"].startswith("OK")          # P26 opção A (só prévia)
+    assert rel["caminhos"]["D"]["lote"]
     assert rel["ok"] and set(rel["sa_confirmacao_simulada"]) == {60000, 60001, 60002}

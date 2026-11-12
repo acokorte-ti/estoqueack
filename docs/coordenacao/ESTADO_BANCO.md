@@ -2,11 +2,11 @@
 
 Chat **BANCO E TESTES**, braço do TÉCNICO (BACKEND 2). Escopo: fechar as definições de banco (Mega e PostgreSQL) e os testes que faltam para a implantação da Fase 1 (sem data: vale a ordem das etapas e o go/no-go). Não mexe em fluxo de tela nem em regra de negócio; o que depende de outra frente vira pedido em `PEDIDOS.md`.
 
-Atualizado: 2026-11-06 pelo chat BANCO E TESTES (rodada da auditoria de 06/11, ver §5c).
+Atualizado: 2026-11-12 pelo chat BANCO E TESTES (rodada de 12/11, R048, ver §5d).
 
 ## Situação em uma frase
 
-**Parte A (Mega) e Parte B (PostgreSQL) concluídas; ponta a ponta dos 5 caminhos já rodou OK com os dados da carga e o Mega real (04/11, §5); roteiro de aceite pronto.** Critérios de go/no-go nº 2 (ensaio) e nº 3 (concorrência no PostgreSQL) atendidos; o nº 2 se repete antes do aceite e depois da recarga final.
+**0008 revisada (R048, sem bloqueio) e ponta a ponta preparado para as regras v3.5–v3.9; roda depois da recarga do zero.** Parte A (Mega) e Parte B (PostgreSQL) concluídas; ponta a ponta dos 5 caminhos já rodou OK com os dados da carga e o Mega real (04/11, §5); roteiro de aceite pronto.** Critérios de go/no-go nº 2 (ensaio) e nº 3 (concorrência no PostgreSQL) atendidos; o nº 2 se repete antes do aceite e depois da recarga final.
 
 ## Resumo para cada chat
 
@@ -127,8 +127,19 @@ Os SAs das OPs 100592/100553/100550 foram confirmados **pelo Mega de verdade** (
 | **Datas-prazo** | Retiradas de `03_roteiro_aceite.md`, `06_implantacao.md` (renomeado de `06_implantacao_13_11.md`), `deploy/implantacao/` e deste arquivo. PARs de 13/11/2027 (`05_backup_externo.md`) mantidos |
 | **Recarga** | Não rodada (fica para depois da etapa de correção) |
 
+## 5d. Rodada de 12/11 (R048)
+
+**No ar:** migração **0008** revisada no PostgreSQL 16 (local, `pgserver`): sobe/desce/sobe limpo; com 3 ENTRADA ABERTA do mesmo código antes, fica só a MIN(id) e as outras viram ENCERRADA; depois, 2ª ABERTA do código = `UniqueViolation`, situação/motivo fora da lista = `CheckViolation`; DIVERGENCIA e DESCARTADA não são afetadas; triggers de `movimento`/`auditoria` intactos; `consumo_misto` NOT NULL default false nas duas tabelas. **Homologação** (só leitura): alembic 0008, índice e 3 CHECKs presentes, 9 ABERTA + 10 ENCERRADA, 0 duplicada, 0 ENCERRADA sem data, parâmetros 8 e 7; 1.145 lotes, 0 negativo, saldo = soma dos movimentos em 100 %; **198 lotes RJ com código do Mega** (carga antiga, some na recarga do zero). Suíte inteira verde em SQLite e no PostgreSQL local.
+
+**Testes novos** (`backend/tests/test_banco_r048.py`, dados fictícios): 1.2379 = D2 e 1.2344 = H13 na mesma linha, bitola/comprimento diferente separa; CR8MOD e A8 MOD em linha própria; múltiplo ≠ comprimento com o mesmo número; limites exatos 8 %/5 % (domínio e T13 com lote RJ em Itu inteiro, RETO RJ em Itu e Estoque Mega); T10 peça inteira com `BARRA_MAIS_LEVE_QUE_PECA` (só aviso, grava) e sem tolerância na barra pesada; consumo misto na ordem RJ → Itu, terceira solicitação sem marca avisa, corte em Itu sem marca não é escondido; entrada NF do RJ na bitola de um código do Mega cria item sem código e a sugestão põe os dois na mesma linha; carga pela linha de comando com `--correcoes` (ilegível/inexistente para com código 2; com escrita diferente aplica, grava nota e aba do relatório; kg diferente não aplica), RETO DC53 sem lote-pai mesmo com candidato único. 1 xfail: P28(1) "mesma liga não pede estou ciente" (R053).
+
+**Ponta a ponta preparado (não rodado):** `app/jobs/e2e_caminhos.py` passa a conferir 8 % no B (só prévias: 7 % passa, 9 % pede com "8 %"), consumo misto no B2 (corte marcado; prévia da solicitação ao RJ da mesma OP com e sem a marca), lote do D sem código do Mega e, na conferência final, `lotes_rj_com_codigo_mega = 0` (entra no OK). Ensaio com Mega falso no pytest verde. Roteiro de aceite atualizado (8 %/5 %, consumo misto, barra mais leve, RJ sem código).
+
+**Pedido aberto:** R053 ao TÉCNICO (P28(1) ciência, tabela de equivalências fixa, comprimento na entrada NF, correção não aplicada em silêncio, detalhes da 0008).
+
 ## 6. Próximos passos deste chat
 
+0. **Depois da recarga do zero** (espera o ok do Eduardo e do Fabiano na paridade): rodar `deploy/e2e/rodar_e2e.sh` (uma conexão) e mostrar a tabela dos 5 caminhos + conferência (inclui 0 lote RJ com código).
 1. **Backup externo:** assim que o Eduardo criar o bucket e os PARs, instalar, rodar o 1º envio, o teste de restauração a partir do bucket e a prova de que o PAR de escrita não apaga; marcar o go/no-go nº 4.
 2. **Testes da T16 mínima** quando a API sair (diferença por código Mega × soma dos lotes > 5 kg; perfis; volume).
 3. **Repetir o ponta a ponta** depois da recarga final: `deploy/e2e/rodar_e2e.sh` (≈ 1 min).

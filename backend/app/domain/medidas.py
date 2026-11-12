@@ -174,12 +174,13 @@ class ChaveMaterial:
 
     @property
     def texto(self) -> str:
-        if self.formato == "REDONDO":
+        # R055: item do Mega sem bitola legível (formato RETANGULAR sem medidas) não pode derrubar a T04
+        if self.formato == "REDONDO" and self.diametro:
             b = f"Ø{self.diametro:g}"
-        elif self.formato == "RETANGULAR":
+        elif self.formato == "RETANGULAR" and self.espessura and self.largura:
             b = f"{self.espessura:g}X{self.largura:g}"
         else:
-            b = self.formato
+            b = "SEM BITOLA" if self.formato in ("REDONDO", "RETANGULAR") else self.formato
         b = b.replace(".", ",")
         if self.comprimento:
             b += f"X{self.comprimento}"

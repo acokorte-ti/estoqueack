@@ -188,9 +188,7 @@ def test_lote_rj_sem_codigo_do_mega_na_entrada_nf_e_na_sugestao(amb):
     assert all(x["codigo_mega"] is None for x in lista if x["estoque"] != "ESTOQUE_MEGA")
 
 
-@pytest.mark.xfail(strict=False, reason="R053 (TÉCNICO): P28(1) diz que 1.2344 = H13 não pede 'estou ciente'; "
-                                        "a T07 ainda gera LIGA_EQUIVALENTE (CIÊNCIA). Tirar o xfail quando corrigir.")
-def test_p28_liga_mesma_linha_nao_pede_ciencia(amb):
+def test_p28_liga_mesma_linha_nao_pede_ciencia(amb):         # R053(1) corrigido pelo TÉCNICO em 2026-11-12
     client, u, ids, _ = amb
     h = entrar(client, u["itu"])
     v = client.post("/api/solicitacoes/validar", headers=h, json=corpo_solicitacao(ids["l2344"])).json()
@@ -251,9 +249,8 @@ def test_carga_cli_correcoes_gravadas_e_reto_sem_pai(base, tmp_path, monkeypatch
     corr = tmp_path / "corr.json"       # escrita diferente (minúsculas, espaços) e kg conferido: deve aplicar
     corr.write_text(json.dumps({"origem_reto": [
         {"linha_descricao": "imp-dc53  reto", "origem_planilha": "IMP-DC53 30 X 500MM",
-         "origem_correta": "IMP-DC53 31X500MM", "kg": 400, "fonte": "teste fictício"},
-        {"linha_descricao": "IMP-DC53 RETO", "origem_planilha": "IMP-DC53 99X500MM",
-         "origem_correta": "IMP-DC53 98X500MM", "fonte": "não casa com nenhuma parcela"}]}), encoding="utf-8")
+         "origem_correta": "IMP-DC53 31X500MM", "kg": 400, "fonte": "teste fictício"}]}), encoding="utf-8")
+    # a que não casa com nenhuma parcela agora bloqueia a carga (R053(4)): `test_r053_correcao_que_nao_casa_...`
     rc, saida = _main(tmp_path, monkeypatch, "--importar", "--correcoes", str(corr))
     assert rc == 0
     with SessionLocal() as db:

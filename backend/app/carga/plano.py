@@ -166,8 +166,9 @@ class Plano:
     ligas_novas: dict[str, float] = field(default_factory=dict)
     lotes: list[LoteP] = field(default_factory=list)
     paridades: list[dict[str, Any]] = field(default_factory=list)
-    # P29: linha da ESTOQUE 2026 sem comprimento → comprimento do HISTORICO do mesmo contêiner (texto, linhas)
-    compr_hist: dict[int, tuple[str, list[dict[str, Any]]]] = field(default_factory=dict)
+    # P29/P31: linha da ESTOQUE 2026 sem comprimento → comprimento do HISTORICO do mesmo contêiner, usado na chave só
+    # quando a linha de Itu da mesma liga e seção também tem comprimento. {linha: {texto, hist, usado, motivo}}
+    compr_hist: dict[int, dict[str, Any]] = field(default_factory=dict)
     correcoes_aplicadas: list[dict[str, Any]] = field(default_factory=list)
     solicitacoes: list[SolP] = field(default_factory=list)
     cops: dict[int, dict[str, Any]] = field(default_factory=dict)
@@ -211,14 +212,21 @@ def chave_mat(desc: str, comprimento_fixado: str | None = None, comprimento: str
     return chave_material(medida(desc), desc, comprimento_fixado, comprimento)
 
 
-def _comprimentos_historico(estoque: list[P.LinhaEstoque2026], historico: list[dict]
-                            ) -> dict[int, tuple[str, list[dict[str, Any]]]]:
-    """P29 (Eduardo, 2026-11-11): a ESTOQUE 2026 não traz comprimento e o HISTORICO (packing list) do mesmo contêiner
-    traz → vale o do HISTORICO (ex.: CH39SH D2 Ø90 → Ø90X2425). Mesma liga e seção. Vários comprimentos diferentes
-    no HISTORICO viram uma chave com todos ('2810-4035/3070-4330'): leitura literal, a confirmar (R051)."""
+def _comprimentos_historico(estoque: list[P.LinhaEstoque2026], historico: list[dict],
+                            geral: list[P.LinhaGeral] | None = None) -> dict[int, dict[str, Any]]:
+    """P29 + P31 (Eduardo, 2026-11-11/12): a ESTOQUE 2026 não traz comprimento e o HISTORICO (packing list) do mesmo
+    contêiner traz (mesma liga e seção). Esse comprimento só entra na chave da paridade quando a linha de Itu da mesma
+    liga e seção TAMBÉM informa comprimento na descrição (ex.: CH39SH D2 Ø90 → Ø90X2425 = 95199); senão, e quando o
+    HISTORICO tem vários comprimentos diferentes, é ignorado na paridade e fica só como informação do lote."""
     por_ct: dict[str, list[dict]] = defaultdict(list)
     for h in historico or []:
         por_ct[h["conteiner"]].append(h)
+    itu_com_compr: set[tuple] = set()
+    for g in geral or []:
+        if g.codigo:
+            k = chave_mat(g.descricao, g.comprimento_fixado)
+            if k.comprimento:
+                itu_com_compr.add((k.liga, k.secao))
     out = {}
     for e in estoque:
         m = medida(e.material)
@@ -232,9 +240,23 @@ def _comprimentos_historico(estoque: list[P.LinhaEstoque2026], historico: list[d
                 c = comprimento_texto(h["descricao"], mh.formato)
                 if c:
                     hs.append({**h, "comprimento": c})
-        if hs:
-            out[e.linha] = ("/".join(sorted({h["comprimento"] for h in hs})), hs)
+        if not hs:
+            continue
+        textos = sorted({h["comprimento"] for h in hs})
+        k = chave_mat(e.material)
+        if len(textos) > 1:
+            usado, motivo = False, "vários comprimentos no HISTORICO: ignorado na paridade"
+        elif (k.liga, k.secao) not in itu_com_compr:
+            usado, motivo = False, "Itu sem comprimento na descrição: ignorado na paridade"
+        else:
+            usado, motivo = True, "usado na paridade (Itu também tem comprimento)"
+        out[e.linha] = {"texto": "/".join(textos), "hist": hs, "usado": usado, "motivo": motivo}
     return out
+
+
+def _compr_usado(pl: Plano, linha: int) -> str | None:
+    c = pl.compr_hist.get(linha)
+    return c["texto"] if c and c["usado"] else None
 
 
 def _formato_valido(m) -> str:
@@ -276,7 +298,7 @@ def _liga(plano: Plano, ctx: Contexto, codigo: str | None, origem, densidade: fl
 def montar(ctx: Contexto, estoque: list[P.LinhaEstoque2026], historico: list[dict], geral: list[P.LinhaGeral],
            corte: list[P.LinhaCorte], sas: list[P.LinhaSa]) -> Plano:
     pl = Plano(data_mega=ctx.data_mega)
-    pl.compr_hist = _comprimentos_historico(estoque, historico)
+    pl.compr_hist = _comprimentos_historico(estoque, historico, geral)
     _catalogo_geral(pl, ctx, geral)
     lotes_rj = _lotes_rj_no_rio(pl, ctx, estoque, historico)
     _paridade(pl, estoque, geral)
@@ -284,6 +306,7 @@ def montar(ctx: Contexto, estoque: list[P.LinhaEstoque2026], historico: list[dic
     _rj_em_itu(pl, ctx, geral)
     _estoque_mega(pl, ctx, geral)
     _ligar_reto_origem(pl)
+    _correcoes_nao_aplicadas(pl, ctx)
     _restricoes_e_avisos(pl, geral)
     _solicitacoes(pl, ctx, corte, lotes_rj, estoque)
     _sas(pl, sas, lotes_rj)
@@ -354,10 +377,13 @@ def _lotes_rj_no_rio(pl: Plano, ctx: Contexto, estoque: list[P.LinhaEstoque2026]
             k = (h["conteiner"], chave_familia(h["descricao"]))
             entrada[k] = min(entrada.get(k, h["data"]), h["data"])
     for e in estoque:
-        item = _item_rj(pl, ctx, e.material, e.origem, comprimento=(pl.compr_hist.get(e.linha) or (None,))[0])
+        item = _item_rj(pl, ctx, e.material, e.origem, comprimento=_compr_usado(pl, e.linha))
         lote = LoteP(item, "RJ", "RJ", e.conteiner, e.peso_inicial, pecas=e.pecas, custo_kg=e.valor_unitario,
                      conferencia_kg=e.total_estoque, origem=e.origem, estoque="RJ_NO_RIO")
         lote.notas.append(f"Material na planilha: {e.material}")
+        if e.linha in pl.compr_hist:
+            ch_ = pl.compr_hist[e.linha]
+            lote.notas.append(f"Comprimento no HISTORICO: {ch_['texto']} mm ({ch_['motivo']}).")
         if e.comentario_pecas:
             lote.notas.append(f"Peças (comentário da planilha): {e.comentario_pecas}")
         if e.peso_inicial > 0:
@@ -456,12 +482,12 @@ def _paridade(pl: Plano, estoque: list[P.LinhaEstoque2026], geral: list[P.LinhaG
             geral_rio[chave_mat(g.descricao, g.comprimento_fixado)] += g.rj_no_rio
     rj: dict[ChaveMaterial, dict[str, Any]] = {}
     for e in estoque:
-        ch_hist = pl.compr_hist.get(e.linha)
-        k = chave_mat(e.material, comprimento=ch_hist[0] if ch_hist else None)
+        usado = _compr_usado(pl, e.linha)
+        k = chave_mat(e.material, comprimento=usado)
         a = rj.setdefault(k, {"descricoes": Counter(), "kg": 0.0, "origem": e.origem, "hist": False})
         a["descricoes"][e.material] += 1
         a["kg"] += e.total_estoque
-        a["hist"] = a["hist"] or bool(ch_hist)
+        a["hist"] = a["hist"] or bool(usado)
     itens_rj = {it.chave: it for it in pl.itens.values() if it.chave[0] == "RJ"}
     for k, a in rj.items():
         desc_rj = a["descricoes"].most_common(1)[0][0]
@@ -608,7 +634,7 @@ def _corrigir_parcelas(pl: Plano, ctx: Contexto, g: P.LinhaGeral, parcelas: list
     out = []
     for kg, d in parcelas:
         novo = d
-        for c in regras:
+        for n, c in enumerate(regras):
             if (_sem_espaco(c.get("linha_descricao")) == _sem_espaco(g.descricao)
                     and _sem_espaco(c.get("origem_planilha")) == _sem_espaco(d)
                     and (c.get("kg") is None or abs(float(c["kg"]) - kg) < 0.0005)):
@@ -617,10 +643,21 @@ def _corrigir_parcelas(pl: Plano, ctx: Contexto, g: P.LinhaGeral, parcelas: list
                 pl.pend("CORRECAO_APLICADA", "INFO", f"{g.descricao}: parcela de {kg:g} kg com origem \"{d}\" na "
                         f"planilha corrigida para \"{novo}\" ({fonte}).", g.origem)
                 pl.correcoes_aplicadas.append({"linha": g.descricao, "kg": kg, "antes": d, "depois": novo,
-                                               "fonte": fonte})
+                                               "fonte": fonte, "regra": n})
                 break
         out.append((kg, novo))
     return out
+
+
+def _correcoes_nao_aplicadas(pl: Plano, ctx: Contexto) -> None:
+    """R053(4): correção do arquivo --correcoes que não casou com nenhuma parcela → BLOQUEIA: a gravação da carga
+    é recusada (`gravar.gravar`) até o arquivo de correções ou a planilha serem acertados."""
+    aplicadas = {a.get("regra") for a in pl.correcoes_aplicadas}
+    for n, c in enumerate(ctx.correcoes.get("origem_reto") or []):
+        if n not in aplicadas:
+            pl.pend("CORRECAO_NAO_APLICADA", "BLOQUEIA", f"Correção não aplicada: {c.get('linha_descricao')} / "
+                    f"\"{c.get('origem_planilha')}\" → \"{c.get('origem_correta')}\" (nenhuma parcela igual).",
+                    None, "Conferir o arquivo de correções e o comentário da célula")
 
 
 def _ligar_reto_origem(pl: Plano) -> None:

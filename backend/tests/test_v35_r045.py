@@ -46,6 +46,12 @@ def test_chave_material_p28():
     assert k("A8 21X204X1110MM MULT.") != k("A8 21X204X1110MM")           # múltiplo diferencia
 
 
+def test_r055_item_sem_bitola_nao_quebra_a_chave():
+    from app.domain.medidas import ChaveMaterial
+    assert ChaveMaterial("4140", "RETANGULAR", None, None, None, None, False).texto == "4140 SEM BITOLA"
+    assert ChaveMaterial("CR8", "REDONDO", None, None, None, None, False).texto == "CR8 SEM BITOLA"
+
+
 def test_bitola_de_origem_normalizada():
     assert bitola_de_origem("IMP-D2 25X610MM", "D2") == bitola_de_origem("d2 25 x 610", "D2") == "25X610"
     assert bitola_de_origem("IMP-D2 30,5x610MM", "D2") == "30,5X610"
@@ -133,7 +139,8 @@ def test_sugestao_agrupada_por_liga_e_bitola(amb):
     assert g["total_disponivel_kg"] == 1900 and g["falta_kg"] == 100 and "falta 100,0 kg" in g["frase"]
     assert {x["conteiner"] for x in g["estoques"]["RJ_NO_RIO"]["lotes"]} == {"CH33K", "CH40SH"}
     assert g["liga_equivalente"] is False
-    assert [x["liga"] for x in g["estoques"]["RJ_NO_RIO"]["lotes"] if x["liga_equivalente"]] == ["1.2344"]
+    assert "1.2344" in {x["liga"] for x in g["estoques"]["RJ_NO_RIO"]["lotes"]}            # mesma liga (P28(1))
+    assert not any(x["liga_equivalente"] for x in g["estoques"]["RJ_NO_RIO"]["lotes"])
     assert {x["chave"] for x in r["grupos"]} >= {"H13 33X105", "H13 70X610"}       # bitolas nunca se juntam
 
 
@@ -201,9 +208,15 @@ def test_p29_comprimento_do_historico_e_faixa():
     e = P.LinhaEstoque2026(7, "CT01X", "D2 Ø90", None, 2, 300.0, 250.0, [], None, {"linha": 7})
     h = [{"linha": 3, "conteiner": "CT01X", "descricao": "D2 Ø90×2425mm", "entrada": 300.0},
          {"linha": 4, "conteiner": "CT02X", "descricao": "D2 Ø90×3000mm", "entrada": 10.0}]
-    m = _comprimentos_historico([e], h)
-    assert m[7][0] == "2425" and [x["linha"] for x in m[7][1]] == [3]             # só o mesmo contêiner
-    assert chave_mat("D2 Ø90", comprimento=m[7][0]) == chave_mat("IMP-D2 RED 90X2425MM")
+    itu = [P.LinhaGeral(5, 90001, "IMP-D2 RED 90X2425MM", None, 0.0, 0.0, 0.0, None, None, None, None, [], {})]
+    m = _comprimentos_historico([e], h, itu)
+    assert m[7]["texto"] == "2425" and m[7]["usado"] and [x["linha"] for x in m[7]["hist"]] == [3]   # mesmo CT
+    assert chave_mat("D2 Ø90", comprimento=m[7]["texto"]) == chave_mat("IMP-D2 RED 90X2425MM")
+    # P31: Itu sem comprimento na descrição → ignorado na paridade; vários comprimentos → ignorado
+    sem = [P.LinhaGeral(5, 90001, "IMP-D2 RED 90MM", None, 0.0, 0.0, 0.0, None, None, None, None, [], {})]
+    assert _comprimentos_historico([e], h, sem)[7]["usado"] is False
+    h2 = h + [{"linha": 5, "conteiner": "CT01X", "descricao": "D2 Ø90×3000mm", "entrada": 5.0}]
+    assert _comprimentos_historico([e], h2, itu)[7]["usado"] is False
     assert chave_mat("H13 55x610x2800-6000") != chave_mat("H13 55x610x2800-5000")  # faixa diferente
 
 
@@ -226,3 +239,45 @@ def test_correcoes_da_carga_por_arquivo(tmp_path):
     assert lote.saldo == 400 and any("na planilha: IMP-DC53 30X500MM" in n for n in lote.notas)
     assert pl.correcoes_aplicadas[0]["antes"] == "IMP-DC53 30X500MM"
     assert any(p.tipo == "CORRECAO_APLICADA" for p in pl.pendencias)
+
+
+def test_r053_correcao_que_nao_casa_bloqueia_a_carga(tmp_path):
+    """R053(4): correção do --correcoes sem parcela igual vira BLOQUEIA e a gravação é recusada."""
+    from datetime import date
+
+    from app.carga import gravar as G
+    from app.carga import planilhas as P
+    from app.carga import plano
+    from tests.test_auditoria_0611_banco import _com_reto_d2_dc53
+    from tests.test_carga import _planilhas
+    _planilhas(tmp_path)
+    _com_reto_d2_dc53(tmp_path)
+    corr = {"origem_reto": [{"linha_descricao": "IMP-DC53 RETO", "origem_planilha": "IMP-DC53 99X999MM",
+                             "origem_correta": "IMP-DC53 31X500MM", "kg": 400, "fonte": "teste"}]}
+    ctx = plano.Contexto({}, {}, None, lambda _o: None, date(2026, 11, 11), correcoes=corr)
+    e, h = P.ler_estoque_2026(tmp_path)
+    pl = plano.montar(ctx, e, h, P.ler_geral(tmp_path), P.ler_corte(tmp_path), P.ler_sa(tmp_path))
+    assert [p.gravidade for p in pl.pendencias if p.tipo == "CORRECAO_NAO_APLICADA"] == ["BLOQUEIA"]
+    with pytest.raises(G.CargaRecusada, match="Correção não aplicada"):
+        G.gravar(None, pl, usuario_id=None, arquivos={})
+
+
+def test_r055_t04_com_item_mega_sem_bitola(amb):
+    client, u, ids, _ = amb
+    from app.core.db import SessionLocal
+    from app.models import ItemMP, Liga
+    from app.services import movimentos as mov
+    with SessionLocal() as db:
+        lg = Liga(codigo="4140", nome="4140", densidade=7.85, apelidos=[])
+        db.add(lg)
+        db.flush()
+        it = ItemMP(descricao="4140 BARRA", liga_id=lg.id, formato="RETANGULAR", codigo_mega=99001)
+        db.add(it)
+        db.flush()
+        lote = mov.criar_lote(db, item=it, planta_fiscal="ITU", local_fisico="ITU", peso_inicial_kg=10)
+        mov.lancar(db, lote, "SALDO_INICIAL", 10, usuario_id=None)
+        db.commit()
+    h = entrar(client, u["itu"])
+    assert client.get("/api/lotes", headers=h).status_code == 200
+    g = client.get("/api/lotes/agrupado", headers=h, params={"liga": "4140"}).json()["itens"]
+    assert g[0]["chave"] == "4140 SEM BITOLA" and g[0]["codigos_itu"] == [99001]

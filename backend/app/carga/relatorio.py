@@ -64,12 +64,13 @@ def gerar(pl: Plano, destino: Path, *, titulo: str, conferencia_banco: list[dict
     from .plano import chave_mat
     itu = {p["chave"]: p for p in pl.paridades if p["estoque"] == "RJ_NO_RIO"}
     lin = []
-    for linha, (compr, hs) in sorted(pl.compr_hist.items()):
+    for linha, ch_ in sorted(pl.compr_hist.items()):
+        compr, hs = ch_["texto"], ch_["hist"]
         lp = next((x for x in pl.lotes if (x.origem or {}).get("linha") == linha
                    and (x.origem or {}).get("aba") == "ESTOQUE 2026"), None)
         it = pl.itens[lp.item] if lp else None
         par = itu.get(chave_mat(it.descricao).texto) if it else None
-        base = [lp.conteiner if lp else None, it.descricao if it else None, compr,
+        base = [lp.conteiner if lp else None, it.descricao if it else None, compr, ch_["motivo"],
                 lp.peso_inicial if lp else None, lp.conferencia_kg if lp else None]
         tot = round(sum(h["entrada"] or 0 for h in hs), 3)
         for n, h in enumerate(hs):
@@ -77,11 +78,12 @@ def gerar(pl: Plano, destino: Path, *, titulo: str, conferencia_banco: list[dict
                                (par or {}).get("situacao") if n == 0 else None,
                                "; ".join(f"{x['codigo']} {x['descricao']} ({x['kg'] or 0:g} kg Mega na planilha)"
                                          for x in (par or {}).get("itu", [])) if n == 0 else None, linha])
-    _aba(wb, "Comprimento do HISTORICO", ["Contêiner", "Material RJ (com o comprimento usado)", "Comprimento usado",
+    _aba(wb, "Comprimento do HISTORICO", ["Contêiner", "Material RJ (item)", "Comprimento no HISTORICO",
+                                          "Uso na paridade (P31)",
                                           "Peso inicial (ESTOQUE 2026)", "Total em estoque (ESTOQUE 2026)",
                                           "Entrada no HISTORICO", "kg da entrada", "Linha HISTORICO",
                                           "Soma do HISTORICO", "Situação", "Linha de Itu", "Linha ESTOQUE 2026"],
-         lin, [10, 40, 18, 14, 14, 40, 12, 10, 12, 14, 60, 10])
+         lin, [10, 40, 18, 40, 14, 14, 40, 12, 10, 12, 14, 60, 10])
     _aba(wb, "Correções aplicadas", ["Linha do Estoque Geral", "kg", "Na planilha", "Corrigido para", "Fonte"],
          [[c["linha"], c["kg"], c["antes"], c["depois"], c["fonte"]] for c in pl.correcoes_aplicadas],
          [30, 10, 30, 30, 50])

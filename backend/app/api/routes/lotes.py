@@ -14,7 +14,7 @@ from app.core.db import get_db
 from app.models import Destinacao, Lote, Nota, Usuario
 from app.services import auditoria, estoque
 from app.services import movimentos as mov
-from app.domain.medidas import chave_multiplo
+from app.domain.medidas import LIGA_MESMA_LINHA, chave_multiplo
 from app.services.base import lote_visivel, so_rj_no_rio
 from app.services.solicitacoes import ligas_equivalentes
 
@@ -134,7 +134,9 @@ def compativeis(liga: str, formato: Literal["RETANGULAR", "REDONDO"] = "RETANGUL
         bitola = None if it.formato == "RETO" else calc.Dimensoes(it.formato, it.espessura, it.largura, it.diametro)
         c = calc.calcular(bitola=bitola, acabada=acabada, quantidade=quantidade, densidade=float(it.liga.densidade),
                           sobremetal_comprimento_mm=5, sobremetal_largura_mm=None)
-        saida.append({**base, "disponivel_kg": disponivel, "liga_equivalente": it.liga_id != alvo.id,
+        # P28(1): 1.2344 = H13 e 1.2379 = D2 são a mesma liga (sem selo); outra equivalência da T22 leva selo
+        mesma = LIGA_MESMA_LINHA.get(it.liga.codigo, it.liga.codigo) == LIGA_MESMA_LINHA.get(alvo.codigo, alvo.codigo)
+        saida.append({**base, "disponivel_kg": disponivel, "liga_equivalente": not mesma,
                       "multiplo": chave_multiplo(it.descricao, it.comprimento_fixado),
                       "peso_previsto_kg": c.peso_previsto_kg, "peso_peca_kg": c.peso_peca_kg,
                       "sobremetal_pct": c.sobremetal_pct, "substituido_por_id": it.substituido_por_id,

@@ -154,7 +154,7 @@ def test_material_insuficiente_trocar_lote_e_cancelar(amb):
     h = entrar(client, u["itu"])
     v = client.post(f"/api/solicitacoes/{s['id']}/trocar-lote/validar", json={"lote_id": ids["l2344"]},
                     headers=h).json()
-    assert "LIGA_EQUIVALENTE" in [o["codigo"] for o in v["ocorrencias"]]
+    assert "LIGA_EQUIVALENTE" not in [o["codigo"] for o in v["ocorrencias"]]     # P28(1): 1.2344 = H13
     r = client.post(f"/api/solicitacoes/{s['id']}/trocar-lote", headers=h,
                     json={"lote_id": ids["l2344"], "confirmacoes": {"LIGA_EQUIVALENTE": "1.2344 equivale ao H13"}})
     assert r.status_code == 200, r.text
@@ -222,6 +222,6 @@ def test_lotes_compativeis_com_liga_equivalente(amb):
     r = client.get("/api/lotes/compativeis", params={"liga": "H13", "espessura": 30, "largura": 100,
                                                       "comprimento": 250, "quantidade": 12}).json()
     codigos = [(x["id"], x["liga_equivalente"]) for x in r["itens"]]
-    assert (ids["l2344"], True) in codigos and (ids["l33"], False) in codigos
+    assert (ids["l2344"], False) in codigos and (ids["l33"], False) in codigos   # P28(1): mesma liga, sem selo
     assert ids["l70"] in [x["id"] for x in r["itens"]]          # comporta, mas com sobremetal maior
     assert r["itens"][-1]["id"] == ids["l70"]

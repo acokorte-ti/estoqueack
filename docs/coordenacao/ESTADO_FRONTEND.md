@@ -1,6 +1,15 @@
 ﻿# Estado — FRONTEND / UX
 
-Atualizado: 2026-11-04 (chat FRONTEND, rodada 2 da COORDENAÇÃO)
+Atualizado: 2026-11-12 (rodada de 12/11)
+
+## Rodada 2026-11-12 (commit 2f7bb9e)
+
+- **T04** "Agrupado por liga × bitola" (chave, códigos de Itu, Estoque Mega / RJ em Itu / RJ no Rio, total, reservado, disponível, "só no RJ"/"só em Itu"; clicar abre os lotes da linha). Código Mega só em lote Estoque Mega.
+- **T07 passo 2**: grupos de `/lotes/compativeis` com Itu e RJ lado a lado, frase necessário × disponível, kg a usar por lote e "faltam X kg". Sem `grupos`, a lista antiga.
+- **Consumo misto opção A**: lotes do RJ = solicitação com `consumo_misto`; parte de Itu (um lote) abre "Registrar corte em Itu agora" com OP, lote, peças e previsto proporcional; marca na T08 (lista e detalhe).
+- **T13**: tolerância usada (8 % RJ em Itu / 5 % Estoque Mega) e limite na mensagem de EXCESSO_TOLERANCIA; perda em kg e %. **T10**: aviso BARRA_MAIS_LEVE_QUE_PECA (da API, com reserva local). **T23**: unidade ao lado do valor.
+- **Fora (P30/P31)**: SA complementar, "Transferir para o Estoque Mega", comprimento do HISTORICO.
+- Próximo: P30/P31 quando respondidas; conferir T07 com OP real no ensaio ponta a ponta.
 
 ## No ar (https://estoque.acokorte.com.br)
 

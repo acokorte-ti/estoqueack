@@ -184,7 +184,8 @@ function LinhaAgrupada({ g, soRj, filtroEstoque, comSaldo }: { g: Agrupado; soRj
   const pe = g.por_estoque ?? {};
   const rjTotal = (pe.RJ_NO_RIO ?? 0) + (pe.RJ_EM_ITU ?? 0);
   const megaKg = pe.ESTOQUE_MEGA ?? 0;
-  const marca = soRj ? null : megaKg > 0 && rjTotal <= 0 ? "só em Itu" : megaKg <= 0 && rjTotal > 0 ? "só no RJ" : null;
+  // "só no RJ"/"só em Itu" só faz sentido vendo todos os estoques
+  const marca = soRj || filtroEstoque ? null : megaKg > 0 && rjTotal <= 0 ? "só em Itu" : megaKg <= 0 && rjTotal > 0 ? "só no RJ" : null;
   const codigos = g.codigos_itu ?? (g.codigo_mega ? [g.codigo_mega] : []);
   const chave = chaveAgrupado(g);
   const colunas = soRj ? 5 : 8;

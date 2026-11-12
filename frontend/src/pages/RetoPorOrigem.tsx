@@ -49,7 +49,7 @@ export default function RetoPorOrigem({ soRj, estoqueInicial, aoVoltar }: { soRj
         <span className="contagem">{r ? `${r.totais.lotes ?? 0} lote(s)` : ""}</span>
         <div className="chips" role="group" aria-label="Visão">
           <button type="button" className="chip" aria-pressed={false} onClick={() => aoVoltar("lote")}>Por lote</button>
-          <button type="button" className="chip" aria-pressed={false} onClick={() => aoVoltar("item")}>Agrupado por item</button>
+          <button type="button" className="chip" aria-pressed={false} onClick={() => aoVoltar("item")}>Agrupado por liga × bitola</button>
           <button type="button" className="chip" aria-pressed={true}>RETO por origem</button>
         </div>
         <a className="secundario" href={`/api/exportar/reto-por-origem.xlsx${qs(q)}`} download>Exportar para Excel</a>

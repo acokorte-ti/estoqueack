@@ -94,3 +94,26 @@ class TestRedondoComComprimento(unittest.TestCase):
         self.assertEqual(r[("D2", "25X610", "CH26SH")], 381)
         self.assertEqual(r[("D2", "IMP-D2 45x510~610MM", "sem lote de origem")], 54)
         self.assertEqual(r[("D2", "RETO", "")], 73)
+
+
+class TestLeituraConferencia1211(unittest.TestCase):
+    """Conferência da leitura de 2026-11-12: escritas comuns que o leitor não entendia (exemplos fictícios)."""
+
+    def test_faixa_com_mm_dentro_do_parenteses(self):
+        for texto in ("D2 5X(700-800MM)", "CR12MOV 3X(700-800 MM)", "CR12MOV SHEET 5X(700-800)"):
+            m = interpretar(texto)
+            self.assertEqual((m.formato, m.largura), ("RETANGULAR", 800.0), texto)
+
+    def test_round_bars_sem_ro_nem_red(self):
+        m = interpretar("CR12MOV STEEL ROUND BARS 254")
+        self.assertEqual((m.liga, m.formato, m.bitola, m.comprimento), ("CR12MOV", "REDONDO", "Ø254", None))
+        self.assertEqual(interpretar("H13 Round Bar Ø235").bitola, "Ø235")
+        self.assertEqual(interpretar("D2 STEEL ROUND BARS 91X2430").comprimento, 2430.0)
+
+    def test_duas_ops_separadas_por_barra(self):
+        from app.carga.planilhas import _ops_do_comentario
+        ops, _, _, dm = _ops_do_comentario("OP 81234/81299 14/05")
+        self.assertEqual((ops, dm), ([81234, 81299], (14, 5)))
+        ops, _, _, dm = _ops_do_comentario("OP 81234 14/05/2026")
+        self.assertEqual((ops, dm), ([81234], (14, 5)))
+        self.assertEqual(_ops_do_comentario("OP 81234 e OP 81235 16/07")[0], [81234, 81235])

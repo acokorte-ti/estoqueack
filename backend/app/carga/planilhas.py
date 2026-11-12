@@ -152,8 +152,10 @@ def _autor_fora(texto: str) -> str:
 def _ops_do_comentario(t: str) -> tuple[list[int], list[str], bool, tuple[int, int] | None]:
     up = t.upper()
     sem_op = "SEM OP" in up
-    # números de 4 a 9 dígitos antes da data (a data é dd/mm, curta)
-    textos = re.findall(r"(?<![\d/])(\d{4,9})(?![\d/])", t)
+    # números de 4 a 9 dígitos antes da data (a data é dd/mm, curta). 'OP 97683/95377' = duas OPs separadas por /
+    # (só número longo dos dois lados da barra: '14/05/2026' continua sendo data)
+    textos = [x for g in re.findall(r"(?<![\d/])(\d{4,9}(?:\s*/\s*\d{4,9})*)(?![\d/])", t)
+              for x in re.split(r"\s*/\s*", g)]
     ops = [int(x) for x in textos]
     dm = None
     m = re.search(r"(?<!\d)(\d{1,2})/(\d{1,2})(?:/\d{2,4})?(?!\d)", t)

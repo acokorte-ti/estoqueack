@@ -78,7 +78,8 @@ def normalizar_liga(texto: str | None) -> str | None:
     return None
 
 
-_RE_RED = re.compile(r"(?:RED\.?\s*Ø?|Ø\s*)(\d+(?:[.,]\d+)?)")
+# 'STEEL ROUND BARS 254' (sem Ø nem RED) = redondo Ø254, como 'ROUND BARS 91X2430' já é redondo com comprimento
+_RE_RED = re.compile(r"(?:RED\.?\s*Ø?|Ø\s*|(?<![A-Z])ROUND(?:\s+BARS?)?\s*Ø?\s*)(\d+(?:[.,]\d+)?)")
 _RE_RET = re.compile(r"(\d+(?:[.,]\d+)?)\s*X\s*(\d+(?:[.,]\d+)?)(?:\s*X\s*(\d+(?:[.,]\d+)?))?")
 
 
@@ -90,8 +91,8 @@ def interpretar(descricao: str) -> Medida:
     """Extrai liga e bitola de uma descrição livre."""
     liga = normalizar_liga(descricao)
     t = (descricao or "").upper().replace("×", "X")     # P28(3): x, X e × são o mesmo separador (HISTORICO usa ×)
-    # Faixa de largura 'X(400-600)' → usa o maior valor (capacidade máxima da bitola)
-    t = re.sub(r"\((\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)\)", lambda m: m.group(2), t)
+    # Faixa de largura 'X(400-600)' ou 'X(700-800MM)' → usa o maior valor (capacidade máxima da bitola)
+    t = re.sub(r"\((\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)\s*(?:MM)?\s*\)", lambda m: m.group(2), t)
     if re.search(r"\bRETO\b", t):
         return Medida(liga, "RETO")
     # Remove a liga do texto para não confundir números (ex.: 1.2746 76x183)

@@ -9,7 +9,9 @@ Atualizado: 2026-11-12 (rodada de 12/11)
 - **Consumo misto opção A**: lotes do RJ = solicitação com `consumo_misto`; parte de Itu (um lote) abre "Registrar corte em Itu agora" com OP, lote, peças e previsto proporcional; marca na T08 (lista e detalhe).
 - **T13**: tolerância usada (8 % RJ em Itu / 5 % Estoque Mega) e limite na mensagem de EXCESSO_TOLERANCIA; perda em kg e %. **T10**: aviso BARRA_MAIS_LEVE_QUE_PECA (da API, com reserva local). **T23**: unidade ao lado do valor.
 - **Fora (P30/P31)**: SA complementar, "Transferir para o Estoque Mega", comprimento do HISTORICO.
-- Próximo: P30/P31 quando respondidas; conferir T07 com OP real no ensaio ponta a ponta.
+- **Conferido na homologação (12/11, sem gravar; carga antiga):** T04 agrupado (RJ no Rio, RJ em Itu, abrir lotes), T07 passo 2 com OP real (8 grupos, Itu × RJ, consumo misto até a prévia), T08 marca (fetch simulado), T13 prévia 5 % (Estoque Mega) e 8 % (RJ em Itu), T10 aviso (previsto simulado), T23, T15, RETO por origem. Console sem erros. Ajuste `f2a91a9` (marca só com "Todos"; rótulo da aba RETO).
+- **Aguardando TÉCNICO (R055):** 500 em `/api/lotes` e `/api/lotes/agrupado` com lote do Estoque Mega (T04 "Todos"/"Estoque Mega" quebrado).
+- Próximo: R054 (spec v3.10: pendência "Informar o peso real", "Corrigir no Mega") quando a coordenação mandar.
 
 ## No ar (https://estoque.acokorte.com.br)
 

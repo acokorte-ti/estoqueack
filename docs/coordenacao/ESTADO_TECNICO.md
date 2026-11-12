@@ -1,6 +1,6 @@
 # Estado — BACKEND / TÉCNICO
 
-Atualizado: 2026-11-12 pelo TÉCNICO: R055 (500 da T04) corrigido e conferido na homologação (`d339372`); P31; R053 (1)–(5); R054(3) respondido (Mega não traz peso do SA). Recarga só com o ok do Eduardo e do Fabiano no relatório `paridade_rj_itu_previa_20261112_0904.xlsx`.
+Atualizado: 2026-11-12 pelo TÉCNICO: conferência da leitura das planilhas antes da recarga (`2ca30ea`, leitor corrigido em 3 escritas; R057 ao FUNCIONAL; perguntas ao Fabiano em `carga/perguntas_fabiano_2026-11-12b.txt`). Antes: R055, P31, R053 (1)–(5), R054(3). Recarga só com o ok do Eduardo e do Fabiano (paridade `_0904` + perguntas 12b).
 
 > Para retomar a parte técnica do zero: `estoqueack/docs/tecnico/00_RETOMAR_PROJETO.md` (inventário, onde fica cada segredo, operação, lições e incidentes; §7.2 e §7.3 = Fase 1).
 
@@ -14,6 +14,14 @@ Atualizado: 2026-11-12 pelo TÉCNICO: R055 (500 da T04) corrigido e conferido na
 - **Comigo daqui para frente:** recarregar a T25 quando o Fabiano devolver as correções do R032 (avisar antes no R033); campos da impressão da Fila RJ se o FUNCIONAL pedir; na implantação, a carga final (roteiro do BANCO E TESTES, em `deploy/implantacao/`). PDFs de romaneio e ficha do lote ficaram para a F1.1.
 
 ## 2. Feito
+
+### Conferência da leitura antes da recarga (2026-11-12, `2ca30ea`)
+
+- Prévia local (planilhas 11/11 + `correcoes_carga.json`, nada gravado). Relatórios em `carga/relatorios/`: `conferencia_sem_par_rj_20261112_1309.xlsx`, `conferencia_leitura_planilhas_20261112_1309.xlsx`, `conferencia_leitura_20261112_1309_resumo.txt`.
+- **"Só no RJ" sem nada parecido:** RJ no Rio 81 = (a) 71 / 113.082 kg, (b) 1 / 770 kg (`H13 50x410-460x2210-5505`), (c) 9 / 7.249 kg; RJ em Itu 8 = (a) 7 / 4.006,5 kg, (b) 1 / 322 kg (`Cr8 13x510/560/610`). 16 materiais (51.189,5 kg) têm a mesma bitola escrita "A8 MOD" na ESTOQUE 2026 e "IMP-A8" no Estoque Geral (pergunta 1).
+- **Falhas de leitura:** sem medida 25 / 199,5 kg; liga NAO-INFORMADA 182 / 32.036 kg (quase tudo "1271 STEEL" do SA de 2017 e "45 C" do HISTORICO); medida com dúvida 19 / 16.455 kg; lote RJ no Rio sem data 8 / 13.020 kg; solicitação não importada 15 / 722 kg (10 com contêiner trocado = B05 da P33); comentário sem OP 1 / 377 kg; OP fora da faixa 2 / 1.673 kg; ESTOQUE 2026 × Geral > 5 kg 61 materiais.
+- **Leitor corrigido:** `5X(700-800MM)` (33 linhas do SA), `STEEL ROUND BARS 254` (CH9K, 500 kg), `OP 97683/95377` (1.424 kg). 181 testes + 5 skip local; paridade igual.
+- **Aguardando:** R057 (faixa `~`/`-` sem parênteses; correções de liga/contêiner do HISTORICO pelo `--correcoes`) e as respostas do Fabiano (12b).
 
 ### Paridade RJ × Itu por liga × bitola (R049, P28 do Eduardo, 2026-11-11)
 

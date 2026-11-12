@@ -471,3 +471,11 @@ tr.linha-aviso .validacao { margin: 0 0 var(--esp-2); font-size: var(--t-pequeno
   .lateral-sair strong { display: block; color: var(--branco); font-size: var(--t-base); }
   .lateral-sair .secundario { margin-top: var(--esp-3); width: 100%; }
 }
+
+/* T07 sugestão por liga × bitola: Itu e RJ lado a lado (empilha abaixo de 900 px) */
+.grupo-sugestao { margin-bottom: var(--esp-4); }
+.grupo-sugestao h3 { margin: 0 0 var(--esp-1); font-size: 1rem; }
+.lado-a-lado { display: grid; grid-template-columns: 1fr 1fr; gap: var(--esp-4); }
+.kg-uso { display: flex; align-items: center; gap: var(--esp-2); margin: var(--esp-1) 0 0 var(--esp-5); font-size: var(--t-pequeno); }
+.linha-detalhe td { background: #f7f7f7; }
+@media (max-width: 900px) { .lado-a-lado { grid-template-columns: 1fr; } }

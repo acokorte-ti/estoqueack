@@ -17,7 +17,14 @@ export interface SolicItem {
   situacao: SituacaoSolic; encerrada_saldo_pendente: boolean; motivo: string | null;
   dias_em_aberto: number | null; atraso: "NORMAL" | "ATENCAO" | "ATRASADO" | null;
   cops: { id: number; numero: number }[] | number[]; enviada_em: string | null;
+  /** P26(1) opção A: OP que consome Itu + RJ (contrato F1 §1). Campo novo, opcional. */
+  consumo_misto?: ConsumoMisto | null;
 }
+
+export interface ConsumoMisto { itu_kg: number; rj_kg: number; texto: string }
+
+export const textoMisto = (c: ConsumoMisto) =>
+  c.texto || `OP com consumo misto: Itu ${c.itu_kg.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg + RJ ${c.rj_kg.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`;
 
 export interface Medida { formato: "RETANGULAR" | "REDONDO"; espessura: number | null; largura: number | null; diametro: number | null; comprimento: number | null }
 

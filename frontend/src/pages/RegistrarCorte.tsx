@@ -52,6 +52,12 @@ export default function RegistrarCorte() {
     linhas: linhas.map((l) => ({ lote_id: l.lote_id, pecas: num(l.pecas) ?? 0, peso_real_kg: num(l.peso) ?? 0, comprimento_barra_mm: num(l.barra) ?? null })),
     data_corte: dataCorte, observacao: obs.trim() || null, confirmacoes: c,
   });
+  // P26(2a): aviso BARRA_MAIS_LEVE_QUE_PECA vem da API; enquanto ela não mandar, a tela calcula o mesmo aviso (não bloqueia)
+  const somaPeso = linhas.reduce((t, l) => t + (num(l.peso) ?? 0), 0);
+  const somaPecas = linhas.reduce((t, l) => t + (num(l.pecas) ?? 0), 0);
+  const previstoProp = s?.peso_previsto_kg && s.quantidade ? (s.peso_previsto_kg * somaPecas) / s.quantidade : 0;
+  const barraLeveLocal = !!v && s?.modo === "TRAZER_INTEIRA" && previstoProp > 0 && somaPeso > 0 && somaPeso < previstoProp &&
+    !v.ocorrencias.some((o) => o.codigo.startsWith("BARRA_MAIS_LEVE_QUE_PECA"));
   const completo = linhas.length > 0 && linhas.every((l) => (num(l.pecas) ?? 0) > 0 && (num(l.peso) ?? 0) > 0);
 
   async function conferir() {
@@ -94,8 +100,6 @@ export default function RegistrarCorte() {
     );
   }
 
-  const somaPecas = linhas.reduce((a, l) => a + (num(l.pecas) ?? 0), 0);
-  const somaPeso = linhas.reduce((a, l) => a + (num(l.peso) ?? 0), 0);
   const nomeLote = (lid: number) => { const o = lotesDisponiveis.find((x) => x.id === lid); return o ? `${o.liga} ${o.bitola} · ${o.conteiner ?? "—"} (${o.codigo})` : String(lid); };
 
   return (
@@ -115,7 +119,7 @@ export default function RegistrarCorte() {
           <div><dt>Prazo</dt><dd>{data(s.prazo)}</dd></div>
           {s.instrucao_processo && <div><dt>Processo</dt><dd>{s.instrucao_processo}</dd></div>}
         </dl>
-        {s.modo === "TRAZER_INTEIRA" && <p className="dica" style={{ marginTop: 8 }}>Peça inteira: informe o peso da barra inteira separada. A regra dos 5 % é conferida em Itu.</p>}
+        {s.modo === "TRAZER_INTEIRA" && <p className="dica" style={{ marginTop: 8 }}>Peça inteira: informe o peso da barra inteira separada. A tolerância (8 % para material do RJ) é conferida no corte em Itu. Se a barra pesar menos que a peça prevista, aparece um aviso para conferir a pesagem ou a bitola (não bloqueia).</p>}
       </section>
 
       {linhas.map((l, i) => (
@@ -163,6 +167,11 @@ export default function RegistrarCorte() {
                 <li key={e.lote}>Lote <strong>{e.lote_id ? nomeLote(e.lote_id) : e.lote}</strong>: {kg(e.antes_kg)} kg → <strong>{kg(e.depois_kg)} kg</strong></li>
               ))}
             </ul>
+          )}
+          {barraLeveLocal && (
+            <p className="validacao alerta">
+              A barra ({kg(somaPeso)} kg) pesa menos do que a peça prevista ({kg(previstoProp)} kg); confira a pesagem ou a bitola.
+            </p>
           )}
           <PainelValidacao ocorrencias={v.ocorrencias} confirmacoes={conf} aoMudar={setConf} semOcorrencias="Peso dentro da tolerância." />
         </div>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, data, ESTOQUE_NOME, kg, qs, validacaoDoErro, type Ocorrencia, type Validacao } from "../api/cliente";
 import { useSessao } from "../api/sessao";
-import { MODO_NOME, material, numerosCop, type SolicDetalhe } from "../api/solicitacao";
+import { MODO_NOME, material, numerosCop, textoMisto, type SolicDetalhe } from "../api/solicitacao";
 import { EtiquetaAtraso, EtiquetaSituacao } from "../components/Etiquetas";
 import Janela, { fecharJanela } from "../components/Janela";
 import PainelValidacao, { confirmacoesValidas, JUSTIFICATIVA_MIN, podeGravar, type Confirmacoes } from "../components/PainelValidacao";
@@ -77,6 +77,7 @@ export default function SolicitacaoDetalhe() {
 
       {erro && <p className="erro" role="alert">{erro}</p>}
       {aviso.map((a) => <p key={a} className="validacao alerta">{a}</p>)}
+      {s.consumo_misto && <p className="validacao alerta">{textoMisto(s.consumo_misto)}</p>}
       {s.situacao === "MATERIAL_INSUFICIENTE" && s.motivo && <p className="validacao erro">RJ informou material insuficiente: {s.motivo}</p>}
       {s.situacao === "CANCELADA" && s.motivo && <p className="validacao alerta">Cancelada: {s.motivo}</p>}
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, data, kg, qs } from "../api/cliente";
 import { useSessao } from "../api/sessao";
-import { MODO_NOME, material, numerosCop, type SituacaoSolic, type SolicItem } from "../api/solicitacao";
+import { MODO_NOME, material, numerosCop, textoMisto, type SituacaoSolic, type SolicItem } from "../api/solicitacao";
 import { EtiquetaAtraso, EtiquetaSituacao } from "../components/Etiquetas";
 
 const GRUPOS: { chave: string; nome: string; situacao: SituacaoSolic[] }[] = [
@@ -108,7 +108,7 @@ export default function Solicitacoes() {
               {itens.map((s) => (
                 <tr key={s.id} className={s.atraso === "ATRASADO" ? "atrasado" : ""} onClick={() => nav(`/solicitacoes/${s.id}`)}>
                   <td><Link to={`/solicitacoes/${s.id}`} onClick={(e) => e.stopPropagation()}>{s.numero}</Link><br /><span className="desc">{data(s.data)}</span></td>
-                  <td><strong>{s.op}</strong>{!s.op_confirmada_mega && <span className="etiqueta atencao" title="Dados da OP não confirmados no Mega"> não confirmada</span>}<br /><span className="desc">{s.cliente ?? "—"}</span></td>
+                  <td><strong>{s.op}</strong>{!s.op_confirmada_mega && <span className="etiqueta atencao" title="Dados da OP não confirmados no Mega"> não confirmada</span>}{s.consumo_misto && <> <span className="etiqueta info" title={textoMisto(s.consumo_misto)}>consumo misto</span></>}<br /><span className="desc">{s.cliente ?? "—"}</span></td>
                   <td>{material(s.lote)}<br /><span className="desc">{s.lote.conteiner ?? "—"} · {s.lote.codigo}</span></td>
                   <td>{MODO_NOME[s.modo]}</td>
                   <td className="num">{s.pecas_cortadas ? `${s.pecas_cortadas} / ${s.quantidade}` : s.quantidade}</td>

@@ -24,6 +24,19 @@ interface LoteCompativel {
   liga_equivalente?: boolean; substituido_por_id?: number | null;
   indicadores?: { destinacao?: boolean; nota?: boolean; origem_nao_identificada?: boolean };
 }
+/** Sugestão por liga × bitola (contrato F1 §1, spec v3.5–v3.9 T07, §1.4). Tudo opcional: a API antiga não manda `grupos`. */
+interface LoteGrupo {
+  id: number; codigo: string; estoque: string; conteiner: string | null; codigo_mega?: number | null; tipo: string;
+  saldo_kg: number; reservado_kg: number; disponivel_kg: number; liga?: string; liga_equivalente?: boolean; descricao?: string | null;
+  indicadores?: LoteCompativel["indicadores"];
+}
+interface EstoqueGrupo { disponivel_kg: number; lotes: LoteGrupo[] }
+interface Grupo {
+  chave?: string; liga: string; formato: string; bitola: string; multiplo?: string | null; liga_equivalente?: boolean;
+  peso_previsto_kg?: number | null; sobremetal_pct?: number | null; peso_necessario_kg?: number | null;
+  total_disponivel_kg: number; falta_kg?: number; sobra_kg?: number; so_um_estoque?: boolean; frase?: string;
+  estoques: { ITU?: EstoqueGrupo; RJ_NO_RIO?: EstoqueGrupo };
+}
 type Modo = "CORTAR_RJ" | "TRAZER_INTEIRA";
 interface Efeito { lote: string; lote_id: number; material: string; conteiner: string | null; modo: Modo; quantidade: number;
   bruto: { espessura: number | null; largura: number | null; diametro: number | null; comprimento: number | null };
@@ -42,11 +55,14 @@ interface ItemCorte {
   comprimento_barra: string;
   instrucao: string;
   instrucao_processo: string;
+  /** kg que a pessoa decidiu usar deste lote (passo 2, só para a conta "necessário × escolhido") */
+  kg_uso: string;
 }
 
 const PASSOS = ["OP", "Lote", "Corte", "Revisão"];
 const PROCESSOS = ["Retificar espessura", "Retificar largura", "Peça bipartida", "Usar sobras"];
 const emItu = (l: LoteCompativel) => l.estoque !== "RJ_NO_RIO";
+const kg1 = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const n2s = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v).replace(".", ","));
 const pct = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} %`);
 const SITUACAO_BLOQUEIA = ["EN", "CA"]; // Encerrada / Cancelada (R026)
@@ -70,6 +86,7 @@ export default function NovaSolicitacao() {
 
   // passo 2 e 3
   const [lotes, setLotes] = useState<LoteCompativel[] | null>(null);
+  const [grupos, setGrupos] = useState<Grupo[] | null>(null);
   const [itens, setItens] = useState<ItemCorte[]>([]);
   const [prazo, setPrazo] = useState("");
   const [observacao, setObservacao] = useState("");
@@ -84,7 +101,30 @@ export default function NovaSolicitacao() {
   }, []);
 
   const quantidadeOp = op?.quantidade ? String(op.quantidade) : "";
-  const itu = itens.length === 1 && emItu(itens[0].lote);
+  // consumo misto (P26(1) opção A): lotes do RJ viram a solicitação; o lote de Itu vai para a T13
+  const itensRj = itens.filter((i) => !emItu(i.lote));
+  const itemItu = itens.find((i) => emItu(i.lote)) ?? null;
+  const itu = !itensRj.length && !!itemItu;
+  const misto = !!itemItu && itensRj.length > 0;
+  const qtdConsulta = num(quantidadeOp) ?? 1;
+  const kgPorPeca = (l: LoteCompativel) => (l.peso_previsto_kg ? l.peso_previsto_kg / qtdConsulta : null);
+  const grupoDoLote = (id: number) =>
+    grupos?.find((g) => [...(g.estoques.ITU?.lotes ?? []), ...(g.estoques.RJ_NO_RIO?.lotes ?? [])].some((x) => x.id === id)) ?? null;
+  const necessario = (() => {
+    if (!itens.length) return null;
+    const g = grupoDoLote(itens[0].lote.id);
+    return g?.peso_necessario_kg ?? g?.peso_previsto_kg ?? itens[0].lote.peso_previsto_kg ?? null;
+  })();
+  const kgEscolhido = itens.reduce((t, i) => t + (num(i.kg_uso) ?? 0), 0);
+  const kgItu = itens.filter((i) => emItu(i.lote)).reduce((t, i) => t + (num(i.kg_uso) ?? 0), 0);
+  const previstoItu = (() => {
+    if (!itemItu) return null;
+    const k = kgPorPeca(itemItu.lote);
+    const q = num(itemItu.quantidade);
+    return k && q ? Math.round(k * q * 10) / 10 : num(itemItu.kg_uso) ?? itemItu.lote.peso_previsto_kg;
+  })();
+  const linkItu = itemItu ? `/corte-itu${qs({ op: op?.numero, lote_id: itemItu.lote.id, previsto: previstoItu ?? undefined,
+    pecas: num(itemItu.quantidade) ?? undefined, consumo_misto: misto ? 1 : undefined })}` : "";
 
   /* ---------- passo 1: OP ---------- */
   async function buscarOp(e: FormEvent) {
@@ -131,7 +171,7 @@ export default function NovaSolicitacao() {
     setErro("");
     setOcupado(true);
     try {
-      const r = await api.get<LoteCompativel[] | { itens: LoteCompativel[] }>(
+      const r = await api.get<LoteCompativel[] | { itens: LoteCompativel[]; grupos?: Grupo[] }>(
         `/lotes/compativeis${qs({
           liga, formato: medida.formato,
           espessura: num(medida.espessura), largura: num(medida.largura), diametro: num(medida.diametro),
@@ -139,6 +179,7 @@ export default function NovaSolicitacao() {
         })}`,
       );
       setLotes(Array.isArray(r) ? r : r.itens);
+      setGrupos(!Array.isArray(r) && r.grupos?.length ? r.grupos : null);
       setPasso(2);
     } catch (err) {
       setErro(err instanceof Error ? err.message : "Não foi possível buscar os lotes.");
@@ -149,15 +190,40 @@ export default function NovaSolicitacao() {
 
   function novoItem(l: LoteCompativel): ItemCorte {
     return { lote: l, modo: "CORTAR_RJ", quantidade: quantidadeOp, sobremetal_c: "5", sobremetal_l: "",
-      bruto: { espessura: "", largura: "", diametro: "", comprimento: "" }, comprimento_barra: "", instrucao: "", instrucao_processo: "" };
+      bruto: { espessura: "", largura: "", diametro: "", comprimento: "" }, comprimento_barra: "", instrucao: "", instrucao_processo: "", kg_uso: "" };
+  }
+
+  /** Lote do quadro de sugestão com os dados completos da lista (sobremetal, previsto). */
+  function loteDoGrupo(gl: LoteGrupo, g: Grupo): LoteCompativel {
+    const da = lotes?.find((x) => x.id === gl.id);
+    if (da) return da;
+    return { id: gl.id, codigo: gl.codigo, conteiner: gl.conteiner, liga: gl.liga ?? g.liga, formato: g.formato, bitola: g.bitola,
+      descricao: gl.descricao ?? "", estoque: gl.estoque, tipo: gl.tipo, saldo_kg: gl.saldo_kg, reservado_kg: gl.reservado_kg,
+      disponivel_kg: gl.disponivel_kg, peso_previsto_kg: g.peso_previsto_kg ?? null, peso_peca_kg: null, sobremetal_pct: g.sobremetal_pct ?? null,
+      liga_equivalente: gl.liga_equivalente, indicadores: gl.indicadores };
   }
 
   function alternarLote(l: LoteCompativel) {
     const ja = itens.find((i) => i.lote.id === l.id);
     if (ja) return setItens(itens.filter((i) => i.lote.id !== l.id));
-    // lote em Itu vai sozinho (corte em Itu, sem solicitação); lotes do RJ podem ser vários
-    if (emItu(l)) return setItens([novoItem(l)]);
-    setItens([...itens.filter((i) => !emItu(i.lote)), novoItem(l)]);
+    // sugere usar o que falta para o necessário (a decisão é de quem monta; nada é escolhido sozinho)
+    const g = grupoDoLote(l.id);
+    const nec = necessario ?? g?.peso_necessario_kg ?? g?.peso_previsto_kg ?? l.peso_previsto_kg ?? 0;
+    const falta = Math.max(0, nec - kgEscolhido);
+    const item = { ...novoItem(l), kg_uso: n2s(Math.round(Math.min(l.disponivel_kg, falta || l.disponivel_kg) * 10) / 10) };
+    // lotes do RJ podem ser vários; de Itu, um por vez (cada um é um corte na T13). Itu + RJ = consumo misto
+    if (emItu(l)) return setItens([...itens.filter((i) => !emItu(i.lote)), item]);
+    setItens([...itens, item]);
+  }
+
+  /** Passo 2 → 3: com mais de um lote, sugere as peças de cada parte proporcionais aos kg escolhidos. */
+  function irParaCorte() {
+    const total = itens.reduce((t, i) => t + (num(i.kg_uso) ?? 0), 0);
+    const q = num(quantidadeOp);
+    if (itens.length > 1 && q && total > 0) {
+      setItens(itens.map((i) => ({ ...i, quantidade: String(Math.max(1, Math.round((q * (num(i.kg_uso) ?? 0)) / total))) })));
+    }
+    setPasso(3);
   }
 
   const mudarItem = (id: number, p: Partial<ItemCorte>) => setItens(itens.map((i) => (i.lote.id === id ? { ...i, ...p } : i)));
@@ -168,7 +234,7 @@ export default function NovaSolicitacao() {
       op: op?.numero, liga,
       medida: { formato: medida.formato, espessura: num(medida.espessura) ?? null, largura: num(medida.largura) ?? null,
         diametro: num(medida.diametro) ?? null, comprimento: num(medida.comprimento) ?? null },
-      itens: itens.map((i) => {
+      itens: itensRj.map((i) => {
         const b = i.bruto;
         const temBruto = Object.values(b).some((v) => v.trim() !== "");
         return {
@@ -181,7 +247,7 @@ export default function NovaSolicitacao() {
       }),
       prazo: prazo || null, observacao: observacao.trim() || null,
       op_manual: megaFora ? { item_codigo: num(opManual.item_codigo) ?? null, item_descricao: opManual.item_descricao.trim(), cliente: opManual.cliente.trim() || null } : null,
-      enviar, confirmacoes,
+      consumo_misto: misto, enviar, confirmacoes,
     };
   }
 
@@ -216,7 +282,7 @@ export default function NovaSolicitacao() {
   }
 
   function recomecar() {
-    setPasso(1); setOp(null); setOpNum(""); setMegaFora(false); setLotes(null); setItens([]); setValidacao(null);
+    setPasso(1); setOp(null); setOpNum(""); setMegaFora(false); setLotes(null); setGrupos(null); setItens([]); setValidacao(null);
     setConf({}); setGravado(null); setErro(""); setObservacao(""); setPrazo("");
   }
 
@@ -237,8 +303,18 @@ export default function NovaSolicitacao() {
               <li key={s.id}><Link to={`/solicitacoes/${s.id}`}><strong>{s.numero}</strong></Link>{s.lote ? `, lote ${s.lote.codigo}` : ""}</li>
             ))}
           </ul>
+          {misto && itemItu && (
+            <p className="validacao alerta">
+              OP com consumo misto: falta lançar a parte de Itu ({itemItu.lote.codigo}, {itemItu.quantidade} peça(s){previstoItu ? `, ${kg(previstoItu)} kg previstos` : ""}) no Corte em Itu.
+            </p>
+          )}
           <div className="botoes">
-            <button className="primario" onClick={recomecar}>Nova solicitação</button>
+            {misto && itemItu ? (
+              <>
+                <Link className="primario" to={linkItu}>Registrar corte em Itu agora</Link>
+                <button className="secundario" onClick={recomecar}>Nova solicitação</button>
+              </>
+            ) : <button className="primario" onClick={recomecar}>Nova solicitação</button>}
           </div>
         </div>
       </>
@@ -333,6 +409,28 @@ export default function NovaSolicitacao() {
       {/* ============ PASSO 2 ============ */}
       {passo === 2 && lotes && (
         <div className="bloco-passo">
+          {grupos ? (
+            <>
+              <p className="dica">
+                Material de {liga} que comporta {medida.formato === "RETANGULAR" ? `${medida.espessura} × ${medida.largura}` : `Ø ${medida.diametro}`} × {medida.comprimento} mm,
+                agrupado por liga × bitola exatas, com Itu e RJ lado a lado. Marque um ou mais lotes e diga quantos kg de cada.
+                Lotes do RJ formam a solicitação; o lote de Itu (um por vez) é lançado no Corte em Itu.
+              </p>
+              {grupos.map((g) => (
+                <QuadroGrupo key={g.chave ?? `${g.liga}-${g.formato}-${g.bitola}-${g.multiplo ?? ""}`} g={g}
+                  itens={itens} aoMarcar={(gl) => alternarLote(loteDoGrupo(gl, g))}
+                  aoMudarKg={(id, v) => mudarItem(id, { kg_uso: v })} />
+              ))}
+              {itens.length > 0 && necessario !== null && (
+                <p className={kgEscolhido + 0.05 < necessario ? "validacao alerta" : "frase-resultado"} role="status">
+                  Necessário {kg1(necessario)} kg × escolhido {kg1(kgEscolhido)} kg
+                  {misto && ` (Itu ${kg1(kgItu)} kg + RJ ${kg1(kgEscolhido - kgItu)} kg)`}
+                  {kgEscolhido + 0.05 < necessario ? `: faltam ${kg1(necessario - kgEscolhido)} kg para a OP (vira solicitação parcial).` : "."}
+                </p>
+              )}
+            </>
+          ) : (
+          <>
           <p className="dica">
             Lotes de {liga} (e ligas equivalentes) que comportam {medida.formato === "RETANGULAR" ? `${medida.espessura} × ${medida.largura}` : `Ø ${medida.diametro}`} × {medida.comprimento} mm,
             do menor sobremetal para o maior. Para usar mais de um lote do RJ na mesma OP, marque os dois. Lote em Itu vai sozinho.
@@ -370,8 +468,10 @@ export default function NovaSolicitacao() {
               })}
             </ul>
           )}
+          </>
+          )}
           <div className="botoes">
-            <button className="primario" disabled={!itens.length} onClick={() => setPasso(3)}>Continuar: dados do corte</button>
+            <button className="primario" disabled={!itens.length} onClick={irParaCorte}>Continuar: dados do corte</button>
             <button className="secundario" onClick={() => setPasso(1)}>Voltar</button>
           </div>
         </div>
@@ -388,18 +488,26 @@ export default function NovaSolicitacao() {
                 nem reserva: o corte é lançado direto no "Corte em Itu", com a OP, o lote e o peso previsto preenchidos.
               </p>
               <div className="botoes">
-                <Link
-                  className="primario"
-                  to={`/corte-itu${qs({ op: op?.numero, lote_id: itens[0].lote.id, previsto: itens[0].lote.peso_previsto_kg ?? undefined })}`}
-                >
-                  Registrar corte em Itu agora
-                </Link>
+                <Link className="primario" to={linkItu}>Registrar corte em Itu agora</Link>
                 <button className="secundario" onClick={() => setPasso(2)}>Voltar</button>
               </div>
             </div>
           ) : (
             <>
-              {itens.map((i) => (
+              {misto && itemItu && (
+                <section className="painel-form" aria-label="Parte de Itu">
+                  <h2>Parte de Itu · {itemItu.lote.liga} {itemItu.lote.bitola} <span className="desc">({itemItu.lote.codigo}, {ESTOQUE_NOME[itemItu.lote.estoque] ?? itemItu.lote.estoque})</span></h2>
+                  <p className="dica">OP com consumo misto. Esta parte não entra na solicitação: depois de enviar a parte do RJ, o botão "Registrar corte em Itu agora" abre o Corte em Itu com a OP, o lote e o previsto.</p>
+                  <div className="grade-form">
+                    <label>
+                      <span className="rotulo">Peças desta parte <span className="sugerido">sugerido</span></span>
+                      <input inputMode="numeric" value={itemItu.quantidade} onChange={(e) => mudarItem(itemItu.lote.id, { quantidade: e.target.value })} />
+                    </label>
+                    <div><span className="rotulo">Previsto desta parte</span><p className="numero">{previstoItu ? `${kg(previstoItu)} kg` : "—"}</p></div>
+                  </div>
+                </section>
+              )}
+              {itensRj.map((i) => (
                 <ItemCorteForm key={i.lote.id} item={i} formato={medida.formato} aoMudar={(p) => mudarItem(i.lote.id, p)} />
               ))}
               <div className="painel-form">
@@ -415,7 +523,7 @@ export default function NovaSolicitacao() {
                 </div>
               </div>
               <div className="botoes">
-                <button className="primario" disabled={ocupado || itens.some((i) => !num(i.quantidade))} onClick={() => void revisar()}>
+                <button className="primario" disabled={ocupado || itensRj.some((i) => !num(i.quantidade))} onClick={() => void revisar()}>
                   {ocupado ? "Calculando…" : "Continuar: revisar"}
                 </button>
                 <button className="secundario" onClick={() => setPasso(2)}>Voltar</button>
@@ -430,6 +538,11 @@ export default function NovaSolicitacao() {
         <div className="bloco-passo">
           {validacao.resultado?.frase && <p className="frase-resultado resultado-frase">{validacao.resultado.frase}</p>}
           {!!validacao.resultado?.efeitos?.length && <TabelaEfeitos efeitos={validacao.resultado.efeitos} />}
+          {misto && itemItu && (
+            <p className="validacao alerta">
+              OP com consumo misto: esta solicitação é a parte do RJ. A parte de Itu ({itemItu.lote.codigo}, {itemItu.quantidade} peça(s){previstoItu ? `, ${kg(previstoItu)} kg` : ""}) é lançada no Corte em Itu depois de enviar.
+            </p>
+          )}
           <PainelValidacao ocorrencias={validacao.ocorrencias} confirmacoes={conf} aoMudar={setConf} semOcorrencias="Tudo certo. Pode enviar ao RJ." />
           <div className="rodape-acao">
             {temErro && <span className="resultado-frase">Corrija os itens em vermelho para enviar.</span>}
@@ -605,5 +718,78 @@ function TabelaEfeitos({ efeitos }: { efeitos: Efeito[] }) {
         )}
       </table>
     </div>
+  );
+}
+
+/** Um grupo da sugestão (liga × bitola × comprimento × múltiplo): Itu (Estoque Mega + RJ em Itu) e RJ no Rio lado a lado. */
+function QuadroGrupo({ g, itens, aoMarcar, aoMudarKg }: {
+  g: Grupo; itens: ItemCorte[]; aoMarcar: (l: LoteGrupo) => void; aoMudarKg: (id: number, v: string) => void;
+}) {
+  const ituLotes = g.estoques.ITU?.lotes ?? [];
+  const rioLotes = g.estoques.RJ_NO_RIO?.lotes ?? [];
+  const kgMega = ituLotes.filter((l) => l.estoque === "ESTOQUE_MEGA").reduce((t, l) => t + l.disponivel_kg, 0);
+  const kgRjItu = ituLotes.filter((l) => l.estoque !== "ESTOQUE_MEGA").reduce((t, l) => t + l.disponivel_kg, 0);
+  const nec = g.peso_necessario_kg ?? g.peso_previsto_kg ?? null;
+  const frase = g.frase ?? (nec !== null
+    ? `Necessário ${kg1(nec)} kg × disponível ${kg1(g.total_disponivel_kg)} kg: ${nec > g.total_disponivel_kg ? `falta ${kg1(nec - g.total_disponivel_kg)} kg` : `sobra ${kg1(g.total_disponivel_kg - nec)} kg`}`
+    : `Disponível ${kg1(g.total_disponivel_kg)} kg`);
+  const falta = (g.falta_kg ?? (nec !== null ? nec - g.total_disponivel_kg : 0)) > 0;
+
+  const linha = (l: LoteGrupo) => {
+    const item = itens.find((i) => i.lote.id === l.id);
+    return (
+      <li key={l.id}>
+        <label className={item ? "escolha-lote marcada" : "escolha-lote"}>
+          <input type="checkbox" checked={!!item} onChange={() => aoMarcar(l)} />
+          <span>
+            <span className="titulo">
+              {l.conteiner ?? (l.indicadores?.origem_nao_identificada ? "origem não identificada" : "sem contêiner")}
+              <span className={`estoque-tag ${l.estoque}`}>{ESTOQUE_NOME[l.estoque] ?? l.estoque}</span>
+              {l.liga_equivalente && <span className="etiqueta atencao">liga {l.liga}</span>}
+              {!l.liga_equivalente && l.liga && l.liga !== g.liga && <span className="etiqueta">liga {l.liga}</span>}
+              {l.indicadores?.destinacao && <span className="etiqueta atencao">reserva/restrição</span>}
+              {l.tipo !== "ORIGINAL" && <span className="etiqueta">{l.tipo}</span>}
+            </span>
+            <span className="linha2">{l.codigo}{l.estoque === "ESTOQUE_MEGA" && l.codigo_mega ? ` · código Mega ${l.codigo_mega}` : ""}</span>
+          </span>
+          <span className="kg"><strong className="numero">{kg(l.disponivel_kg)} kg</strong><span className="desc">disponível</span></span>
+        </label>
+        {item && (
+          <label className="kg-uso">
+            kg a usar deste lote
+            <input inputMode="decimal" className="campo-curto" value={item.kg_uso} onChange={(e) => aoMudarKg(l.id, e.target.value)} />
+          </label>
+        )}
+      </li>
+    );
+  };
+
+  return (
+    <section className="ficha grupo-sugestao" aria-label={`Material ${g.chave ?? `${g.liga} ${g.bitola}`}`}>
+      <div className="linha-titulo">
+        <h2>
+          {g.chave ?? `${g.liga} ${g.bitola}`}
+          {g.multiplo && <> <span className="etiqueta info">múltiplo {g.multiplo}</span></>}
+          {g.liga_equivalente && <> <span className="etiqueta atencao">liga equivalente</span></>}
+        </h2>
+        <span className="desc">
+          {g.sobremetal_pct !== null && g.sobremetal_pct !== undefined && `sobremetal ${pct(g.sobremetal_pct)}`}
+          {g.peso_previsto_kg ? ` · previsto ${kg(g.peso_previsto_kg)} kg` : ""}
+        </span>
+      </div>
+      <p className={falta ? "validacao alerta" : "frase-resultado"}>{frase}</p>
+      <div className="lado-a-lado">
+        <div>
+          <h3>Itu · {kg(g.estoques.ITU?.disponivel_kg ?? kgMega + kgRjItu)} kg</h3>
+          <p className="desc">Estoque Mega {kg(kgMega)} kg · RJ em Itu {kg(kgRjItu)} kg</p>
+          {ituLotes.length ? <ul className="escolhas">{ituLotes.map(linha)}</ul> : <p className="desc">Nada em Itu nesta liga × bitola.</p>}
+        </div>
+        <div>
+          <h3>RJ no Rio · {kg(g.estoques.RJ_NO_RIO?.disponivel_kg ?? 0)} kg</h3>
+          <p className="desc">Sem código do Mega (o código vem no cadastro de SA).</p>
+          {rioLotes.length ? <ul className="escolhas">{rioLotes.map(linha)}</ul> : <p className="desc">Nada no RJ nesta liga × bitola.</p>}
+        </div>
+      </div>
+    </section>
   );
 }

@@ -1,18 +1,34 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { api, ErroApi, ESTOQUE_NOME, kg, num, qs, validacaoDoErro, type Validacao } from "../api/cliente";
+import { api, ErroApi, ESTOQUE_NOME, kg, num, qs, validacaoDoErro, type Ocorrencia, type Validacao } from "../api/cliente";
 import PainelValidacao, { confirmacoesValidas, podeGravar, type Confirmacoes } from "../components/PainelValidacao";
 
 interface Lote { id: number; codigo: string; conteiner: string | null; liga: string; bitola: string; estoque: string; tipo: string;
   saldo_kg: number; disponivel_kg: number; codigo_mega?: number | null }
 interface OpMega { numero: number; item_codigo: number | null; item_descricao: string | null; cliente: string | null; pedido: string | null;
   situacao: string | null; situacao_descricao: string | null }
-interface Resultado { frase?: string; perda_kg?: number; perda_esperada_kg?: number; previsto_kg?: number | null; gera_sa?: boolean; instrucao_mega?: string | null }
+interface Resultado { frase?: string; perda_kg?: number; perda_esperada_kg?: number; previsto_kg?: number | null; gera_sa?: boolean; instrucao_mega?: string | null;
+  perda_pct?: number; perda_max_pct?: number; perda_max_kg?: number; peso_usado_kg?: number;
+  /** spec v3.5 P22(a): 8 % para material fiscal RJ em Itu, 5 % para lote do Estoque Mega */
+  tolerancia_excesso_pct?: number; consumo_misto?: boolean }
 interface Gravado { id: number; op: number; consumo_kg: number; sobra_kg: number; perda_kg: number; lote_reto: { id: number; codigo: string } | null;
   sa_id: number | null; instrucao_mega: string | null }
 
 const hojeIso = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 const emItu = (l: Lote) => l.estoque !== "RJ_NO_RIO";
+const pctBr = (v: number) => `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} %`;
+/** Tolerância da T13 pelo lote, enquanto a API não diz: RJ em Itu 8 %, Estoque Mega 5 %. */
+const limitePadrao = (l: Lote | null) => (l?.estoque === "RJ_EM_ITU" ? 8 : 5);
+const limiteDe = (pctLim: number) => (pctLim >= 8 ? "para material do RJ" : "para lote do Estoque Mega");
+
+/** A mensagem de EXCESSO_TOLERANCIA diz o limite usado; se a API ainda não disser, a tela completa. */
+function comLimite(ocs: Ocorrencia[], pctLim: number): Ocorrencia[] {
+  return ocs.map((o) => {
+    if (!o.codigo.startsWith("EXCESSO_TOLERANCIA") || /limite/i.test(o.mensagem)) return o;
+    const lim = typeof o.dados?.limite_pct === "number" ? (o.dados.limite_pct as number) : pctLim;
+    return { ...o, mensagem: `${o.mensagem} Limite: ${pctBr(lim)} ${limiteDe(lim)}.` };
+  });
+}
 
 /** T13 Corte em Itu: consumo da OP, sobra na bitola ou RETO, perda e a instrução "Fazer no Mega". */
 export default function CorteItu() {
@@ -24,7 +40,8 @@ export default function CorteItu() {
   const [busca, setBusca] = useState("");
   const [achados, setAchados] = useState<Lote[] | null>(null);
   const previstoUrl = num(params.get("previsto") ?? "");
-  const [f, setF] = useState({ pecas: "", consumo: "", sobra: "", naBitola: true, usado: "", data: hojeIso(), obs: "" });
+  const misto = params.get("consumo_misto") === "1";
+  const [f, setF] = useState({ pecas: params.get("pecas") ?? "", consumo: "", sobra: "", naBitola: true, usado: "", data: hojeIso(), obs: "" });
   const [v, setV] = useState<Validacao<Resultado> | null>(null);
   const [conf, setConf] = useState<Confirmacoes>({});
   const [erro, setErro] = useState("");
@@ -73,7 +90,7 @@ export default function CorteItu() {
     op: op?.numero, lote_id: lote?.id, consumo_kg: num(f.consumo), sobra_kg: num(f.sobra) ?? 0, sobra_na_bitola: f.naBitola,
     pecas: num(f.pecas) ?? null, peso_usado_kg: num(f.usado) ?? null, previsto_kg: previstoUrl ?? null,
     data_corte: f.data || null, observacao: f.obs.trim() || null, op_manual: megaFora ? { item_codigo: null, cliente: null } : null,
-    confirmacoes: c,
+    consumo_misto: misto, confirmacoes: c,
   });
   const pronto = !!op && !!lote && (num(f.consumo) ?? 0) > 0;
 
@@ -190,7 +207,8 @@ export default function CorteItu() {
 
       <section className="painel-form" style={{ marginTop: "var(--esp-4)" }}>
         <h2>Corte</h2>
-        {previstoUrl && <p className="dica">Peso previsto da solicitação: {kg(previstoUrl)} kg (base da regra dos 5 %).</p>}
+        {misto && <p className="validacao alerta">Parte de Itu de uma OP com consumo misto (Itu + RJ). A parte do RJ segue pela solicitação enviada.</p>}
+        {previstoUrl && <p className="dica">Peso previsto: {kg(previstoUrl)} kg. Tolerância: {pctBr(limitePadrao(lote))} {limiteDe(limitePadrao(lote))}.</p>}
         <div className="grade-form">
           <label>Peças produzidas<input inputMode="numeric" value={f.pecas} onChange={(e) => mudar({ pecas: e.target.value })} /></label>
           <label>Consumo da OP (kg, balança)<input inputMode="decimal" className="campo-grande" value={f.consumo} onChange={(e) => mudar({ consumo: e.target.value })} /></label>
@@ -219,14 +237,16 @@ export default function CorteItu() {
           {v.resultado?.frase && <p className="frase-resultado resultado-frase">{v.resultado.frase}</p>}
           {v.resultado && (
             <dl className="dados ficha">
-              {v.resultado.perda_kg !== undefined && <div><dt>Perda de corte</dt><dd>{kg(v.resultado.perda_kg)} kg</dd></div>}
-              {v.resultado.perda_esperada_kg !== undefined && <div><dt>Perda esperada (serra)</dt><dd>{kg(v.resultado.perda_esperada_kg)} kg</dd></div>}
+              {v.resultado.perda_kg !== undefined && <div><dt>Perda de corte</dt><dd>{kg(v.resultado.perda_kg)} kg{v.resultado.perda_pct !== undefined && ` (${pctBr(v.resultado.perda_pct)} do material usado)`}</dd></div>}
+              {v.resultado.perda_max_pct !== undefined && <div><dt>Perda máxima</dt><dd>{pctBr(v.resultado.perda_max_pct)}{v.resultado.perda_max_kg !== undefined && ` = ${kg(v.resultado.perda_max_kg)} kg`}</dd></div>}
+              {v.resultado.perda_pct === undefined && v.resultado.perda_esperada_kg !== undefined && <div><dt>Perda esperada (serra)</dt><dd>{kg(v.resultado.perda_esperada_kg)} kg</dd></div>}
               {v.resultado.previsto_kg ? <div><dt>Previsto</dt><dd>{kg(v.resultado.previsto_kg)} kg</dd></div> : null}
+              {v.resultado.previsto_kg ? <div><dt>Tolerância usada</dt><dd>{pctBr(v.resultado.tolerancia_excesso_pct ?? limitePadrao(lote))} {limiteDe(v.resultado.tolerancia_excesso_pct ?? limitePadrao(lote))}</dd></div> : null}
               {v.resultado.gera_sa !== undefined && <div><dt>Gera pedido de SA</dt><dd>{v.resultado.gera_sa ? "Sim (material fiscal RJ)" : "Não"}</dd></div>}
               {v.resultado.instrucao_mega && <div className="largo"><dt>Fazer no Mega</dt><dd>{v.resultado.instrucao_mega}</dd></div>}
             </dl>
           )}
-          <PainelValidacao ocorrencias={v.ocorrencias} confirmacoes={conf} aoMudar={setConf} semOcorrencias="Dentro da tolerância." />
+          <PainelValidacao ocorrencias={comLimite(v.ocorrencias, v.resultado?.tolerancia_excesso_pct ?? limitePadrao(lote))} confirmacoes={conf} aoMudar={setConf} semOcorrencias="Dentro da tolerância." />
         </div>
       )}
 

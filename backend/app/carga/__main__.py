@@ -22,6 +22,7 @@ from app.core.config import get_config
 from app.core.db import SessionLocal
 from app.integrations.mega import fabrica
 from app.models import Liga, MegaSaldo, Usuario
+from app.services import estoque
 
 from . import gravar, planilhas, plano, relatorio
 
@@ -56,7 +57,7 @@ def contexto(db, conferir_ops: bool, correcoes: dict | None = None) -> plano.Con
     quando = db.scalar(select(func.max(MegaSaldo.atualizado_em)))
     return plano.Contexto(ligas, mega, quando.strftime("%Y-%m-%d %H:%M") if quando else None,
                           _verificador_op() if conferir_ops else (lambda _op: None), date.today(), _kardex(),
-                          correcoes or {})
+                          correcoes or {}, estoque.mapa_mesma_linha(db))
 
 
 def _kardex():

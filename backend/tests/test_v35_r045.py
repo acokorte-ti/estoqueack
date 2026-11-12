@@ -281,3 +281,66 @@ def test_r055_t04_com_item_mega_sem_bitola(amb):
     assert client.get("/api/lotes", headers=h).status_code == 200
     g = client.get("/api/lotes/agrupado", headers=h, params={"liga": "4140"}).json()["itens"]
     assert g[0]["chave"] == "4140 SEM BITOLA" and g[0]["codigos_itu"] == [99001]
+
+
+def test_r053_t22_sem_mod_e_mesma_liga(amb):
+    """R053(2), §1.4 item 5: equivalência sem MOD da T22 (12746 = 1.2746) = mesma liga; com MOD, nunca."""
+    _client, _u, _ids, _ = amb
+    from app.core.db import SessionLocal
+    from app.models import Liga, LigaEquivalente
+    from app.services.estoque import mapa_mesma_linha, mesma_liga
+    with SessionLocal() as db:
+        ls = {c: Liga(codigo=c, nome=c, densidade=7.8, apelidos=[]) for c in ("12746", "1.2746", "A8", "A8MOD")}
+        db.add_all(ls.values())
+        db.flush()
+        db.add_all([LigaEquivalente(liga_a_id=ls["12746"].id, liga_b_id=ls["1.2746"].id),
+                    LigaEquivalente(liga_a_id=ls["A8"].id, liga_b_id=ls["A8MOD"].id)])
+        db.commit()
+        m = mapa_mesma_linha(db)
+    assert mesma_liga(m, "12746", "1.2746") and mesma_liga(m, "1.2344", "H13") and mesma_liga(m, "D2", "1.2379")
+    assert not mesma_liga(m, "A8", "A8MOD") and m["1.2344"] == "H13"
+
+
+def test_r053_entrada_nf_com_comprimento_em_linha_separada(amb):
+    """R053(3), P28(2): NF com comprimento cria item próprio (H13 24X62X3000); sem comprimento, outro item."""
+    client, u, _ids, _ = amb
+    from datetime import date
+    h = entrar(client, u["rj"])
+
+    def nf(numero, compr):
+        it = {"liga": "H13", "formato": "RETANGULAR", "espessura": 24, "largura": 62, "pecas": 1, "peso_kg": 100}
+        if compr:
+            it["comprimento"] = compr
+        r = client.post("/api/entradas-nf", headers=h, json={
+            "numero": numero, "data": date.today().isoformat(), "fornecedor": "FORNECEDOR TESTE",
+            "conteiner": "CT91TS", "itens": [it]})
+        assert r.status_code == 201, r.text
+        return client.get(f"/api/lotes/{r.json()['itens'][0]['lote_id']}", headers=h).json()
+    a, b, c = nf("880021", "3000"), nf("880022", None), nf("880023", "3000 mm")
+    assert a["chave_material"] == c["chave_material"] == "H13 24X62X3000"
+    assert b["chave_material"] == "H13 24X62"
+
+
+def test_r053_pendencia_concorrente_nao_derruba_a_sincronizacao(amb, monkeypatch):
+    """R053(5): se outra transação já abriu a pendência do código, a sincronização segue com os outros."""
+    from app.core.db import SessionLocal
+    from app.models import PendenciaMega
+    from app.services import entradas_mega as em
+    calc = {91001: {"mega": 50.0, "lotes": 0.0, "explicada": 0.0, "diferenca": 50.0},
+            91002: {"mega": 60.0, "lotes": 0.0, "explicada": 0.0, "diferenca": 60.0}}
+    monkeypatch.setattr(em, "diferencas", lambda _db, _c=None: calc)
+    with SessionLocal() as outra:
+        outra.add(PendenciaMega(tipo="ENTRADA", codigo=91001, kg=50, situacao="ABERTA"))
+        outra.commit()
+    import sqlalchemy as sa
+    real = em.select
+    # simula a corrida: a sincronização leu as ABERTAS antes de a outra transação gravar a do 91001
+    monkeypatch.setattr(em, "select", lambda *a: real(*a).where(sa.false()))
+    with SessionLocal() as db:
+        c = em.atualizar(db)
+        db.commit()
+    monkeypatch.setattr(em, "select", real)
+    assert c["criadas"] == 1 and c["concorrentes"] == 1
+    with SessionLocal() as db:
+        assert sorted(db.scalars(real(PendenciaMega.codigo).where(PendenciaMega.situacao == "ABERTA"))) == [
+            91001, 91002]

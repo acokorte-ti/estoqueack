@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.config import Config
 from app.domain import corte, regras
 from app.domain.formato import kg_br, pct_br
-from app.domain.medidas import LIGA_MESMA_LINHA
 from app.domain.validacao import Nivel, Ocorrencia, Resultado
 from app.integrations.mega.consultas import SITUACOES_OP
 from app.models import (CadastroSa, Conteiner, CorteItu, ItemMP, LiberacaoCorte, Liga, LigaEquivalente, Lote,
@@ -23,7 +22,7 @@ from app.models import (CadastroSa, Conteiner, CorteItu, ItemMP, LiberacaoCorte,
 from . import auditoria, movimentos, ops
 from .base import (ErroNegocio, NaoEncontrado, Previa, agora, exigir_sem_pendencias, hoje, notificar, parametro,
                    so_rj_no_rio)
-from .estoque import BALDE, bitola
+from .estoque import BALDE, bitola, mapa_mesma_linha, mesma_liga
 from .fluxo import ATIVAS_RJ, material_texto, recalcular_solicitacao
 
 ESTOQUE_ITU = ("ESTOQUE",)
@@ -92,9 +91,9 @@ def _validar_liga(db: Session, liga_pedida: str | None, lote: Lote) -> Resultado
     alvo = db.scalar(select(Liga).where(Liga.codigo == liga_pedida.strip().upper()))
     if alvo is None or alvo.id == lote.item.liga_id:
         return r
-    # P28(1) (Eduardo, 2026-11-11): 1.2344 = H13 e 1.2379 = D2 são a mesma liga (mesma linha): sem "estou ciente"
-    if LIGA_MESMA_LINHA.get(alvo.codigo, alvo.codigo) == LIGA_MESMA_LINHA.get(lote.item.liga.codigo,
-                                                                             lote.item.liga.codigo):
+    # P28(1) (Eduardo, 2026-11-11): equivalência sem MOD (1.2344 = H13, 1.2379 = D2, outras da T22) é a mesma liga
+    # (mesma linha): sem "estou ciente"
+    if mesma_liga(mapa_mesma_linha(db), alvo.codigo, lote.item.liga.codigo):
         return r
     if lote.item.liga_id in ligas_equivalentes(db, alvo.id):
         r.adicionar("LIGA_EQUIVALENTE", Nivel.CIENCIA,

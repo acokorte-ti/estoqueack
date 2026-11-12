@@ -31,7 +31,7 @@ Parâmetros: `liga` (obrigatório), `formato` (`RETANGULAR`/`REDONDO`), `espessu
                   "RJ_NO_RIO": { "disponivel_kg": 100.0, "lotes": [ ... ] } } } ] }
 ```
 
-- Grupo = **liga e bitola exatas** (mesmo formato e medidas; 21x202 e 21x203 nunca se juntam), **o mesmo comprimento informado e o mesmo múltiplo** (P28, 2026-11-11: D2 Ø90 ≠ D2 Ø90X2425). `chave` é o texto da linha (ex.: `"H13 33X105"`); o código do Mega não entra. **1.2344 = H13 e 1.2379 = D2 ficam no mesmo grupo** (P28(1)); o lote de liga equivalente vem com `liga_equivalente: true` dentro do grupo (selo e "estou ciente" continuam, P18), e o grupo só tem `liga_equivalente: true` se todos os lotes forem equivalentes. Cada lote do grupo traz `liga`, `liga_equivalente` e `descricao`. `ITU` junta Estoque Mega e RJ em Itu (cada lote traz `codigo_mega`); `RJ_NO_RIO` lista por contêiner. Estoque sem lote vem com `lotes: []`.
+- Grupo = **liga e bitola exatas** (mesmo formato e medidas; 21x202 e 21x203 nunca se juntam), **o mesmo comprimento informado e o mesmo múltiplo** (P28, 2026-11-11: D2 Ø90 ≠ D2 Ø90X2425). `chave` é o texto da linha (ex.: `"H13 33X105"`); o código do Mega não entra. **1.2344 = H13, 1.2379 = D2 e as outras equivalências sem MOD da T22 (ex.: 12746 = 1.2746) ficam no mesmo grupo e contam como a mesma liga** (P28(1), 2026-11-12): `liga_equivalente: false`, sem selo nem "estou ciente" (`LIGA_EQUIVALENTE` não aparece na T07); só equivalência com MOD (que não junta grupo) vem com `liga_equivalente: true`. O grupo só tem `liga_equivalente: true` se todos os lotes forem equivalentes. Cada lote do grupo traz `liga`, `liga_equivalente` e `descricao`. `ITU` junta Estoque Mega e RJ em Itu (cada lote traz `codigo_mega`); `RJ_NO_RIO` lista por contêiner. Estoque sem lote vem com `lotes: []`.
 - A8MOD e **CR8MOD** são ligas distintas (P24, P28): nunca entram no grupo de A8/CR8. `codigo_mega` dos lotes vem só no Estoque Mega (o RJ não tem código, spec v3.7 §1.4).
 - `peso_necessario_kg` ausente → usa o `peso_previsto_kg` estimado do grupo. `falta_kg`/`sobra_kg` = necessário − total disponível. Nada é escolhido sozinho: a tela deixa marcar lotes de um ou dos dois estoques (ver "Consumo misto").
 
@@ -204,6 +204,8 @@ COP: `{ id, numero, situacao, data, fechado_em, enviado_em, qtd_itens, peso_tota
                "descricao_nf": "...", "pecas": 4, "peso_kg": 9000, "comprimento": "2800-6000", "custo_kg": null } ],
   "confirmacoes": {} }
 ```
+
+`comprimento` (opcional) faz parte da identidade do material (P28(2), R053(3), 2026-11-12): com comprimento (`"2425"`, faixa `"2800-6000"`, "mm" e espaços ignorados), o lote vai para o item "<liga> <bitola>X<comprimento>" (linha própria na T04/T07, `chave_material` com o comprimento); sem comprimento, para o item sem comprimento.
 
 Ocorrências: `NF_DUPLICADA`, `SEM_ITENS`, `LIGA_DESCONHECIDA#n`, `BITOLA_INCOMPLETA#n`, `PESO_TEORICO_DIFERENTE#n` (ALERTA, > 20 %). Gravou: `201` com `{ id, numero, fornecedor, data, conteiner, itens: [{ lote_id, ... }] }`; cada item vira um lote RJ no Rio.
 

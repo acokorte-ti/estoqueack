@@ -23,6 +23,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.domain.formato import kg_br
@@ -118,9 +119,15 @@ def atualizar(db: Session, codigo: int | None = None) -> dict[str, int]:
         c["atualizadas" if p.situacao == "ABERTA" else "fechadas"] += 1
     for cod, d in calc.items():
         if cod not in abertas and d["diferenca"] > limite:
-            db.add(PendenciaMega(tipo="ENTRADA", codigo=cod, kg=d["diferenca"], situacao="ABERTA",
-                                 saldo_mega_kg=d["mega"], soma_lotes_kg=d["lotes"], atualizado_em=agora()))
-            c["criadas"] += 1
+            # R053(5): outra transação (Criar lote/Reabrir, outra sincronização) pode ter aberto a mesma pendência
+            # agora; o índice único (0008) recusa a 2ª e só este código fica de fora, sem derrubar a sincronização.
+            try:
+                with db.begin_nested():
+                    db.add(PendenciaMega(tipo="ENTRADA", codigo=cod, kg=d["diferenca"], situacao="ABERTA",
+                                         saldo_mega_kg=d["mega"], soma_lotes_kg=d["lotes"], atualizado_em=agora()))
+                c["criadas"] += 1
+            except IntegrityError:
+                c["concorrentes"] = c.get("concorrentes", 0) + 1
     db.flush()
     return c
 

@@ -10,11 +10,12 @@ from sqlalchemy.orm import Session
 
 from app.domain import peso as dpeso
 from app.domain.formato import kg_br, pct_br
+from app.domain.medidas import comprimento_texto
 from app.domain.validacao import Nivel
 from app.models import (Conteiner, CopItem, Destinacao, EntradaNf, EntradaNfItem, ItemMP, LiberacaoCorte, Liga, Lote,
                         Movimento, SolicitacaoCorte, Usuario)
 
-from . import auditoria, movimentos
+from . import auditoria, estoque, movimentos
 from .base import ErroNegocio, NaoEncontrado, Previa, exigir_sem_pendencias, so_rj_no_rio
 from .fluxo import recalcular_solicitacao
 
@@ -50,6 +51,14 @@ def _comprimento_medio(txt: str | None) -> float | None:
     return sum(nums) / len(nums) if nums else None
 
 
+def _comprimento_chave(txt: str | None) -> str | None:
+    """Comprimento da NF normalizado como na chave do material (§1.4 item 7): '2425', '2800-6000'."""
+    t = re.sub(r"\s*MM$", "", (txt or "").strip().upper().replace(",", "."))
+    if not re.fullmatch(r"\d+(?:\.\d+)?(?:\s*[-~/]\s*\d+(?:\.\d+)?)*", t):
+        return None
+    return comprimento_texto(f"1X1X{t}", "RETANGULAR")
+
+
 def _item(db: Session, i: ItemNf, *, criar: bool) -> tuple[ItemMP | None, Liga | None]:
     liga = db.scalar(select(Liga).where(Liga.codigo == i.liga.strip().upper()))
     if liga is None:
@@ -58,10 +67,15 @@ def _item(db: Session, i: ItemNf, *, criar: bool) -> tuple[ItemMP | None, Liga |
     q = q.where(ItemMP.diametro == i.diametro) if i.formato == "REDONDO" else q.where(
         ItemMP.espessura == i.espessura, ItemMP.largura == i.largura)
     # spec v3.7 §1.4: lote do RJ não tem código do Mega → só item sem código (o com código é do Estoque Mega)
-    item = db.scalar(q.where(ItemMP.codigo_mega.is_(None)).order_by(ItemMP.id))
+    med = f"Ø{i.diametro:g}" if i.formato == "REDONDO" else f"{i.espessura:g}X{i.largura:g}"
+    # P28(2) (R053(3)): o comprimento informado na NF diferencia o material (D2 Ø90 ≠ D2 Ø90X2425) → item próprio
+    # com o comprimento na descrição; sem comprimento, só item sem comprimento. Faixa ("2800-6000") vale como escrita.
+    compr = _comprimento_chave(i.comprimento)
+    descricao = f"{liga.codigo} {med}" + (f"X{compr}" if compr else "")
+    item = next((x for x in db.scalars(q.where(ItemMP.codigo_mega.is_(None)).order_by(ItemMP.id))
+                 if estoque.chave_lote(x).comprimento == compr and not estoque.chave_lote(x).multiplo), None)
     if item is None and criar:
-        med = f"Ø{i.diametro:g}" if i.formato == "REDONDO" else f"{i.espessura:g}X{i.largura:g}"
-        item = ItemMP(descricao=f"{liga.codigo} {med}", liga_id=liga.id, formato=i.formato, espessura=i.espessura,
+        item = ItemMP(descricao=descricao, liga_id=liga.id, formato=i.formato, espessura=i.espessura,
                       largura=i.largura, diametro=i.diametro)
         db.add(item)
         db.flush()

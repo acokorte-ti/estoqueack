@@ -207,15 +207,17 @@ def comprimento_texto(descricao: str | None, formato: str) -> str | None:
 
 
 def chave_material(m: Medida, descricao: str | None = None, comprimento_fixado: str | None = None,
-                   comprimento: str | None = None) -> ChaveMaterial:
-    """`comprimento` (opcional) substitui o da descrição: P29, comprimento do HISTORICO do mesmo contêiner."""
+                   comprimento: str | None = None, mesma_linha: dict[str, str] | None = None) -> ChaveMaterial:
+    """`comprimento` (opcional) substitui o da descrição: P29, comprimento do HISTORICO do mesmo contêiner.
+    `mesma_linha`: liga → liga do grupo (padrão: LIGA_MESMA_LINHA; com a T22, `estoque.mapa_mesma_linha`)."""
     mult = chave_multiplo(descricao, comprimento_fixado)
     compr = comprimento or (comprimento_texto(descricao, m.formato) if descricao else None)
     if compr is None and m.comprimento:
         compr = _n(str(m.comprimento))
     if compr is None and mult and mult != "MULT":
         compr = mult
-    liga = LIGA_MESMA_LINHA.get(m.liga, m.liga) if m.liga else None
+    mapa = LIGA_MESMA_LINHA if mesma_linha is None else mesma_linha
+    liga = mapa.get(m.liga, m.liga) if m.liga else None
     if m.formato == "REDONDO":
         return ChaveMaterial(liga, "REDONDO", None, None, m.diametro, compr, bool(mult))
     if m.formato == "RETANGULAR":

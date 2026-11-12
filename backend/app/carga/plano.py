@@ -207,9 +207,14 @@ def chave_familia(desc: str) -> tuple:
     return chave_item(liga, m)[1:]
 
 
+# liga → liga do grupo (§1.4 item 5: 1.2344 = H13, 1.2379 = D2 e as equivalências sem MOD da T22). `montar` troca
+# pelo `Contexto.mesma_linha` (lido do banco em `__main__.contexto`); sem banco fica só a lista fixa.
+_MESMA_LINHA: dict[str, str] | None = None
+
+
 def chave_mat(desc: str, comprimento_fixado: str | None = None, comprimento: str | None = None) -> ChaveMaterial:
     """Identidade do material para a mesma linha Itu × RJ (P28; `comprimento` = P29, do HISTORICO)."""
-    return chave_material(medida(desc), desc, comprimento_fixado, comprimento)
+    return chave_material(medida(desc), desc, comprimento_fixado, comprimento, _MESMA_LINHA)
 
 
 def _comprimentos_historico(estoque: list[P.LinhaEstoque2026], historico: list[dict],
@@ -277,6 +282,7 @@ class Contexto:
     # correções respondidas pelo Fabiano/Eduardo que a planilha não vai receber, lidas de um arquivo FORA do repositório
     # (`python -m app.carga --correcoes arquivo.json`). Formato em `docs/tecnico/04_carga_inicial.md` §5.
     correcoes: dict[str, Any] = field(default_factory=dict)
+    mesma_linha: dict[str, str] | None = None      # None = só 1.2344 = H13 e 1.2379 = D2 (sem banco)
 
 
 def _liga(plano: Plano, ctx: Contexto, codigo: str | None, origem, densidade: float | None = None) -> str:
@@ -297,6 +303,8 @@ def _liga(plano: Plano, ctx: Contexto, codigo: str | None, origem, densidade: fl
 
 def montar(ctx: Contexto, estoque: list[P.LinhaEstoque2026], historico: list[dict], geral: list[P.LinhaGeral],
            corte: list[P.LinhaCorte], sas: list[P.LinhaSa]) -> Plano:
+    global _MESMA_LINHA
+    _MESMA_LINHA = ctx.mesma_linha
     pl = Plano(data_mega=ctx.data_mega)
     pl.compr_hist = _comprimentos_historico(estoque, historico, geral)
     _catalogo_geral(pl, ctx, geral)

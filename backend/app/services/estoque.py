@@ -98,11 +98,51 @@ def consulta_lotes(db: Session, f: dict[str, Any]):
     return lotes
 
 
-def chave_lote(item: ItemMP) -> ChaveMaterial:
-    """Mesma linha Itu × RJ (spec v3.7 §1.4 + P28, 2026-11-11): liga (1.2344 = H13, 1.2379 = D2; MOD diferente),
-    formato, seção do cadastro, comprimento informado na descrição e múltiplo. O código do Mega não entra."""
+def mapa_mesma_linha(db: Session) -> dict[str, str]:
+    """Spec §1.4 item 5 (P28(1), Eduardo, 2026-11-11; R053(2)): as equivalências **sem MOD** da T22 valem como a
+    mesma liga (ex.: 12746 = 1.2746), além de 1.2344 = H13 e 1.2379 = D2. Liga com "MOD" nunca junta.
+    Devolve liga → liga do grupo. O nome do grupo não está na spec (leitura literal: H13/D2 quando estão no grupo;
+    senão o código sem ponto, depois o menor), só serve para a chave; o lote continua mostrando a liga dele."""
+    from app.models import LigaEquivalente
+    pai: dict[str, str] = {}
+
+    def achar(x: str) -> str:
+        while pai.setdefault(x, x) != x:
+            x = pai[x]
+        return x
+
+    pares = list(LIGA_MESMA_LINHA.items())
+    a_, b_ = Liga.__table__.alias("a"), Liga.__table__.alias("b")
+    pares += [(a, b) for a, b in db.execute(
+        select(a_.c.codigo, b_.c.codigo).select_from(LigaEquivalente.__table__)
+        .join(a_, a_.c.id == LigaEquivalente.liga_a_id).join(b_, b_.c.id == LigaEquivalente.liga_b_id))
+        if "MOD" not in a.upper().replace(" ", "") and "MOD" not in b.upper().replace(" ", "")]
+    for a, b in pares:
+        ra, rb = achar(a), achar(b)
+        if ra != rb:
+            pai[ra] = rb
+    grupos: dict[str, list[str]] = defaultdict(list)
+    for x in list(pai):
+        grupos[achar(x)].append(x)
+    fixos = set(LIGA_MESMA_LINHA.values())
+    out: dict[str, str] = {}
+    for membros in grupos.values():
+        nome = min(membros, key=lambda c: (c not in fixos, "." in c, c))
+        out.update({m: nome for m in membros})
+    return out
+
+
+def mesma_liga(mapa: dict[str, str], a: str, b: str) -> bool:
+    return mapa.get(a, a) == mapa.get(b, b)
+
+
+def chave_lote(item: ItemMP, mapa: dict[str, str] | None = None) -> ChaveMaterial:
+    """Mesma linha Itu × RJ (spec v3.7 §1.4 + P28, 2026-11-11): liga (1.2344 = H13, 1.2379 = D2 e as outras
+    equivalências sem MOD da T22, `mapa_mesma_linha`; MOD diferente), formato, seção do cadastro, comprimento
+    informado na descrição e múltiplo. O código do Mega não entra."""
     k = chave_material(interpretar(item.descricao or ""), item.descricao, item.comprimento_fixado)
-    liga = LIGA_MESMA_LINHA.get(item.liga.codigo, item.liga.codigo)
+    mapa = LIGA_MESMA_LINHA if mapa is None else mapa
+    liga = mapa.get(item.liga.codigo, item.liga.codigo)
     if item.formato == "REDONDO":
         return ChaveMaterial(liga, "REDONDO", None, None, item.diametro, k.comprimento, k.multiplo)
     if item.formato == "RETANGULAR":
@@ -113,6 +153,7 @@ def chave_lote(item: ItemMP) -> ChaveMaterial:
 def lote_resumo(db: Session, lotes: list[Lote]) -> list[dict]:
     ids = [l.id for l in lotes]
     res, dest, notas = mov.reservado(db, ids), _com_destinacao(db, ids), _com_nota(db, ids)
+    mapa = mapa_mesma_linha(db)
     saida = []
     for l in lotes:
         reservado = round(min(res.get(l.id, 0.0), l.saldo_kg), 3)
@@ -126,7 +167,7 @@ def lote_resumo(db: Session, lotes: list[Lote]) -> list[dict]:
             "liga": l.item.liga.codigo, "formato": l.item.formato, "bitola": bitola(l.item),
             "descricao": l.item.descricao,
             "codigo_mega": l.item.codigo_mega if (l.planta_fiscal, l.local_fisico) == ("ITU", "ITU") else None,
-            "chave_material": chave_lote(l.item).texto,
+            "chave_material": chave_lote(l.item, mapa).texto,
             "estoque": BALDE.get((l.planta_fiscal, l.local_fisico)), "tipo": l.tipo,
             "saldo_kg": round(l.saldo_kg, 3), "reservado_kg": reservado,
             "disponivel_kg": round(l.saldo_kg - reservado, 3), "origem": origem,

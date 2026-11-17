@@ -17,12 +17,14 @@ export default function Conciliacao() {
   const [busca, setBusca] = useState("");
   const [r, setR] = useState<Resposta | null>(null);
   const [erro, setErro] = useState("");
+  // Lê todos os códigos e filtra aqui: com `somente_divergentes=true` a API soma os totais só das divergentes
+  // (os quadros mostravam 0 códigos / 0 kg quando tudo batia).
   useEffect(() => {
-    api.get<Resposta>(`/conciliacao?somente_divergentes=${soDiv}`).then(setR).catch((e: Error) => setErro(e.message));
-  }, [soDiv]);
+    api.get<Resposta>("/conciliacao?somente_divergentes=false").then(setR).catch((e: Error) => setErro(e.message));
+  }, []);
 
   const q = busca.trim().toUpperCase();
-  const itens = (r?.itens ?? []).filter((i) => !q || String(i.codigo).includes(q) || i.descricao.toUpperCase().includes(q));
+  const itens = (r?.itens ?? []).filter((i) => (!soDiv || i.status !== "OK") && (!q || String(i.codigo).includes(q) || i.descricao.toUpperCase().includes(q)));
 
   return (
     <>

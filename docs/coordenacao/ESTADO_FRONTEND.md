@@ -1,6 +1,13 @@
 ﻿# Estado — FRONTEND / UX
 
-Atualizado: 2026-11-17 (R059 peso real)
+Atualizado: 2026-11-17 (conferência depois da recarga de 17/11)
+
+## 2026-11-17 Conferência na homologação (recarga de 17/11, API do R058 no ar)
+
+- **Conferido sem gravar** (leitura real; peso real pendente simulado com `window.fetch`, pois a homologação tem 0 peças aguardando): Painel (card, vermelho, "Encerrar pendência" com justificativa, links da T13), T04 (agrupado nos 4 estoques, "mesma linha por exceção" em 3 linhas, RETO por origem com RJ em Itu), T07 com OP real (8 grupos, validar real; faixa vermelha + ERRO `PESO_REAL_PENDENTE` + "Enviar ao RJ" desabilitado; aviso cinza antes do prazo), T09 (21), T11 (47 COPs), T12 (vazia), T13 (peças pendentes, prévia real Estoque Mega/RJ em Itu, tolerância 5 %/8 % simulada), T14 (8.361 no histórico, sem "Corrigir no Mega"), T15, T16, T23 (`PENDENCIA_PESO_REAL_DIAS` = 7). Console sem erro.
+- **Corrigido:** T16 mostrava 0 códigos/0 kg (API soma `totais` só das divergentes) → lê tudo e filtra na tela; T07 mandava espessura/largura junto com o diâmetro ao trocar para redondo.
+- **Aguardando TÉCNICO (R065):** prazo com ano errado em 2 solicitações da carga; totais da T16 na API.
+- **Próximo:** R064 (spec v3.13: T13 E × L da sobra e regra do RETO, T23 3 parâmetros, T14 texto/perfil Análise) quando o contrato do R063 sair.
 
 ## 2026-11-17 R059 (commit 505ba19)
 

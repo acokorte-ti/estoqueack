@@ -105,6 +105,12 @@ export default function NovaSolicitacao() {
   }, []);
 
   const quantidadeOp = op?.quantidade ? String(op.quantidade) : "";
+  // só as medidas do formato escolhido (ao trocar de retangular para redondo, espessura/largura ficavam no estado e iam para a API)
+  const redondo = medida.formato !== "RETANGULAR";
+  const med = {
+    espessura: redondo ? null : num(medida.espessura) ?? null, largura: redondo ? null : num(medida.largura) ?? null,
+    diametro: redondo ? num(medida.diametro) ?? null : null, comprimento: num(medida.comprimento) ?? null,
+  };
   // consumo misto (P26(1) opção A): lotes do RJ viram a solicitação; o lote de Itu vai para a T13
   const itensRj = itens.filter((i) => !emItu(i.lote));
   const itemItu = itens.find((i) => emItu(i.lote)) ?? null;
@@ -178,8 +184,8 @@ export default function NovaSolicitacao() {
       const r = await api.get<LoteCompativel[] | { itens: LoteCompativel[]; grupos?: Grupo[] }>(
         `/lotes/compativeis${qs({
           liga, formato: medida.formato,
-          espessura: num(medida.espessura), largura: num(medida.largura), diametro: num(medida.diametro),
-          comprimento: num(medida.comprimento), quantidade: num(quantidadeOp) ?? 1,
+          espessura: med.espessura ?? undefined, largura: med.largura ?? undefined, diametro: med.diametro ?? undefined,
+          comprimento: med.comprimento ?? undefined, quantidade: num(quantidadeOp) ?? 1,
         })}`,
       );
       setLotes(Array.isArray(r) ? r : r.itens);
@@ -236,8 +242,7 @@ export default function NovaSolicitacao() {
   function corpo(enviar: boolean, confirmacoes: Confirmacoes) {
     return {
       op: op?.numero, liga,
-      medida: { formato: medida.formato, espessura: num(medida.espessura) ?? null, largura: num(medida.largura) ?? null,
-        diametro: num(medida.diametro) ?? null, comprimento: num(medida.comprimento) ?? null },
+      medida: { formato: medida.formato, ...med },
       itens: itensRj.map((i) => {
         const b = i.bruto;
         const temBruto = Object.values(b).some((v) => v.trim() !== "");

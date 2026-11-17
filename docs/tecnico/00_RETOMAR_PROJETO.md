@@ -137,6 +137,11 @@ curl -s http://127.0.0.1:8090/api/saude               # saúde da API
 - **Migração 0008** revisada (sobe/desce/sobe, índice único parcial `uq_pend_entrada_aberta`, CHECKs). Aplicada na homologação. A próxima é a **0009**.
 - **Ponta a ponta** (`app/jobs/e2e_caminhos.py`) confere também 8 % no corte em Itu do RJ em Itu (B), consumo misto sem `OP_DUPLICADA` (B2, só prévia), lote da entrada NF sem código do Mega (D) e `lotes_rj_com_codigo_mega = 0`. **Só passa depois da recarga do zero** (em 12/11 a homologação ainda tinha 198 lotes RJ com código da carga antiga).
 
+## 7.6 Situação em 2026-11-17 (TÉCNICO, spec v3.11, R058)
+
+- **Migração 0009** aplicada na homologação (deploy do `e2f54fb`, 08h47): `item_mp.restricao_uso`, `item_mp.paridade_item_id`, colunas do "Encerrar pendência" do peso real em `solicitacao_corte` e o parâmetro `PENDENCIA_PESO_REAL_DIAS`. Revisão do BANCO E TESTES pedida no R061. A próxima é a **0010**.
+- **Recarga do zero** da homologação em 17/11 08h47 (planilhas `~/estoqueack-carga/planilhas/2026-11-17/` + `~/estoqueack-carga/correcoes_carga.json`, backup antes `estoqueack_20261117_084553`), numa conexão SSH: `tar` (planilhas + correções + script) por `ssh system-lab 'tar -x … && bash recarga.sh <sha>'`; o script confere o commit publicado, faz backup, sincroniza o Mega (`app.jobs.agendador --forcar`), prévia, `--importar --limpar`, conferência no banco e devolve os relatórios em base64 na mesma saída. Números em `docs/coordenacao/ESTADO_TECNICO.md`.
+
 ## 8. Registro de incidentes
 
 **2026-10-29, senha do backup publicada no GitHub.** O commit `ea2b71b (antigo 3422e54)` (13h04), feito pelo chat TÉCNICO com `git add -A`, incluiu `pass_bkp/pass.txt`, uma anotação local do Eduardo com a senha GPG dos backups, num repositório **público**.

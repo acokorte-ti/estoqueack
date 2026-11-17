@@ -63,6 +63,10 @@ def criar_lote(db: Session, *, item: ItemMP, planta_fiscal: str, local_fisico: s
     db.add(lote)
     db.flush()
     lote.codigo = f"L-{lote.id:06d}"
+    if item.restricao_uso:
+        # B09 (P33, 2026-11-17): a restrição gravada no item vale para todo lote novo dele ("estou ciente" na baixa)
+        db.add(Destinacao(lote_id=lote.id, tipo="RESTRICAO", descricao=item.restricao_uso[:300],
+                          criado_por_id=usuario_id))
     db.flush()
     return lote
 

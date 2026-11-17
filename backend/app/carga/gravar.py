@@ -75,12 +75,14 @@ def gravar(db: Session, pl: Plano, *, usuario_id: int | None, arquivos: dict[str
         itens[ch] = ItemMP(codigo_mega=it.codigo_mega, descricao=it.descricao, liga_id=ligas[it.liga].id,
                            formato=it.formato, espessura=it.espessura, largura=it.largura, diametro=it.diametro,
                            comprimento_fixado=(it.comprimento_fixado or None) and str(it.comprimento_fixado)[:120],
-                           observacao_uso=it.observacao_uso)
+                           observacao_uso=it.observacao_uso, restricao_uso=it.restricao_uso)
         db.add(itens[ch])
     db.flush()
     for ch, it in pl.itens.items():
         if it.substituido_por in itens:
             itens[ch].substituido_por_id = itens[it.substituido_por].id
+        if it.paridade_cm and ("CM", it.paridade_cm) in itens:      # paridade manual (§1.4 item 8)
+            itens[ch].paridade_item_id = itens[("CM", it.paridade_cm)].id
 
     # contêineres e lotes (saldo entra pelos movimentos)
     cts: dict[str, Conteiner] = {}
@@ -220,7 +222,10 @@ def gravar(db: Session, pl: Plano, *, usuario_id: int | None, arquivos: dict[str
         nf = _nf(x.extras)
         item_cop = None
         if sp.solicitacao is not None:
-            cand = [itens_cop[id(lp)] for lp in sp.solicitacao.liberacoes if id(lp) in itens_cop]
+            libs_sol = [lp for lp in sp.solicitacao.liberacoes if id(lp) in itens_cop]
+            if len(libs_sol) > 1:          # B07: corte dividido entre contêineres → o item do COP do contêiner do SA
+                libs_sol = [lp for lp in libs_sol if lp.lote.conteiner == x.origem_ct] or libs_sol
+            cand = [itens_cop[id(lp)] for lp in libs_sol]
             if len(cand) == 1 and id(cand[0]) not in usados:
                 item_cop = cand[0]
                 usados.add(id(item_cop))

@@ -139,7 +139,10 @@ def mesma_liga(mapa: dict[str, str], a: str, b: str) -> bool:
 def chave_lote(item: ItemMP, mapa: dict[str, str] | None = None) -> ChaveMaterial:
     """Mesma linha Itu × RJ (spec v3.7 §1.4 + P28, 2026-11-11): liga (1.2344 = H13, 1.2379 = D2 e as outras
     equivalências sem MOD da T22, `mapa_mesma_linha`; MOD diferente), formato, seção do cadastro, comprimento
-    informado na descrição e múltiplo. O código do Mega não entra."""
+    informado na descrição e múltiplo. O código do Mega não entra. Paridade manual (§1.4 item 8, 0009): o item RJ
+    confirmado pelo usuário como o mesmo material de um item de Itu usa a linha (chave) desse item."""
+    if item.paridade_item_id is not None and item.paridade_item is not None and item.paridade_item is not item:
+        return chave_lote(item.paridade_item, mapa)
     k = chave_material(interpretar(item.descricao or ""), item.descricao, item.comprimento_fixado)
     mapa = LIGA_MESMA_LINHA if mapa is None else mapa
     liga = mapa.get(item.liga.codigo, item.liga.codigo)
@@ -168,6 +171,7 @@ def lote_resumo(db: Session, lotes: list[Lote]) -> list[dict]:
             "descricao": l.item.descricao,
             "codigo_mega": l.item.codigo_mega if (l.planta_fiscal, l.local_fisico) == ("ITU", "ITU") else None,
             "chave_material": chave_lote(l.item, mapa).texto,
+            "paridade_manual": l.item.paridade_item_id is not None,      # §1.4 item 8 (R060)
             "estoque": BALDE.get((l.planta_fiscal, l.local_fisico)), "tipo": l.tipo,
             "saldo_kg": round(l.saldo_kg, 3), "reservado_kg": reservado,
             "disponivel_kg": round(l.saldo_kg - reservado, 3), "origem": origem,
@@ -185,7 +189,9 @@ def agrupado(itens: list[dict]) -> list[dict]:
         k = i["chave_material"]
         a = g.setdefault(k, {"chave": k, "liga": k.split(" ", 1)[0], "formato": i["formato"], "bitola": i["bitola"],
                              "lotes": 0, "saldo_kg": 0.0, "reservado_kg": 0.0, "disponivel_kg": 0.0,
-                             "por_estoque": defaultdict(float), "codigos_itu": set(), "ligas": set()})
+                             "por_estoque": defaultdict(float), "codigos_itu": set(), "ligas": set(),
+                             "paridade_manual": False})
+        a["paridade_manual"] = a["paridade_manual"] or bool(i.get("paridade_manual"))
         a["lotes"] += 1
         for c in ("saldo_kg", "reservado_kg", "disponivel_kg"):
             a[c] = round(a[c] + i[c], 3)

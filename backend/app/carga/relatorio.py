@@ -84,19 +84,44 @@ def gerar(pl: Plano, destino: Path, *, titulo: str, conferencia_banco: list[dict
                                           "Entrada no HISTORICO", "kg da entrada", "Linha HISTORICO",
                                           "Soma do HISTORICO", "Situação", "Linha de Itu", "Linha ESTOQUE 2026"],
          lin, [10, 40, 18, 40, 14, 14, 40, 12, 10, 12, 14, 60, 10])
-    _aba(wb, "Correções aplicadas", ["Linha do Estoque Geral", "kg", "Na planilha", "Corrigido para", "Fonte"],
-         [[c["linha"], c["kg"], c["antes"], c["depois"], c["fonte"]] for c in pl.correcoes_aplicadas],
-         [30, 10, 30, 30, 50])
+    _aba(wb, "Correções aplicadas", ["Onde (linha do Estoque Geral, da ESTOQUE 2026…)", "kg", "Na planilha",
+                                     "Corrigido para", "Fonte", "Tipo"],
+         [[c["linha"], c["kg"], c["antes"], c["depois"], c["fonte"], c.get("tipo")] for c in pl.correcoes_aplicadas],
+         [40, 10, 40, 40, 60, 16])
+    # v3.11 §10.9 (P33): o que a carga corrigiu em relação à planilha, para o Fabiano conferir caso a caso
+    _aba(wb, "Contêiner do Corte (B05)", ["OP", "MP no Controle de Corte", "Contêiner no Corte", "Contêiner usado",
+                                          "Fonte", "Contêineres com a OP", "Linha do Corte"],
+         [[c["op"], c["mp"], c["conteiner_corte"], c["conteiner"], c["fonte"], ", ".join(c["opcoes"]), c["linha"]]
+          for c in pl.conteiner_corrigido], [10, 24, 14, 14, 16, 30, 10])
+    _aba(wb, "Corte dividido (B07)", ["OP", "MP no Controle de Corte", "Contêiner no Corte", "Peso no Corte",
+                                      "Contêiner (ESTOQUE 2026)", "kg", "Material (ESTOQUE 2026)", "Linha do Corte"],
+         [[d["op"], d["mp"], d["conteiner_corte"], d["peso_corte"], ct, kg, mat, d["linha"]]
+          for d in pl.cortes_divididos for ct, kg, mat in d["partes"]], [10, 24, 14, 12, 16, 10, 36, 10])
+    _aba(wb, "Peso inicial (B08)", ["Contêiner", "Material (ESTOQUE 2026)", "Entrada do packing list (peso inicial)",
+                                    "PESO INICIAL 2026 (abertura)", "Saídas anteriores a 2026", "Data de entrada",
+                                    "Linhas do HISTORICO", "Linha ESTOQUE 2026"],
+         [[x["conteiner"], x["material"], x["packing"], x["abertura"], round(x["packing"] - x["abertura"], 3),
+           x["data_entrada"], ", ".join(map(str, x["linhas_hist"])), x["linha"]] for x in pl.peso_inicial_packing],
+         [12, 40, 18, 18, 16, 12, 30, 10])
+    _aba(wb, "Em aberto (avisos)", ["Aba", "Linha", "Descrição na planilha", "Aviso", "Fonte"],
+         [[a["aba"], a["linha"], a["descricao"], a["texto"], a["fonte"]] for a in pl.avisos], [16, 8, 30, 100, 40])
     lot = []
     for n, l in enumerate(pl.lotes, start=1):
         it = pl.itens[l.item]
+        d0 = next((m.data for m in l.movimentos if m.tipo == "SALDO_INICIAL"), None)
         lot.append([f"L-{n:06d}", l.estoque, l.conteiner, it.liga, it.descricao, it.codigo_mega, l.tipo,
-                    l.peso_inicial, l.saldo, l.conferencia_kg, "Não" if not l.origem_identificada else "Sim",
+                    l.peso_inicial, l.abertura_kg, d0, l.saldo, l.conferencia_kg,
+                    "Não" if not l.origem_identificada else "Sim",
                     len(l.movimentos), "; ".join(f"{t}: {d}" for t, d in l.destinacoes) or None,
-                    (l.origem or {}).get("arquivo"), (l.origem or {}).get("linha")])
+                    (l.origem or {}).get("arquivo"), (l.origem or {}).get("linha"), " | ".join(l.notas) or None])
     _aba(wb, "Lotes", ["Lote (previsto)", "Estoque", "Contêiner", "Liga", "Item", "Código Mega", "Tipo",
-                       "Peso inicial", "Saldo", "Conferência planilha", "Origem identificada", "Movimentos",
-                       "Restrições", "Arquivo", "Linha"], lot, [12, 22, 10, 9, 40, 11, 9, 11, 11, 11, 10, 9, 40, 30, 8])
+                       "Peso inicial", "Abertura 2026 (PESO INICIAL)", "Data de entrada", "Saldo",
+                       "Conferência planilha", "Origem identificada", "Movimentos", "Restrições", "Arquivo", "Linha",
+                       "Notas do lote"], lot,
+         [12, 22, 10, 9, 40, 11, 9, 11, 12, 12, 11, 11, 10, 9, 40, 30, 8, 80])
+    _aba(wb, "Restrições no item (B09)", ["Item", "Liga", "Código Mega", "Restrição", "Lotes do item"],
+         [[it.descricao, it.liga, it.codigo_mega, it.restricao_uso, sum(1 for l in pl.lotes if l.item == ch)]
+          for ch, it in pl.itens.items() if it.restricao_uso], [40, 10, 12, 50, 12])
     _aba(wb, "Solicitações", ["OP", "Item", "Cliente", "Lote (contêiner)", "Modo", "Qtd", "Peso previsto",
                               "Situação", "Cortes", "Peso cortado", "COP", "Prazo", "Linha"],
          [[s.op, s.item_codigo, s.cliente, s.lote.conteiner, s.modo, s.quantidade, s.peso_previsto, s.situacao,

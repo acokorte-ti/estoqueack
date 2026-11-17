@@ -24,12 +24,16 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
-from app.domain.medidas import ChaveMaterial, chave_material, comprimento_texto, interpretar
+from app.domain.medidas import ChaveMaterial, chave_material, comprimento_texto, faixa_na_secao, interpretar
 
+from . import correcoes as C
 from . import planilhas as P
 
 FAMILIA = {"1.2344": "H13", "A8MOD": "A8", "1.2379": "D2"}
 TOL_KG = 5.0
+# B08 (P33, Eduardo, 2026-11-17): o PESO INICIAL da ESTOQUE 2026 é o saldo de abertura de 2026, não o peso recebido.
+# O lote entra com a entrada do HISTORICO (packing list) e uma baixa "saídas anteriores a 2026" até a abertura.
+ABERTURA_ESTOQUE_2026 = date(2025, 12, 31)
 # R038 / §10.7: densidades da revisão do BLOCO 1 (aba 3, "Densidade proposta") e das ligas que não são aço
 DENSIDADES_REVISADAS = {
     "N2360M": 7.85, "K-100": 7.70, "D3": 7.70, "OH255": 7.85, "VF800": 7.80, "OH251": 7.85, "1.2721": 7.85,
@@ -80,6 +84,8 @@ class ItemP:
     codigo_mega: int | None = None
     comprimento_fixado: str | None = None
     observacao_uso: str | None = None
+    restricao_uso: str | None = None     # B09: restrição do item, herdada por todo lote novo do item
+    paridade_cm: int | None = None       # paridade manual (§1.4 item 8): código de Itu da mesma linha
     substituido_por: tuple | None = None
     origem: dict[str, Any] | None = None
 
@@ -115,6 +121,7 @@ class LoteP:
     origem: dict[str, Any] | None = None
     estoque: str = ""
     pai: LoteP | None = None            # lote de origem (RETO filho), quando a origem existe no cadastro
+    abertura_kg: float | None = None    # B08: PESO INICIAL da ESTOQUE 2026 (saldo de abertura de 2026)
 
     @property
     def saldo(self) -> float:
@@ -170,6 +177,15 @@ class Plano:
     # quando a linha de Itu da mesma liga e seção também tem comprimento. {linha: {texto, hist, usado, motivo}}
     compr_hist: dict[int, dict[str, Any]] = field(default_factory=dict)
     correcoes_aplicadas: list[dict[str, Any]] = field(default_factory=list)
+    # notas que as correções/avisos do arquivo --correcoes põem no lote, por (aba, linha) de origem
+    notas_origem: dict[tuple, list[str]] = field(default_factory=lambda: defaultdict(list))
+    consumo_corrigido: dict[str, str] = field(default_factory=dict)          # célula → texto (consumo_sem_op)
+    paridade_manual: dict[ChaveMaterial, dict[str, Any]] = field(default_factory=dict)
+    avisos: list[dict[str, Any]] = field(default_factory=list)
+    # B05 / B07 / B08: o que a carga corrigiu em relação à planilha, para o relatório
+    conteiner_corrigido: list[dict[str, Any]] = field(default_factory=list)
+    cortes_divididos: list[dict[str, Any]] = field(default_factory=list)
+    peso_inicial_packing: list[dict[str, Any]] = field(default_factory=list)
     solicitacoes: list[SolP] = field(default_factory=list)
     cops: dict[int, dict[str, Any]] = field(default_factory=dict)
     sas: list[SaP] = field(default_factory=list)
@@ -306,6 +322,11 @@ def montar(ctx: Contexto, estoque: list[P.LinhaEstoque2026], historico: list[dic
     global _MESMA_LINHA
     _MESMA_LINHA = ctx.mesma_linha
     pl = Plano(data_mega=ctx.data_mega)
+    # v3.11 §10.9: correções respondidas (arquivo --correcoes) antes de tudo; a planilha não muda (vai para a nota)
+    estoque, historico, corte, sas = C.aplicar_leitura(pl, ctx.correcoes, estoque, historico, corte, sas)
+    estoque = C.aplicar_consumo_sem_op(pl, ctx.correcoes, estoque)
+    C.preparar_paridade_manual(pl, ctx.correcoes, estoque, geral, chave_mat)
+    C.aplicar_avisos(pl, ctx.correcoes, geral, estoque)
     pl.compr_hist = _comprimentos_historico(estoque, historico, geral)
     _catalogo_geral(pl, ctx, geral)
     lotes_rj = _lotes_rj_no_rio(pl, ctx, estoque, historico)
@@ -315,9 +336,10 @@ def montar(ctx: Contexto, estoque: list[P.LinhaEstoque2026], historico: list[dic
     _estoque_mega(pl, ctx, geral)
     _ligar_reto_origem(pl)
     _correcoes_nao_aplicadas(pl, ctx)
-    _restricoes_e_avisos(pl, geral)
-    _solicitacoes(pl, ctx, corte, lotes_rj, estoque)
+    _restricoes_e_avisos(pl, ctx, geral)
+    _solicitacoes(pl, ctx, corte, lotes_rj, estoque, sas)
     _sas(pl, sas, lotes_rj)
+    _notas_das_correcoes(pl)
     _ops_mal_digitadas(pl, ctx, estoque, corte)
     _conferencias(pl, estoque, geral, corte, sas)
     return pl
@@ -346,12 +368,16 @@ def _catalogo_geral(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None
 
 
 def _item_rj(pl: Plano, ctx: Contexto, desc: str, origem, comprimento_fixado: str | None = None,
-             comprimento: str | None = None) -> tuple:
+             comprimento: str | None = None, manual: bool = False) -> tuple:
     """Item do lote RJ (no Rio e em Itu): SEMPRE sem código do Mega (spec v3.7 §1.4, decisão de 2026-11-11). Um item
-    por liga real + formato + seção + comprimento + múltiplo (P28); a escrita da descrição não conta."""
+    por liga real + formato + seção + comprimento + múltiplo (P28); a escrita da descrição não conta.
+    `manual` (só RJ no Rio): paridade manual do arquivo de correções (§1.4 item 8, P34(a)) → o item mantém a própria
+    medida (peso previsto e corte) e guarda o código de Itu da mesma linha (`paridade_cm` → item_mp.paridade_item_id),
+    que a T04/T07 usam só para agrupar."""
     m = medida(desc)
     liga = _liga(pl, ctx, m.liga, origem)
     k = chave_mat(desc, comprimento_fixado, comprimento)
+    pm = (pl.paridade_manual.get(chave_mat(desc)) or pl.paridade_manual.get(k)) if manual else None
     ch = ("RJ", liga, k.formato, k.espessura, k.largura, k.diametro, k.comprimento, k.multiplo)
     if ch not in pl.itens:
         # P29: o comprimento do HISTORICO entra na descrição do item (é ela que a T04/T07 leem para a mesma linha)
@@ -359,7 +385,16 @@ def _item_rj(pl: Plano, ctx: Contexto, desc: str, origem, comprimento_fixado: st
         cf = comprimento_fixado if k.multiplo else None
         pl.itens[ch] = ItemP(ch, nome, liga, _formato_valido(m), k.espessura, k.largura, k.diametro,
                              comprimento_fixado=cf, origem=origem)
+    if pm:
+        pl.itens[ch].paridade_cm = pm["g"].codigo
     return ch
+
+
+def _nota_faixa(lote: LoteP, desc: str) -> None:
+    """v3.11 §1.4 item 7: faixa na medida da seção vale pelo maior valor; a faixa escrita fica na nota do lote."""
+    f = faixa_na_secao(desc)
+    if f:
+        lote.notas.append(f"Faixa na medida da planilha: {f} (vale o maior valor: {chave_mat(desc).texto}).")
 
 
 def _data_consumo(dm: tuple[int, int] | None, hoje: date) -> date | None:
@@ -380,15 +415,41 @@ def _lotes_rj_no_rio(pl: Plano, ctx: Contexto, estoque: list[P.LinhaEstoque2026]
                      historico: list[dict] | None = None) -> dict[tuple, list[LoteP]]:
     idx: dict[tuple, list[LoteP]] = defaultdict(list)
     entrada: dict[tuple, date] = {}
+    entrada_kg: dict[tuple, float] = defaultdict(float)
+    entrada_linhas: dict[tuple, list[int]] = defaultdict(list)
     for h in historico or []:
+        k = (h["conteiner"], chave_familia(h["descricao"]))
         if h["data"]:
-            k = (h["conteiner"], chave_familia(h["descricao"]))
             entrada[k] = min(entrada.get(k, h["data"]), h["data"])
+        if h["descricao"].strip() not in ("?", ""):
+            entrada_kg[k] += h["entrada"] or 0
+            entrada_linhas[k].append(h["linha"])
+    linhas_por_chave = Counter((e.conteiner, chave_familia(e.material)) for e in estoque)
     for e in estoque:
-        item = _item_rj(pl, ctx, e.material, e.origem, comprimento=_compr_usado(pl, e.linha))
-        lote = LoteP(item, "RJ", "RJ", e.conteiner, e.peso_inicial, pecas=e.pecas, custo_kg=e.valor_unitario,
-                     conferencia_kg=e.total_estoque, origem=e.origem, estoque="RJ_NO_RIO")
+        item = _item_rj(pl, ctx, e.material, e.origem, comprimento=_compr_usado(pl, e.linha), manual=True)
+        kch = (e.conteiner, chave_familia(e.material))
+        # B08: peso inicial = entrada do HISTORICO (packing list) do mesmo contêiner + material, quando é uma linha só
+        # na ESTOQUE 2026 e a entrada é maior que o PESO INICIAL (o PESO INICIAL vira a conferência de abertura)
+        e_kg = round(entrada_kg.get(kch, 0.0), 3)
+        um_so = linhas_por_chave[kch] == 1
+        packing = e_kg if (um_so and e.peso_inicial > 0 and e_kg > e.peso_inicial + 0.0005) else None
+        lote = LoteP(item, "RJ", "RJ", e.conteiner, packing or e.peso_inicial, pecas=e.pecas,
+                     custo_kg=e.valor_unitario, conferencia_kg=e.total_estoque, origem=e.origem, estoque="RJ_NO_RIO",
+                     abertura_kg=e.peso_inicial)
         lote.notas.append(f"Material na planilha: {e.material}")
+        _nota_faixa(lote, e.material)
+        if e.peso_inicial > 0 and e_kg and e_kg < e.peso_inicial - TOL_KG:
+            pl.pend("PESO_INICIAL_MAIOR_QUE_ENTRADA", "REVISAR", f"{e.conteiner} {e.material}: PESO INICIAL da "
+                    f"ESTOQUE 2026 ({e.peso_inicial:g} kg) maior que a entrada do HISTORICO ({e_kg:g} kg, linhas "
+                    f"{', '.join(map(str, entrada_linhas[kch][:6]))}). Fica o PESO INICIAL.", e.origem)
+        elif e.peso_inicial > 0 and not e_kg:
+            # P34(b) [proposta]: sem ENTRADA no HISTORICO, fica o PESO INICIAL da ESTOQUE 2026 e vai para a lista
+            pl.pend("PESO_INICIAL_SEM_PACKING_LIST", "INFO", f"{e.conteiner} {e.material}: sem entrada no HISTORICO "
+                    f"(packing list); peso inicial = PESO INICIAL da ESTOQUE 2026 ({e.peso_inicial:g} kg).", e.origem)
+        elif e.peso_inicial > 0 and e_kg > e.peso_inicial + 0.0005 and linhas_por_chave[kch] > 1:
+            pl.pend("PESO_INICIAL_VARIAS_LINHAS", "INFO", f"{e.conteiner} {e.material}: a entrada do HISTORICO "
+                    f"({e_kg:g} kg) é de {linhas_por_chave[kch]} linhas da ESTOQUE 2026 do mesmo material; fica o "
+                    "PESO INICIAL de cada linha.", e.origem)
         if e.linha in pl.compr_hist:
             ch_ = pl.compr_hist[e.linha]
             lote.notas.append(f"Comprimento no HISTORICO: {ch_['texto']} mm ({ch_['motivo']}).")
@@ -401,8 +462,24 @@ def _lotes_rj_no_rio(pl: Plano, ctx: Contexto, estoque: list[P.LinhaEstoque2026]
             d0 = entrada.get((e.conteiner, chave_familia(e.material)))
             if datas and (d0 is None or d0 > min(datas)):
                 d0 = min(datas) - timedelta(days=1)
-            lote.movimentos.append(MovP("SALDO_INICIAL", e.peso_inicial, data=d0, documento="Carga ESTOQUE 2026",
-                                        origem=e.origem))
+            if packing:
+                lote.movimentos.append(MovP("SALDO_INICIAL", packing, data=d0, documento="Carga HISTORICO (packing "
+                                            "list)", origem=e.origem))
+                da = min([ABERTURA_ESTOQUE_2026] + [d - timedelta(days=1) for d in datas])
+                da = max(da, d0) if d0 else da
+                lote.movimentos.append(MovP(
+                    "AJUSTE_INVENTARIO", -round(packing - e.peso_inicial, 3), data=da, documento="Carga ESTOQUE 2026",
+                    justificativa=(f"Carga inicial: saídas anteriores a 2026 (entrada do packing list {packing:g} kg "
+                                   f"− saldo de abertura de 2026 {e.peso_inicial:g} kg)")[:500], origem=e.origem))
+                lote.notas.append(f"Peso inicial = entrada do HISTORICO (packing list, linhas "
+                                  f"{', '.join(map(str, entrada_linhas[kch][:8]))}): {packing:g} kg. Saldo de "
+                                  f"abertura de 2026 (PESO INICIAL da ESTOQUE 2026): {e.peso_inicial:g} kg.")
+                pl.peso_inicial_packing.append({"conteiner": e.conteiner, "material": e.material, "linha": e.linha,
+                                                "packing": packing, "abertura": e.peso_inicial,
+                                                "linhas_hist": entrada_linhas[kch], "data_entrada": d0})
+            else:
+                lote.movimentos.append(MovP("SALDO_INICIAL", e.peso_inicial, data=d0,
+                                            documento="Carga ESTOQUE 2026", origem=e.origem))
         for c in e.consumos:
             if c.sem_op:
                 pl.pend("SEM_OP", "REVISAR", f"{e.conteiner} {e.material}: consumo de {c.kg:g} kg sem OP "
@@ -413,6 +490,8 @@ def _lotes_rj_no_rio(pl: Plano, ctx: Contexto, estoque: list[P.LinhaEstoque2026]
                         f"legível (\"{c.comentario}\").", c.origem)
             op = c.ops[0] if c.ops else None
             extra = f" (comentário com várias OPs: {', '.join(map(str, c.ops))})" if len(c.ops) > 1 else ""
+            if c.origem.get("celula") in pl.consumo_corrigido:
+                extra += f" ({pl.consumo_corrigido[c.origem['celula']]})"
             lote.movimentos.append(MovP("SAIDA_CORTE_RJ", -c.kg, op=op, data=_data_consumo(c.dia_mes, ctx.hoje),
                                         documento=(c.comentario or "")[:60] or None,
                                         justificativa=("Carga: consumo da planilha" + extra)[:500], origem=c.origem))
@@ -492,19 +571,31 @@ def _paridade(pl: Plano, estoque: list[P.LinhaEstoque2026], geral: list[P.LinhaG
     for e in estoque:
         usado = _compr_usado(pl, e.linha)
         k = chave_mat(e.material, comprimento=usado)
-        a = rj.setdefault(k, {"descricoes": Counter(), "kg": 0.0, "origem": e.origem, "hist": False})
+        pm = pl.paridade_manual.get(chave_mat(e.material)) or pl.paridade_manual.get(k)
+        k_proprio = k
+        if pm:
+            k = pm["chave_itu"]           # §1.4 item 8: exceção confirmada pelo usuário (arquivo de correções)
+        a = rj.setdefault(k, {"descricoes": Counter(), "kg": 0.0, "origem": e.origem, "hist": False, "manual": None,
+                              "proprio": k_proprio})
         a["descricoes"][e.material] += 1
         a["kg"] += e.total_estoque
         a["hist"] = a["hist"] or bool(usado)
+        a["manual"] = a["manual"] or pm
     itens_rj = {it.chave: it for it in pl.itens.values() if it.chave[0] == "RJ"}
     for k, a in rj.items():
         desc_rj = a["descricoes"].most_common(1)[0][0]
-        ch = next((c for c, it in itens_rj.items() if chave_mat(it.descricao, it.comprimento_fixado) == k), None)
+        kp = a["proprio"] if a["manual"] else k            # paridade manual: o item RJ tem a própria medida
+        ch = next((c for c, it in itens_rj.items() if chave_mat(it.descricao, it.comprimento_fixado) == kp), None)
         p = _linha_paridade(desc_rj, "RJ_NO_RIO", k, a["kg"], geral_rio.get(k, 0.0), itu, ch, a["origem"])
         p["descricoes_rj"] = sorted(a["descricoes"])
         p["comprimento_historico"] = a["hist"]
         if a["hist"]:
             p["motivo"] += " (comprimento do HISTORICO)"
+        if a["manual"] and p["situacao"] == "MESMA LINHA":
+            g = a["manual"]["g"]
+            p["motivo"] = (f"mesma linha por exceção (paridade manual): {g.codigo} {g.descricao.strip()} "
+                           f"({a['manual']['fonte']})")
+            p["paridade_manual"] = True
         pl.paridades.append(p)
         if p["situacao"] != "MESMA LINHA" and a["kg"] > 0:
             pl.pend("PARIDADE_SO_NO_RJ", "INFO", f"Material RJ \"{desc_rj}\" ({a['kg']:.1f} kg): {p['motivo']} "
@@ -549,6 +640,8 @@ def _esgotados_historico(pl: Plano, ctx: Contexto, estoque, historico: list[dict
                               f"{h['pecas']} pç" if h["pecas"] else None,
                               h["data"].isoformat() if h["data"] else None, h["obs"], h["historico"]]
                     lote.notas.append("HISTORICO: " + " · ".join(str(x) for x in partes if x))
+                    lote.notas.extend(f"HISTORICO linha {h['linha']}: {t}"
+                                      for t in pl.notas_origem.get(("HISTORICO", h["linha"]), []))
             continue
         entrada = round(sum(h["entrada"] or 0 for h in hs), 3)
         if entrada <= 0:
@@ -571,6 +664,9 @@ def _esgotados_historico(pl: Plano, ctx: Contexto, estoque, historico: list[dict
         for h in hs:
             if h["obs"] or h["historico"]:
                 lote.notas.append("HISTORICO: " + " · ".join(x for x in (h["obs"], h["historico"]) if x))
+            lote.notas.extend(f"HISTORICO linha {h['linha']}: {t}"
+                              for t in pl.notas_origem.get(("HISTORICO", h["linha"]), []))
+        _nota_faixa(lote, hs[0]["descricao"])
         pl.lotes.append(lote)
         idx[(ct, k)].append(lote)
 
@@ -614,6 +710,10 @@ def _rj_em_itu(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
                                       f"anotadas: {sum(k for k, _ in parcelas):g} kg de {g.rj_em_itu:g} kg).")
                 if g.obs_itu:
                     lote.notas.append(f"Observação do Estoque Geral (RJ em Itu): {g.obs_itu}")
+                if not desc_origem:
+                    _nota_faixa(lote, g.descricao)
+                if "/" in g.descricao and not reto:
+                    lote.notas.append(f"Medidas na planilha: {g.descricao.strip()} (várias larguras num lote só).")
                 pl.lotes.append(lote)
             if parcelas:
                 pl.pend("RETO_EM_ITU_POR_ORIGEM", "INFO", f"{g.descricao}: {g.rj_em_itu:.1f} kg em {len(parcelas)} "
@@ -650,8 +750,8 @@ def _corrigir_parcelas(pl: Plano, ctx: Contexto, g: P.LinhaGeral, parcelas: list
                 fonte = c.get("fonte") or "arquivo de correções"
                 pl.pend("CORRECAO_APLICADA", "INFO", f"{g.descricao}: parcela de {kg:g} kg com origem \"{d}\" na "
                         f"planilha corrigida para \"{novo}\" ({fonte}).", g.origem)
-                pl.correcoes_aplicadas.append({"linha": g.descricao, "kg": kg, "antes": d, "depois": novo,
-                                               "fonte": fonte, "regra": n})
+                pl.correcoes_aplicadas.append({"tipo": "origem_reto", "linha": g.descricao, "kg": kg, "antes": d,
+                                               "depois": novo, "fonte": fonte, "regra": ("origem_reto", n)})
                 break
         out.append((kg, novo))
     return out
@@ -662,7 +762,7 @@ def _correcoes_nao_aplicadas(pl: Plano, ctx: Contexto) -> None:
     é recusada (`gravar.gravar`) até o arquivo de correções ou a planilha serem acertados."""
     aplicadas = {a.get("regra") for a in pl.correcoes_aplicadas}
     for n, c in enumerate(ctx.correcoes.get("origem_reto") or []):
-        if n not in aplicadas:
+        if ("origem_reto", n) not in aplicadas:
             pl.pend("CORRECAO_NAO_APLICADA", "BLOQUEIA", f"Correção não aplicada: {c.get('linha_descricao')} / "
                     f"\"{c.get('origem_planilha')}\" → \"{c.get('origem_correta')}\" (nenhuma parcela igual).",
                     None, "Conferir o arquivo de correções e o comentário da célula")
@@ -741,15 +841,13 @@ def _estoque_mega(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
                 "Geral e sem movimento no kardex nos últimos 2 anos. Não entra (§10.7).", None)
 
 
-def _restricoes_e_avisos(pl: Plano, geral: list[P.LinhaGeral]) -> None:
-    por_chave: dict[tuple, list[LoteP]] = defaultdict(list)       # (chave P28, estoque) → lotes RJ (sem código)
+def _restricoes_e_avisos(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
+    lotes_do_item: dict[tuple, list[LoteP]] = defaultdict(list)
     for l in pl.lotes:
-        if l.item[0] == "RJ":
-            it = pl.itens[l.item]
-            por_chave[(chave_mat(it.descricao, it.comprimento_fixado), l.estoque)].append(l)
+        lotes_do_item[l.item].append(l)
     for g in geral:
         ch = ("CM", g.codigo) if g.codigo else None
-        for texto, estoque in ((g.obs_rj, "RJ_NO_RIO"), (g.obs_itu, "RJ_EM_ITU")):
+        for texto in (g.obs_rj, g.obs_itu):
             if not texto:
                 continue
             up = texto.upper()
@@ -767,17 +865,33 @@ def _restricoes_e_avisos(pl: Plano, geral: list[P.LinhaGeral]) -> None:
                             "encontrado no catálogo.", g.origem)
                 continue
             if any(t in up for t in TERMOS_RESTRICAO):
-                # observação das colunas RJ vale só para os lotes RJ (sem código) do mesmo material e estoque
-                # (a linha do Estoque Geral é de um código de Itu; se ela tem comprimento/múltiplo e o RJ não, vale a
-                # mesma liga e seção sem o comprimento: a observação é do material RJ anotado nessa linha)
+                # B09 (P33, Eduardo, 2026-11-17): a observação das colunas RJ é do material RJ anotado nessa linha
+                # (item RJ, sem código, da mesma liga × bitola; se a linha de Itu tem comprimento/múltiplo e o RJ não,
+                # vale a mesma liga e seção sem o comprimento). Fica gravada NO ITEM (`restricao_uso`), que a passa a
+                # todo lote novo do item (T06, T13, recebimento), e vai como restrição para os lotes que já existem.
+                # Sem lote, a carga cria o item RJ só para guardar a restrição. Leitura literal: vale para os lotes
+                # do item RJ nos dois estoques do RJ (no Rio e em Itu); o código de Itu (Estoque Mega) não muda.
                 k = chave_mat(g.descricao, g.comprimento_fixado)
-                alvos = (por_chave.get((k, estoque)) or
-                         por_chave.get((ChaveMaterial(k.liga, k.formato, k.espessura, k.largura, k.diametro, None,
-                                                      False), estoque), []))
-                for l in alvos:
-                    l.destinacoes.append(("RESTRICAO", texto[:300]))
-                pl.pend("RESTRICAO_A_REVISAR", "INFO", f"{g.descricao}: \"{texto}\" vira restrição em "
-                        f"{len(alvos)} lote(s).", g.origem, "Conferir se é reserva (com kg) ou restrição")
+                k0 = ChaveMaterial(k.liga, k.formato, k.espessura, k.largura, k.diametro, None, False)
+                rj = [it for it in pl.itens.values() if it.chave[0] == "RJ"]
+                itens = ([it for it in rj if chave_mat(it.descricao, it.comprimento_fixado) == k] or
+                         [it for it in rj if chave_mat(it.descricao, it.comprimento_fixado) == k0])
+                criado = not itens
+                if criado:
+                    itens = [pl.itens[_item_rj(pl, ctx, g.descricao, g.origem, g.comprimento_fixado)]]
+                alvos = []
+                for it in itens:
+                    atuais = [x for x in (it.restricao_uso or "").split("; ") if x]
+                    if texto[:300] not in atuais:
+                        it.restricao_uso = "; ".join(atuais + [texto[:300]])[:300]
+                    for l in lotes_do_item.get(it.chave, []):
+                        if ("RESTRICAO", texto[:300]) not in l.destinacoes:
+                            l.destinacoes.append(("RESTRICAO", texto[:300]))
+                        alvos.append(l)
+                pl.pend("RESTRICAO_A_REVISAR", "INFO", f"{g.descricao}: \"{texto}\" gravada no item RJ "
+                        f"\"{itens[0].descricao}\"" + (" (criado sem lote, só para a restrição)" if criado else "")
+                        + f"; vira restrição em {len(alvos)} lote(s).", g.origem,
+                        "Conferir se é reserva (com kg) ou restrição")
         for c in g.comentarios:
             if re.search(r"PEDID|COMPRA|PRAZO|EMBARC|CHEGA", c, re.I):
                 pl.pend("MATERIAL_A_CHEGAR", "INFO", f"{g.descricao}: \"{c[:200]}\" (vai para T26).", g.origem)
@@ -802,13 +916,70 @@ def _previsto(lote: LoteP, it: ItemP, dens: float, instr: str | None, qtd: int, 
     return 0.0
 
 
+def _conteiner_pela_op(pl: Plano, c: P.LinhaCorte, idx: dict[tuple, list[LoteP]],
+                       consumo_por_ct_op: dict[tuple, list[MovP]], sa_por_op: dict[int, list[P.LinhaSa]],
+                       cand_corte: list[LoteP]) -> list[LoteP]:
+    """Spec v3.11 §10.9 A.1 (B05 da P33, Eduardo, 2026-11-17): contêiner errado no Controle de Corte.
+
+    - A mesma OP (mesmo material) aparece como consumo da ESTOQUE 2026 **e** no ORIGEM do SA num contêiner que não é
+      o do Corte → vale o da ESTOQUE 2026/SA (vários em comum: o de maior consumo; o corte se divide, B07).
+    - A ESTOQUE 2026 e o SA discordam entre si → fica o do Controle de Corte, na lista de pendências [P34(d)].
+    - O contêiner do Corte não tem o material e só uma das duas fontes tem a OP → vale essa fonte (ex. da P33: o
+      Corte diz um contêiner sem aquele material e a ESTOQUE 2026 mostra o consumo em outro).
+    - Contêiner do Corte entre os da ESTOQUE 2026 → não muda (corte dividido é a B07)."""
+    fam = chave_familia(c.mp or "")
+    est = sorted({ct for (ct, op) in consumo_por_ct_op if op == c.op and idx.get((ct, fam))})
+    sa = sorted({x.origem_ct for x in sa_por_op.get(c.op, []) if idx.get((x.origem_ct, fam))})
+    if c.conteiner in est:
+        return cand_corte
+    if est and sa:
+        opcoes = [ct for ct in est if ct in sa]
+        fonte = "ESTOQUE 2026 e planilha de SA"
+        if not opcoes:
+            pl.pend("CONTEINER_DISCORDANTE", "REVISAR", f"OP {c.op} ({c.mp}): o Controle de Corte diz {c.conteiner}, "
+                    f"a ESTOQUE 2026 diz {', '.join(est)} e o SA diz {', '.join(sa)}. Fica o do Controle de Corte "
+                    "[P34(d)].", c.origem, "Conferir o contêiner com o Fabiano")
+            return cand_corte
+    elif not cand_corte and (est or sa):
+        opcoes, fonte = (est, "ESTOQUE 2026") if est else (sa, "planilha de SA")
+    else:
+        return cand_corte
+    ct = max(opcoes, key=lambda x: (sum(-m.kg for m in consumo_por_ct_op.get((x, c.op), [])), x))
+    pl.conteiner_corrigido.append({"op": c.op, "mp": c.mp, "conteiner_corte": c.conteiner, "conteiner": ct,
+                                   "fonte": fonte, "opcoes": opcoes, "linha": c.linha})
+    pl.pend("CONTEINER_CORRIGIDO", "INFO", f"OP {c.op} ({c.mp}): o Controle de Corte diz {c.conteiner}; vale o {ct}, "
+            f"da {fonte} da mesma OP (§10.9 A.1)." +
+            (f" Contêineres com a OP: {', '.join(opcoes)}." if len(opcoes) > 1 else ""), c.origem)
+    return idx[(ct, fam)]
+
+
+def _pecas_divididas(pecas: int, kgs: list[float]) -> list[int]:
+    """Divide as peças pelos kg de cada parte (maiores restos), somando o total."""
+    tot = sum(kgs) or 1.0
+    base = [int(pecas * k / tot) for k in kgs]
+    resto = sorted(range(len(kgs)), key=lambda i: -(pecas * kgs[i] / tot - base[i]))
+    for i in resto[:pecas - sum(base)]:
+        base[i] += 1
+    return base
+
+
 def _solicitacoes(pl: Plano, ctx: Contexto, corte: list[P.LinhaCorte], idx: dict[tuple, list[LoteP]],
-                  estoque) -> None:
+                  estoque, sas: list[P.LinhaSa] | None = None) -> None:
     consumo_por_ct_op: dict[tuple, list[MovP]] = defaultdict(list)
+    lote_do_mov: dict[int, LoteP] = {}
     for l in pl.lotes:
         for m in l.movimentos:
             if m.tipo == "SAIDA_CORTE_RJ" and m.op:
                 consumo_por_ct_op[(l.conteiner, m.op)].append(m)
+                lote_do_mov[id(m)] = l
+    cts_do_corte: dict[int, set[str]] = defaultdict(set)
+    for c in corte:
+        if c.op and c.conteiner:
+            cts_do_corte[c.op].add(c.conteiner)
+    sa_por_op: dict[int, list[P.LinhaSa]] = defaultdict(list)
+    for x in sas or []:
+        if x.op and x.origem_ct:
+            sa_por_op[x.op].append(x)
     sem_cop: list[int] = []
     for c in corte:
         if not c.op:
@@ -822,6 +993,7 @@ def _solicitacoes(pl: Plano, ctx: Contexto, corte: list[P.LinhaCorte], idx: dict
                 cand = idx.get((ct.replace(" ", ""), chave_familia(c.mp or "")), [])
                 if cand:
                     break
+        cand = _conteiner_pela_op(pl, c, idx, consumo_por_ct_op, sa_por_op, cand)
         if not cand:
             pl.pend("SOLICITACAO_SEM_LOTE", "BLOQUEIA", f"OP {c.op}: material {c.mp} / {c.conteiner} não encontrado "
                     "nos lotes (ESTOQUE 2026 nem HISTORICO). Linha não importada.", c.origem)
@@ -858,6 +1030,33 @@ def _solicitacoes(pl: Plano, ctx: Contexto, corte: list[P.LinhaCorte], idx: dict
             pecas = c.pecas_cortadas or qtd
             movs = consumo_por_ct_op.get((lote.conteiner, c.op), [])
             peso = c.peso2 if c.peso2 and c.peso2 > 0 else round(sum(-m.kg for m in movs), 3) or (c.peso or 0)
+            # B07 (P33): a mesma OP consumida em outro contêiner da ESTOQUE 2026 (mesma liga, contêiner que não
+            # aparece em outra linha do Controle de Corte dessa OP) → o corte é dividido como a ESTOQUE 2026 mostra
+            fam_liga = chave_familia(c.mp or "")[0]
+            outros: dict[str, list[MovP]] = {}
+            for (ct_, op_), ms in consumo_por_ct_op.items():
+                if op_ != c.op or ct_ == lote.conteiner or ct_ in cts_do_corte[c.op]:
+                    continue
+                livres = [m for m in ms if m.liberacao is None and FAMILIA.get(
+                    pl.itens[lote_do_mov[id(m)].item].liga, pl.itens[lote_do_mov[id(m)].item].liga) == fam_liga]
+                if livres:
+                    outros[ct_] = livres
+            partes: list[tuple[LoteP, float, list[MovP]]] = [(lote, peso, movs)]
+            # só divide quando o contêiner do Corte tem parte do consumo e o peso do Corte é o total das partes
+            # (ex. da P33: 650 kg no Corte = 198 kg no CH02CR + 452 kg no CH39SH na ESTOQUE 2026)
+            kg_outros = {ct_: round(sum(-m.kg for m in ms), 3) for ct_, ms in outros.items()}
+            kg_main = round(sum(-m.kg for m in movs), 3)
+            tol = max(0.5, min(TOL_KG, 0.02 * peso))
+            if outros and 0 < kg_main < peso - 0.0005 and abs(kg_main + sum(kg_outros.values()) - peso) <= tol:
+                partes = [(lote, kg_main, movs)] + [(lote_do_mov[id(ms[0])], kg_outros[ct_], ms)
+                                                     for ct_, ms in sorted(outros.items())]
+                pl.cortes_divididos.append({
+                    "op": c.op, "mp": c.mp, "linha": c.linha, "conteiner_corte": c.conteiner, "peso_corte": peso,
+                    "partes": [(lp.conteiner, kg, pl.itens[lp.item].descricao) for lp, kg, _ in partes]})
+                pl.pend("CORTE_DIVIDIDO", "INFO", f"OP {c.op}: corte de {peso:g} kg no Controle de Corte "
+                        f"({c.conteiner}) dividido como na ESTOQUE 2026: " + "; ".join(
+                            f"{kg:g} kg {lp.conteiner} {pl.itens[lp.item].descricao}" for lp, kg, _ in partes)
+                        + " (B07).", c.origem)
             if peso > 0:
                 ncop = None
                 mc = re.search(r"COP\s*(\d+)", obs)
@@ -865,18 +1064,19 @@ def _solicitacoes(pl: Plano, ctx: Contexto, corte: list[P.LinhaCorte], idx: dict
                     ncop = int(mc.group(1))
                 elif c.liberacao_feita:
                     sem_cop.append(c.linha)
-                lib = LibP(lote, pecas, round(peso, 3), c.data_liberacao or c.data or ctx.hoje, ncop,
-                           ("RECEBIDO" if c.recebido else "EM_TRANSITO") if c.liberacao_feita and ncop else None,
-                           c.origem)
-                s.liberacoes.append(lib)
-                for m in movs:
-                    if m.liberacao is None:
-                        m.liberacao = lib
-                if ncop:
-                    cp = pl.cops.setdefault(ncop, {"numero": ncop, "datas": [], "itens": 0, "recebidos": 0})
-                    cp["datas"].append(lib.data)
-                    cp["itens"] += 1
-                    cp["recebidos"] += 1 if c.recebido else 0
+                for (lp, kg, ms), pc in zip(partes, _pecas_divididas(pecas, [k for _, k, _ in partes]), strict=True):
+                    lib = LibP(lp, pc, round(kg, 3), c.data_liberacao or c.data or ctx.hoje, ncop,
+                               ("RECEBIDO" if c.recebido else "EM_TRANSITO") if c.liberacao_feita and ncop else None,
+                               c.origem)
+                    s.liberacoes.append(lib)
+                    for m in ms:
+                        if m.liberacao is None:
+                            m.liberacao = lib
+                    if ncop:
+                        cp = pl.cops.setdefault(ncop, {"numero": ncop, "datas": [], "itens": 0, "recebidos": 0})
+                        cp["datas"].append(lib.data)
+                        cp["itens"] += 1
+                        cp["recebidos"] += 1 if c.recebido else 0
             else:
                 pl.pend("CORTE_SEM_PESO", "REVISAR", f"OP {c.op}: corte registrado sem PESO2 nem consumo na ESTOQUE "
                         "2026; entra sem o corte.", c.origem)
@@ -889,6 +1089,9 @@ def _solicitacoes(pl: Plano, ctx: Contexto, corte: list[P.LinhaCorte], idx: dict
 
 def _sas(pl: Plano, sas: list[P.LinhaSa], idx: dict[tuple, list[LoteP]]) -> None:
     sol_por = {(s.op, s.lote.conteiner): s for s in pl.solicitacoes}
+    for s in pl.solicitacoes:                     # B07: SA do contêiner de uma parte do corte dividido
+        for lib in s.liberacoes:
+            sol_por.setdefault((s.op, lib.lote.conteiner), s)
     itens_por_sa: dict[int, set[int]] = defaultdict(set)
     for x in sas:
         if not x.op and not x.sa_codigo:
@@ -933,6 +1136,17 @@ def _ops_mal_digitadas(pl: Plano, ctx: Contexto, estoque, corte) -> None:
     pl.contagens["ops_nao_verificadas_no_mega"] = nao_verificadas
 
 
+def _notas_das_correcoes(pl: Plano) -> None:
+    """Notas das correções/avisos (arquivo --correcoes) nos lotes da linha de origem (ESTOQUE 2026 e Estoque Geral;
+    as do HISTORICO já entraram em `_esgotados_historico`)."""
+    for l in pl.lotes:
+        o = l.origem or {}
+        if o.get("aba") in ("ESTOQUE 2026", "Estoque Geral"):
+            for t in pl.notas_origem.get((o["aba"], o.get("linha")), []):
+                if t not in l.notas:
+                    l.notas.append(t)
+
+
 def _conferencias(pl: Plano, estoque, geral, corte, sas) -> None:
     def add(nome, planilha, sistema, tol=TOL_KG, obs=None):
         dif = None if planilha is None or sistema is None else round(sistema - planilha, 3)
@@ -962,8 +1176,17 @@ def _conferencias(pl: Plano, estoque, geral, corte, sas) -> None:
     validas = [c for c in corte if c.op]
     add("(d) Solicitações históricas importadas × linhas do Controle de Corte", len(corte), len(pl.solicitacoes), 0,
         obs=f"{len(corte) - len(validas)} sem OP; o resto não importado está nas pendências (SOLICITACAO_SEM_LOTE)")
+    extra = sum(len(d["partes"]) - 1 for d in pl.cortes_divididos)
     add("(d) Cortes (liberações) importados", sum(1 for c in corte if c.pecas_cortadas or c.liberacao_feita),
-        sum(len(s.liberacoes) for s in pl.solicitacoes), 0, obs="Cortes sem peso ficam de fora (CORTE_SEM_PESO)")
+        sum(len(s.liberacoes) for s in pl.solicitacoes) - extra, 0,
+        obs="Cortes sem peso ficam de fora (CORTE_SEM_PESO)" + (
+            f"; {len(pl.cortes_divididos)} corte(s) dividido(s) entre contêineres (B07) = {extra} liberação(ões) a "
+            "mais, descontadas aqui" if extra else ""))
+    # B08: o saldo do lote em 31/12/2025 (entrada do packing list − saídas anteriores) = PESO INICIAL da ESTOQUE 2026
+    dif_ab = [l for l in rio if l.abertura_kg is not None and l.abertura_kg > 0 and abs(round(sum(
+        m.kg for m in l.movimentos if m.tipo in ("SALDO_INICIAL", "AJUSTE_INVENTARIO")), 3) - l.abertura_kg) > 0.01]
+    add("(b) Lotes RJ no Rio: saldo de abertura de 2026 ≠ PESO INICIAL da ESTOQUE 2026 (linhas)", 0, len(dif_ab), 0,
+        obs=f"{len(pl.peso_inicial_packing)} lote(s) com peso inicial = entrada do packing list (B08)")
     cops_planilha = {int(m.group(1)) for c in corte if (m := re.search(r"COP\s*(\d+)", (c.observacao or "").upper()))}
     add("(d) COPs importados × COPs citados no Controle de Corte", len(cops_planilha), len(pl.cops), 0)
     add("(d) SAs históricos importados × linhas da planilha de SA", len([x for x in sas if x.op or x.sa_codigo]),

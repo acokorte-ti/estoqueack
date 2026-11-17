@@ -92,6 +92,10 @@ class SolicitacaoCorte(Base):
     situacao: Mapped[str] = mapped_column(String(25), default="RASCUNHO", index=True)
     encerrada_saldo_pendente: Mapped[bool] = mapped_column(Boolean, default=False)
     consumo_misto: Mapped[bool] = mapped_column(Boolean, default=False)   # 0008: OP com consumo Itu + RJ (P26)
+    # 0009 (R058): "Encerrar pendência" do peso real da peça inteira do RJ (P33(e)); a solicitação não muda
+    peso_real_encerrada_em: Mapped[datetime | None] = mapped_column(DataHora)
+    peso_real_encerrada_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    peso_real_justificativa: Mapped[str | None] = mapped_column(String(500))
     motivo: Mapped[str | None] = mapped_column(String(500))      # material insuficiente / cancelamento / encerramento
     confirmacoes: Mapped[dict[str, Any] | None] = mapped_column(JsonDoc)
     enviada_em: Mapped[datetime | None] = mapped_column(DataHora)

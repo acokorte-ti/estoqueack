@@ -86,13 +86,48 @@ _RE_RET = re.compile(r"(\d+(?:[.,]\d+)?)\s*X\s*(\d+(?:[.,]\d+)?)(?:\s*X\s*(\d+(?
 _RE_MARCA_REDONDO = re.compile(r"Ø|(?<![A-Z])RED(?![A-Z])|(?<![A-Z])ROUND(?![A-Z])")
 _RE_DIAM_COMP = re.compile(r"(\d+(?:[.,]\d+)?)\s*X\s*(\d+(?:[.,]\d+)?)(?!\s*X)")
 
+# Faixa na medida da SEÇÃO (spec v3.11 §1.4 item 7, Eduardo, 2026-11-17; fecha o R057 item 1): espessura, largura ou
+# Ø escritos como faixa valem pelo MAIOR valor, em qualquer escrita: 'X(400-600)', 'X(700-800MM)', '26X500~610',
+# '15X510-620'. Só as duas primeiras medidas (a seção) e o Ø: a faixa do comprimento ('21X203X1110-3347') continua
+# sendo faixa de comprimento (P29(b)).
+_F = r"\d+(?:[.,]\d+)?"
+_RE_FAIXA_PAR = re.compile(rf"\(\s*({_F})\s*[-~]\s*({_F})\s*(?:MM)?\s*\)")
+_RE_SECAO_FAIXA = re.compile(rf"(?<![\d.,])({_F})(?:\s*[-~]\s*({_F}))?\s*X\s*({_F})(?:\s*[-~]\s*({_F}))?")
+_RE_DIAM_FAIXA = re.compile(rf"((?:Ø|\bRED\b\.?)\s*Ø?\s*)({_F})\s*[-~]\s*({_F})")
+
+
+def _maior(a: str, b: str | None) -> str:
+    return a if b is None or _num(a) >= _num(b) else b
+
+
+def _secao_pelo_maior(t: str) -> str:
+    """Troca a faixa da seção pelo maior valor (texto já em maiúsculas, com 'X' como separador)."""
+    t = _RE_FAIXA_PAR.sub(lambda m: _maior(m.group(1), m.group(2)), t)
+    m = _RE_SECAO_FAIXA.search(t)
+    if m and (m.group(2) or m.group(4)):
+        t = t[:m.start()] + f"{_maior(m.group(1), m.group(2))}X{_maior(m.group(3), m.group(4))}" + t[m.end():]
+    return _RE_DIAM_FAIXA.sub(lambda x: x.group(1) + _maior(x.group(2), x.group(3)), t)
+
+
+def faixa_na_secao(descricao: str | None) -> str | None:
+    """A faixa escrita na seção (para anotar no lote), ou None. Ex.: 'IMP-A8 26X500~610MM' → '26X500~610'."""
+    t = (descricao or "").upper().replace("×", "X")
+    m = _RE_FAIXA_PAR.search(t)
+    if m:
+        ini = t.rfind(" ", 0, m.start()) + 1
+        return t[ini:m.end()].strip()
+    m = _RE_SECAO_FAIXA.search(t)
+    if m and (m.group(2) or m.group(4)):
+        return re.sub(r"\s+", "", m.group(0))
+    m = _RE_DIAM_FAIXA.search(t)
+    return re.sub(r"\s+", "", m.group(0)) if m else None
+
 
 def interpretar(descricao: str) -> Medida:
     """Extrai liga e bitola de uma descrição livre."""
     liga = normalizar_liga(descricao)
     t = (descricao or "").upper().replace("×", "X")     # P28(3): x, X e × são o mesmo separador (HISTORICO usa ×)
-    # Faixa de largura 'X(400-600)' ou 'X(700-800MM)' → usa o maior valor (capacidade máxima da bitola)
-    t = re.sub(r"\((\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)\s*(?:MM)?\s*\)", lambda m: m.group(2), t)
+    t = _secao_pelo_maior(t)                             # faixa na seção → maior valor (v3.11 §1.4 item 7)
     if re.search(r"\bRETO\b", t):
         return Medida(liga, "RETO")
     # Remove a liga do texto para não confundir números (ex.: 1.2746 76x183)
@@ -199,7 +234,7 @@ def _n(x: str) -> str:
 
 def comprimento_texto(descricao: str | None, formato: str) -> str | None:
     """Comprimento informado na descrição, com faixa (P29: '2800-6000' = faixa; faixa igual = mesma linha)."""
-    t = (descricao or "").upper().replace("×", "X")
+    t = _secao_pelo_maior((descricao or "").upper().replace("×", "X"))     # '50X410-460X2210-5505' → 2210-5505
     m = (_RE_COMPR_RED if formato == "REDONDO" else _RE_COMPR_RET).search(t)
     if not m:
         return None

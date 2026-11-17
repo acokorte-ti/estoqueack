@@ -72,6 +72,25 @@ Gravidade: **BLOQUEIA** (a linha não entra), **REVISAR** (entra, mas o Fabiano 
 
   `kg` é opcional (sem ele, vale para qualquer parcela com essa origem). Cada correção aplicada vai para a nota do lote, para a pendência `CORRECAO_APLICADA` e para a aba "Correções aplicadas". Arquivo ilegível → a carga para (código 2).
 
+- **Tipos novos (spec v3.11 §10.9 B, 2026-11-17; código em `app/carga/correcoes.py`).** Correção que não casa com a planilha → `CORRECAO_NAO_APLICADA` (BLOQUEIA: a gravação é recusada). A planilha não muda: o valor original vai para a nota do lote.
+
+```json
+{ "leitura": [ { "aba": "ESTOQUE 2026 | HISTORICO | CONTROLE DE CORTE | SA",
+                 "linhas": [90, "252-269"], "conteiner": "CTxx" ou ["CTxx", "CTyy"],
+                 "descricao_planilha": "<texto inteiro>", "contem": "<regex; no SA, MATERIAL + DIMENSÃO>",
+                 "liga_planilha": "1.2746", "liga_correta": "H13",          (troca só a liga no texto)
+                 "descricao_correta": "<texto novo>", "conteiner_correto": "CTzz", "nota": "<vai para o lote>",
+                 "esperado": 6, "fonte": "<quem confirmou e quando>" } ],
+  "consumo_sem_op": [ { "celula": "J163", "op_planilha": 989123, "fonte": "…" } ],     (op_planilha null = "OP -")
+  "paridade_manual": [ { "descricao_rj": "<material da ESTOQUE 2026>", "codigo_itu": 0,
+                         "descricao_itu": "<descrição do código no Estoque Geral>", "fonte": "…" } ],
+  "avisos": [ { "aba": "Estoque Geral | ESTOQUE 2026", "linha": 0, "descricao_planilha": "…",
+                "texto": "<pergunta em aberto>", "fonte": "…" } ] }
+```
+
+  Filtros de `leitura` somam (todos têm de casar); `esperado` = quantas linhas têm de casar. `paridade_manual` (P34(a)): o lote RJ mantém a própria medida e o item ganha `item_mp.paridade_item_id` (migração 0009) = item do código de Itu, que a T04/T07 usam só para agrupar. `avisos` não muda nada: vira pendência `PENDENTE_USUARIO` e nota do lote.
+- **O que a carga faz sozinha (§10.9 A):** contêiner do Controle de Corte pelo da ESTOQUE 2026 + SA da mesma OP (`CONTEINER_CORRIGIDO`; se discordam, fica o do Corte: `CONTEINER_DISCORDANTE`); corte dividido como a ESTOQUE 2026 mostra quando o peso do Corte = soma das partes (`CORTE_DIVIDIDO`); peso inicial = ENTRADA do HISTORICO, com `AJUSTE_INVENTARIO` "saídas anteriores a 2026" em 31/12/2025 até o PESO INICIAL da ESTOQUE 2026 (conferência "(b) saldo de abertura"); sem HISTORICO, PESO INICIAL + `PESO_INICIAL_SEM_PACKING_LIST`; restrição das colunas RJ gravada em `item_mp.restricao_uso` (item RJ criado sem lote se preciso; todo lote novo do item herda, `movimentos.criar_lote`); faixa da seção pelo maior valor, com a faixa na nota do lote. Abas do relatório: "Contêiner do Corte (B05)", "Corte dividido (B07)", "Peso inicial (B08)", "Restrições no item (B09)", "Em aberto (avisos)".
+
 ```bash
 docker compose exec -T api python -m app.carga --pasta /tmp/carga/planilhas --saida /tmp/carga/relatorios \
     --correcoes /tmp/carga/correcoes_carga.json

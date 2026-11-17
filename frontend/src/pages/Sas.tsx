@@ -20,11 +20,11 @@ interface Sa {
 interface CopResumo { id: number; numero: number; situacao: string; qtd_itens: number; peso_total_kg: number }
 interface Lista { itens: Sa[]; total: number; cops_aguardando_sa: CopResumo[] }
 
-const SITUACAO: Record<SituacaoSa, { nome: string; classe: string }> = {
-  PENDENTE: { nome: "Pendente", classe: "" },
-  PREPARADO: { nome: "Preparado", classe: "info" },
-  AGUARDANDO_MEGA: { nome: "Aguardando Mega", classe: "atencao" },
-  CONFIRMADO: { nome: "Confirmado", classe: "ok" },
+const SITUACAO: Record<SituacaoSa, { nome: string; classe: string; dica: string }> = {
+  PENDENTE: { nome: "Pendente", classe: "", dica: "Fabiano confere e pede o SA" },
+  PREPARADO: { nome: "Preparado", classe: "info", dica: "aguardando cadastro do SA (Amanda)" },
+  AGUARDANDO_MEGA: { nome: "Aguardando Mega", classe: "atencao", dica: "código informado; o sistema confere no Mega" },
+  CONFIRMADO: { nome: "Confirmado", classe: "ok", dica: "" },
 };
 const FILTROS: { chave: string; nome: string; situacao: SituacaoSa[] }[] = [
   { chave: "abertos", nome: "Em aberto", situacao: [] },
@@ -46,6 +46,8 @@ export default function Sas() {
   const { usuario } = useSessao();
   const altera = usuario?.perfil === "ESTOQUE" || usuario?.perfil === "ADMIN";
   const editaRs = altera || usuario?.perfil === "ANALISE";
+  // spec v3.13 T14 / contrato §7 [P36]: a Amanda (perfil Análise) também informa o código do SA depois de cadastrar no Mega
+  const informaCodigo = altera || usuario?.perfil === "ANALISE";
 
   const [params] = useSearchParams();
   const copFiltro = params.get("cop");
@@ -102,7 +104,7 @@ export default function Sas() {
     acao(async () => {
       const r = await api.post<Sa[]>("/sas/preparar", { ids: sel });
       setSel([]);
-      return `${r.length} pedido(s) marcado(s) como preparado(s).`;
+      return `${r.length} pedido(s) marcado(s) como preparado(s): aguardando cadastro do SA no Mega pela Amanda.`;
     });
 
   const verificar = () =>
@@ -122,7 +124,8 @@ export default function Sas() {
     <>
       <header className="cabecalho">
         <h1>Cadastro de SA (semiacabado)</h1>
-        <p>Pedidos de SA que nascem do COP fechado e do corte em Itu de material RJ. Informe o código e confirme no Mega.</p>
+        <p>Pedidos de SA que nascem do COP fechado e do corte em Itu de material RJ. O Fabiano confere e pede o SA (marca como preparado ou exporta);
+          a Amanda cadastra o SA no Mega e informa o código aqui. O sistema confirma lendo o Mega.</p>
       </header>
 
       {!!lista?.cops_aguardando_sa.length && (
@@ -205,11 +208,12 @@ export default function Sas() {
                   <td className="num">{s.quantidade}</td>
                   <td className="num">{kg(s.peso_kg)} kg</td>
                   <td>
-                    {s.sa_codigo ? <strong>{s.sa_codigo}</strong> : s.sa_novo ? <span className="etiqueta atencao">SA novo – cadastrar no Mega</span> : "—"}
+                    {s.sa_codigo ? <strong>{s.sa_codigo}</strong> : s.sa_novo ? <span className="etiqueta atencao" title="A Amanda cadastra o SA novo no Mega">SA novo – Amanda cadastra no Mega</span> : "—"}
                     {s.sa_codigo && s.sa_codigo_sugerido && s.sa_codigo !== s.sa_codigo_sugerido && <><br /><span className="desc">sugerido {s.sa_codigo_sugerido}</span></>}
                   </td>
                   <td>
                     <span className={`etiqueta ${SITUACAO[s.situacao]?.classe ?? ""}`}>{SITUACAO[s.situacao]?.nome ?? s.situacao}</span>
+                    {SITUACAO[s.situacao]?.dica && <><br /><span className="desc">{SITUACAO[s.situacao].dica}</span></>}
                     {s.atrasado && <><br /><span className="etiqueta ruim">mais de 48 h</span></>}
                   </td>
                   <td>
@@ -218,7 +222,7 @@ export default function Sas() {
                   </td>
                   <td className="num">{s.rs_kg !== null ? s.rs_kg.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "—"}</td>
                   <td className="acoes">
-                    {altera && s.situacao !== "CONFIRMADO" && <button className="link" onClick={() => setCodigoDe(s)}>Informar código</button>}
+                    {informaCodigo && s.situacao !== "CONFIRMADO" && <button className="link" onClick={() => setCodigoDe(s)}>Informar código do SA</button>}
                     {editaRs && <button className="link" onClick={() => setEditarDe(s)}>{altera && s.situacao !== "CONFIRMADO" ? "Editar" : "R$/kg"}</button>}
                   </td>
                 </tr>
@@ -310,8 +314,9 @@ function JanelaCodigo({ sa, aoFechar, aoGravar }: { sa: Sa; aoFechar: () => void
       <div className="painel-form">
         <h2 id="titulo-codigo">Código do SA · OP {sa.op}</h2>
         <p className="desc">{sa.item_codigo} · {sa.item_descricao}</p>
+        <p className="dica">Informe o código depois que o SA estiver cadastrado no Mega pela Amanda. Fica "Aguardando Mega" e o sistema já tenta confirmar.</p>
         {sa.sa_novo && !sa.sa_codigo_sugerido && (
-          <p className="validacao alerta">Esta peça nunca teve SA. Cadastre o SA novo no Mega e digite o código aqui.</p>
+          <p className="validacao alerta">Esta peça nunca teve SA. Depois que a Amanda cadastrar o SA novo no Mega, digite o código aqui.</p>
         )}
         <form className="linha-form" style={{ marginBottom: 0 }} onSubmit={(e) => void conferir(e)}>
           <label>

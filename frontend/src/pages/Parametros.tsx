@@ -3,8 +3,10 @@ import { api, data } from "../api/cliente";
 
 interface Parametro { chave: string; valor: string; tipo: string; descricao: string; atualizado_em: string | null }
 
-/** Unidade pelo nome do parâmetro (ex.: TOLERANCIA_EXCESSO_RJ_INTEIRO_PCT = 8 %, SA_JANELA_ANTES_DIAS = 7 dias). */
-const unidade = (chave: string) => (/_PCT$/.test(chave) ? "%" : /_DIAS$/.test(chave) ? "dias" : /_KG$/.test(chave) ? "kg" : /_MM$/.test(chave) ? "mm" : "");
+/** Unidade pelo nome do parâmetro (ex.: TOLERANCIA_EXCESSO_RJ_INTEIRO_PCT = 8 %, SA_JANELA_ANTES_DIAS = 7 dias).
+ *  Regra do RETO (spec v3.13, contrato §6.1): RETO_ESP_LIMITE, RETO_LARG_MAX_ATE_LIMITE e RETO_LARG_MAX_ACIMA em mm. */
+const unidade = (chave: string) => (/_PCT$/.test(chave) ? "%" : /_DIAS$/.test(chave) ? "dias" : /_KG$/.test(chave) ? "kg"
+  : /_MM$/.test(chave) || /^RETO_(ESP|LARG)_/.test(chave) ? "mm" : "");
 
 /** T23 Parâmetros (mínima): os parâmetros que a API já tem, editáveis pelo Admin. */
 export default function Parametros() {

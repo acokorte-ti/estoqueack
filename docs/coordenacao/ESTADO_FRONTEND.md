@@ -1,6 +1,12 @@
-﻿# Estado — FRONTEND / UX
+# Estado — FRONTEND / UX
 
-Atualizado: 2026-11-17 (conferência depois da recarga de 17/11)
+Atualizado: 2026-11-17 (R064, spec v3.13)
+
+## 2026-11-17 R064 (commit 260ec5c, bundle `index-r69rhZ8w.js` no site)
+
+- **No ar:** **T13** sobra fora da bitola: "Não, mudou de medida" → placa pede E × L (mm), redondo pergunta "vai para RETO?" (+ Ø se lote novo); depois de "Conferir corte" o quadro mostra a regra e o resultado da API ("Espessura 30 mm (até 50) e largura 180 mm (menor que 200): vai para RETO.") e "Confirmar" só libera com "Conferi a regra do RETO"; fora da regra mostra o lote novo com a medida nova e, no Estoque Mega, "sem transferência; o kg continua no código X"; gravado mostra `lote_sobra`. **T23** unidade mm nos 3 `RETO_*`. **T14** cabeçalho "Fabiano confere e pede; Amanda cadastra no Mega e informa o código", dica por situação (Preparado = "aguardando cadastro do SA (Amanda)"), "SA novo – Amanda cadastra no Mega", "Informar código do SA" também para Análise (P36).
+- **Conferido sem gravar (validar real, OP 100957):** L-000770 Estoque Mega 30×180 RETO / 40×200 lote novo / 60×240 RETO; L-000579 RJ em Itu 60×250 lote novo / 40×180 RETO; L-000695 redondo Ø127 → lote novo Ø100; caixa obrigatória nos 6. T23 com os 3 em mm. T14: fila em aberto vazia, linhas vistas com `fetch` simulado. Console sem erro.
+- **Próximo:** aguardar a coordenação (perfis da Amanda quando o usuário existir).
 
 ## 2026-11-17 Conferência na homologação (recarga de 17/11, API do R058 no ar)
 

@@ -14,7 +14,7 @@ Regras do backend. Valem junto com o `CLAUDE.md` da raiz.
 
 ## Migrações (Alembic)
 
-- Existem `0001` a `0009`. A próxima é `0010`, com `down_revision` = a última. Conferir `backend/alembic/versions/` antes de criar.
+- Existem `0001` a `0010`. A próxima é `0011`, com `down_revision` = a última. Conferir `backend/alembic/versions/` antes de criar.
 - **Nunca editar migração já aplicada** na homologação. O `banco-testes` revisa toda migração nova (índices, trigger, compatibilidade com a carga).
 
 ## Testes

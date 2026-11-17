@@ -1,9 +1,10 @@
 # Estado — FUNCIONAL
 
-Atualizado: 2026-11-17 (respostas de 17/11 e nomes do menu, especificação v3.12)
+Atualizado: 2026-11-17 (R062 e observações do Eduardo ao fluxo, especificação v3.13)
 
 ## No ar
 
+- **Especificação v3.13:** observações do Eduardo de 17/11 (SA cadastrado no Mega pela **Amanda**, Fabiano só pede: §2, T14; peso real da peça inteira = consumo da OP, resto = estoque em Itu: §2.2, T13; **regra do RETO** por E × L com "Conferi a regra" e 3 parâmetros na T23: T13, T10, §9) e R062 respondido (§10.3, §10.9 A.1/A.7/B/E: 41 contêineres corrigidos dentro do aprovado, 1 com material diferente; CH35SH = H13 nas três planilhas; Planilha1 com SA). Novas **P35** (RETO), **P36** (quem informa o código do SA), **P37** (carga 17/11); P34(d) com evidência. Pedidos **R063** (TÉCNICO) e **R064** (FRONTEND).
 - **Especificação v3.12:** nomes novos do menu (aprovados pelo Eduardo em 17/11) no §4, matriz §4.1, títulos T03–T16 e fluxos do §2; códigos das telas mantidos. T17, T18 e T24 ficaram fora do menu aprovado.
 - **Especificação v3.11:** respostas de 17/11 (DECISOES 2026-11-17). SA da peça inteira **não é corrigido** (saem "Corrigir no Mega"/"Corrigido no Mega"); pendência do peso real com mais de 7 dias **bloqueia** "Enviar ao RJ" na T07 (`PESO_REAL_PENDENTE`, T23 `PENDENCIA_PESO_REAL_DIAS`); faixa da seção = maior valor (§1.4 item 7, R057 respondido); paridade manual (§1.4 item 8); novo §10.9 (correções antes da recarga + arquivo de correções). P32 respondida; **P33** (detalhes do bloqueio) e **P34** (escolhas da carga) abertas, devolvidas à COORDENAÇÃO para o arquivo único. Pedidos **R058** (TÉCNICO) e **R059** (FRONTEND).
 - **Especificação v3.10:** P30 (pendência do Fabiano para o peso real; SA corrigido para o peso real com "Fazer no Mega" e situação "Corrigir no Mega"; previsto só na NF; sem SA complementar; sobra sem OP = nada na F1) e P31 (comprimento do HISTORICO só conta se Itu também tem comprimento). **P32** aberta (pendência não resolvida; quando o SA conta como corrigido), em `carga/perguntas_eduardo_2026-11-12c.txt`. Pedido **R054**. Exemplos com OPs e contêineres fictícios (6c7c043).
@@ -21,14 +22,14 @@ Atualizado: 2026-11-17 (respostas de 17/11 e nomes do menu, especificação v3.1
 
 ## Próximo
 
-- Aplicar P33 e P34 quando o Eduardo (e o Fabiano, P34 a/c) responder; aplicar a resposta do 1.2767 × 1.2746 RETO (PENDENCIAS 17/11) no §10.9 D.
+- Aplicar P33, P34, P35, P36 e P37 quando o Eduardo (e o Fabiano, P34 a/c) responder; aplicar a resposta do 1.2767 × 1.2746 RETO (PENDENCIAS 17/11) no §10.9 D.
 - Aplicar a P27 quando o Eduardo responder.
 - Depois da implantação: lista do BLOCO 2 (OPs mal digitadas, SEM OP, cortes sem peso, solicitações sem lote), contêiner digitado errado, comentário com várias OPs, corte dividido entre contêineres, "PESO INICIAL" (B05 a B08).
 
 ## Aguardando
 
-- **Eduardo:** P33, P34. **Fabiano:** 1.2767 × 1.2746 RETO (`carga/PENDENCIAS_USUARIOS_2026-11-17.txt`). (55322: resolvido, A8 MOD do RJ fica separado.) Avisar o Fabiano sobre o IPI do NCM 82089000 (se ainda não foi).
-- **TÉCNICO / FRONTEND:** R045, R046, R047, R049, R050, R051, R052, R054, R058, R059.
+- **Eduardo:** P33, P34, P35, P36. **Marcelo:** P37(a). **Fabiano:** P37(b), P34(d) (10 discordantes), aviso da paridade do contêiner H13. **Fabiano:** 1.2767 × 1.2746 RETO (`carga/PENDENCIAS_USUARIOS_2026-11-17.txt`). (55322: resolvido, A8 MOD do RJ fica separado.) Avisar o Fabiano sobre o IPI do NCM 82089000 (se ainda não foi).
+- **TÉCNICO / FRONTEND:** R045, R046, R047, R049, R050, R051, R052, R054, R058, R059, R063, R064.
 
 ## Instruções permanentes desta frente
 
@@ -60,4 +61,4 @@ Atualizado: 2026-11-17 (respostas de 17/11 e nomes do menu, especificação v3.1
 9. **Quando eu gerar uma lista para o Fabiano revisar:** Excel com aba "Leia-me", colunas amarelas só para ele preencher, sugestão minha em coluna separada e o arquivo em `carga/` (fora do repositório).
 10. **Pedidos (`PEDIDOS.md`):**
     - Ao responder, mudar o status e escrever no máximo ~5 linhas, sem quebra de linha na célula. O detalhe vai na especificação ou neste ESTADO.
-    - Próximo número de pedido: o maior R0xx em `PEDIDOS.md` + 1 (em 17/11 o último era R059).
+    - Próximo número de pedido: o maior R0xx em `PEDIDOS.md` + 1 (em 17/11 o último era R064).

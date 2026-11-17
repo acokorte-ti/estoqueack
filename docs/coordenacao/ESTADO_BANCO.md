@@ -2,11 +2,11 @@
 
 Chat **BANCO E TESTES**, braço do TÉCNICO (BACKEND 2). Escopo: fechar as definições de banco (Mega e PostgreSQL) e os testes que faltam para a implantação da Fase 1 (sem data: vale a ordem das etapas e o go/no-go). Não mexe em fluxo de tela nem em regra de negócio; o que depende de outra frente vira pedido em `PEDIDOS.md`.
 
-Atualizado: 2026-11-12 pelo chat BANCO E TESTES (rodada de 12/11, R048, ver §5d).
+Atualizado: 2026-11-17 pelo chat BANCO E TESTES (recarga de 17/11, R061, ver §5e).
 
 ## Situação em uma frase
 
-**0008 revisada (R048, sem bloqueio) e ponta a ponta preparado para as regras v3.5–v3.9; roda depois da recarga do zero.** Parte A (Mega) e Parte B (PostgreSQL) concluídas; ponta a ponta dos 5 caminhos já rodou OK com os dados da carga e o Mega real (04/11, §5); roteiro de aceite pronto.** Critérios de go/no-go nº 2 (ensaio) e nº 3 (concorrência no PostgreSQL) atendidos; o nº 2 se repete antes do aceite e depois da recarga final.
+**Recarga de 17/11 conferida (números batem) e ponta a ponta dos 5 caminhos OK sobre ela (2026-11-17 09h55, §5e); 0009 aprovada (R061).** Go/no-go nº 1: números OK, falta o ok do Fabiano; nº 2: **atendido**; nº 3 atendido. Próximo: revisar a **0010** (R066, regra do RETO) e repetir o ponta a ponta antes do aceite.
 
 ## Resumo para cada chat
 
@@ -137,9 +137,42 @@ Os SAs das OPs 100592/100553/100550 foram confirmados **pelo Mega de verdade** (
 
 **Pedido aberto:** R053 ao TÉCNICO (P28(1) ciência, tabela de equivalências fixa, comprimento na entrada NF, correção não aplicada em silêncio, detalhes da 0008).
 
+## 5e. Recarga de 17/11 e R061 (2026-11-17)
+
+**Conferência independente** (só leitura, homologação em `deb89d2`, carga 08h47; `deploy/implantacao/conferir.sh` = CONFERENCIA_OK + consultas próprias + planilhas de 17/11 lidas por um leitor meu, não o da carga):
+
+| Item | Sistema | Fonte | Resultado |
+|---|---|---|---|
+| Estoque Mega × saldo do Mega por código (± 5 kg) | 410 lotes / 410 códigos, 212.779,1 kg | `mega_saldo` (sync 08h45, antes da carga) 212.779,1 kg | **OK**, maior diferença 0,000 kg; 0 código de lote sem saldo no Mega; 0 lote sem código |
+| RJ no Rio | 174 lotes, 232.222,5 kg | ESTOQUE 2026, col. AN: 232.222,5 kg (174 linhas com saldo) | **OK** |
+| RJ em Itu | 33 lotes, 28.820,8 kg | Estoque Geral "ESTOQUE RJ (em Itu)": 28.820,8 kg | **OK** |
+| RETO RJ em Itu | 8 lotes, 8.939,8 kg | 6 linhas RETO do Estoque Geral, 8.939,8 kg (DC53 em 3 sub-lotes 160 + 182 + 680) | **OK** |
+| Lotes RJ com código do Mega | 0 | v3.7 | **OK** |
+| Saldo = soma dos movimentos / negativos | 990 de 990 lotes / 0 | — | **OK** (1.939 movimentos) |
+| Informativo | 56 códigos com saldo > 5 kg no Mega sem lote (6.148,1 kg) | fora do kardex de 2 anos (R038) | esperado |
+
+**Linha a linha:** L-000185 (CH01AT, 1.2360 21,5X212, RJ no Rio) = ESTOQUE 2026 linha 221: PESO INICIAL 27.398 (= HISTORICO linha 1007, entrada 01/07/2026, data do SALDO_INICIAL), 8 consumos somando 5.885,0, total 21.513 = saldo do lote; L-000559 (D2 Ø355, RJ em Itu) = Estoque Geral linha 259 "IMP-D2 RED 355MM" 2.733 kg, sem código; L-000576 (IMP-H13 RETO, RJ em Itu) = Estoque Geral linha 449, 4.266,8 kg.
+
+**Ponta a ponta** (`deploy/e2e/rodar_e2e.sh`, cópia `estoqueack_e2e` apagada no fim, Mega real, nenhuma confirmação de SA simulada; relatório `~/.local/state/estoqueack-e2e-20261117-0955.json`):
+
+| Caminho | OP real | Lote | Resultado |
+|---|---|---|---|
+| A — corte no RJ | 100777 | L-000185 (RJ no Rio) | **OK**: … COP 48 → SA → NF → envio → recebimento → **Concluída** |
+| B — peça inteira | 100776 | L-000180 (RJ no Rio) | **OK**: recebida = pendência do peso real; recebimento envelhecido na cópia → envio com ERRO `PESO_REAL_PENDENTE`, rascunho só aviso; T13 com 5,823 kg (previsto 5,546) resolve, bloqueio sai, **SA continua 5,546 kg**; RETO L-000992; **Concluída** |
+| B2 — RJ em Itu | 100775 | L-000576 (RETO RJ em Itu) | **OK**: linha de SA 8364 + NF só fiscal; consumo misto não acrescenta `OP_DUPLICADA` (a OP já tinha a solicitação 816 e o SA 8329 da carga, que continuam avisando) |
+| C — material Mega | 100957 | L-000746 (Estoque Mega) | **OK**: "Baixar 11,0 kg do código 71928 na OP 100957."; sobra fora da regra do RETO = lote novo L-000993 (v3.13, sem transferência) |
+| D — entrada NF RJ | — | L-000994 | **OK**, sem código do Mega; NF repetida bloqueada |
+| Conferência final | | todos os lotes da cópia | 0 negativo, saldo = soma em 100 %, 0 lote RJ com código |
+
+Base sem peça inteira pendente (0 abertas, 0 vencidas). No 1º disparo (09h29) o B2 falhou só porque a OP real tinha histórico (o roteiro esperava zero `OP_DUPLICADA`); corrigido no roteiro (`1b88f65`/`022bdef`), não é bug do sistema. Banco em uso intocado (1.939 movimentos antes e depois).
+
+**Achados de operação corrigidos:** `deploy/implantacao/conferir.sh` e `movimentos_desde.sh` **não rodavam** (o `PSQL=${PSQL_CMD:-…}` + `eval` expandia `$POSTGRES_USER` no host: "unbound variable"); agora uma função chama o psql do container. CSV do rollback testado (só leitura, apagado). Falta: a contagem do `movimentos_desde.sh` é de linhas do CSV, não de movimentos (R069 item 5, meu).
+
+**0009 (R061):** sobe/desce/sobe no PostgreSQL 16 local; FK da paridade, DELETE barrado do item apontado, 4 triggers intactos; homologação com alembic 0009, 5 colunas, parâmetro 7. Testes: `tests/test_banco_r061.py` + ensaio do e2e com peça vencida na base. Pontos menores no **R069**.
+
 ## 6. Próximos passos deste chat
 
-0. **Depois da recarga do zero** (espera o ok do Eduardo e do Fabiano na paridade): rodar `deploy/e2e/rodar_e2e.sh` (uma conexão) e mostrar a tabela dos 5 caminhos + conferência (inclui 0 lote RJ com código).
+0. **Revisar a 0010** (R066, regra do RETO: colunas da sobra em `corte_itu`, `sobra_destino`, `lote_sobra_id`, 3 parâmetros) e incluir no e2e a sobra que **vai** para RETO no C (o B já usa 40 × 180). Corrigir a contagem do `movimentos_desde.sh` (R069 item 5). Repetir o ponta a ponta antes do aceite e depois de cada recarga.
 1. **Backup externo:** assim que o Eduardo criar o bucket e os PARs, instalar, rodar o 1º envio, o teste de restauração a partir do bucket e a prova de que o PAR de escrita não apaga; marcar o go/no-go nº 4.
 2. **Testes da T16 mínima** quando a API sair (diferença por código Mega × soma dos lotes > 5 kg; perfis; volume).
 3. **Repetir o ponta a ponta** depois da recarga final: `deploy/e2e/rodar_e2e.sh` (≈ 1 min).

@@ -143,6 +143,13 @@ curl -s http://127.0.0.1:8090/api/saude               # saúde da API
 - **Migração 0010** (spec v3.13, R063): colunas da regra do RETO em `corte_itu` e os parâmetros `RETO_ESP_LIMITE`, `RETO_LARG_MAX_ATE_LIMITE`, `RETO_LARG_MAX_ACIMA`; entra no próximo deploy automático. Revisão pedida no R066. A próxima é a **0011**.
 - **Recarga do zero** da homologação em 17/11 08h47 (planilhas `~/estoqueack-carga/planilhas/2026-11-17/` + `~/estoqueack-carga/correcoes_carga.json`, backup antes `estoqueack_20261117_084553`), numa conexão SSH: `tar` (planilhas + correções + script) por `ssh system-lab 'tar -x … && bash recarga.sh <sha>'`; o script confere o commit publicado, faz backup, sincroniza o Mega (`app.jobs.agendador --forcar`), prévia, `--importar --limpar`, conferência no banco e devolve os relatórios em base64 na mesma saída. Números em `docs/coordenacao/ESTADO_TECNICO.md`.
 
+## 7.7 Situação em 2026-11-17 (chat BANCO E TESTES, recarga de 17/11 e R061)
+
+- **Conferência independente da recarga OK** (Estoque Mega 410 códigos = saldo do Mega, 0 diferença; RJ no Rio 232.222,5 kg = ESTOQUE 2026; RJ em Itu 28.820,8 kg; 0 lote RJ com código; saldo = soma em 100 %) e **ponta a ponta dos 5 caminhos OK** (relatório `~/.local/state/estoqueack-e2e-20261117-0955.json`). Números em `docs/coordenacao/ESTADO_BANCO.md` §5e.
+- **Script remoto numa conexão:** `ssh system-lab 'cat > /tmp/x.sh && bash /tmp/x.sh < /dev/null; rm -f /tmp/x.sh'` < script. Com `ssh … 'bash -s' < script`, o primeiro `docker compose exec -T` **come o resto do script** (stdin) e a sessão termina calada.
+- `deploy/implantacao/conferir.sh` e `movimentos_desde.sh` corrigidos (antes falhavam com "POSTGRES_USER: unbound variable"); o ponta a ponta confere o R058 e o consumo misto com OP real que já tem histórico.
+- Commit de arquivo que outra frente também está editando: montar a versão do índice a partir do último commit (`git hash-object -w` + `git update-index --cacheinfo`), nunca `git add` do arquivo inteiro (em 17/11 isso publicou trabalho não terminado do TÉCNICO e deixou o CI vermelho por um commit).
+
 ## 8. Registro de incidentes
 
 **2026-10-29, senha do backup publicada no GitHub.** O commit `ea2b71b (antigo 3422e54)` (13h04), feito pelo chat TÉCNICO com `git add -A`, incluiu `pass_bkp/pass.txt`, uma anotação local do Eduardo com a senha GPG dos backups, num repositório **público**.

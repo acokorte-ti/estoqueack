@@ -1,6 +1,6 @@
 # Estado — BACKEND / TÉCNICO
 
-Atualizado: 2026-11-17 (noite) pelo TÉCNICO: **bitola estritamente maior que a peça** (R072) e **ajustes do teste manual** (R071: liga por "contém", justificativa sem mínimo, NF só Fio Certo). Antes, à tarde: **ferramenta "Confirmar SA (teste)"** no ar (`fc4b808`, R070 ao FRONTEND) e **recarga do zero** da homologação às 10h23 (números em §2). Aguardando: R070 (botão na T14), R066, R067, R068, R069, P35/P36/P37, 1.2746 × 1.2767 RETO (Fabiano). **No dia da implantação: `MODO_TESTE=false`** (06_implantacao §2.3).
+Atualizado: 2026-11-17 (noite) pelo TÉCNICO: **lote consumido por inteiro e peças × OP** (R073), **bitola estritamente maior que a peça** (R072) e **ajustes do teste manual** (R071: liga por "contém", justificativa sem mínimo, NF só Fio Certo). Antes, à tarde: **ferramenta "Confirmar SA (teste)"** no ar (`fc4b808`, R070 ao FRONTEND) e **recarga do zero** da homologação às 10h23 (números em §2). Aguardando: R070 (botão na T14), R066, R067, R068, R069, P35/P36/P37, 1.2746 × 1.2767 RETO (Fabiano). **No dia da implantação: `MODO_TESTE=false`** (06_implantacao §2.3).
 
 > Para retomar a parte técnica do zero: `estoqueack/docs/tecnico/00_RETOMAR_PROJETO.md` (inventário, onde fica cada segredo, operação, lições e incidentes; §7.2 e §7.3 = Fase 1).
 
@@ -14,6 +14,10 @@ Atualizado: 2026-11-17 (noite) pelo TÉCNICO: **bitola estritamente maior que a 
 - **Comigo daqui para frente:** recarregar a T25 quando o Fabiano devolver as correções do R032 (avisar antes no R033); campos da impressão da Fila RJ se o FUNCIONAL pedir; na implantação, a carga final (roteiro do BANCO E TESTES, em `deploy/implantacao/`). PDFs de romaneio e ficha do lote ficaram para a F1.1.
 
 ## 2. Feito
+
+### Lote consumido por inteiro e peças × OP (2026-11-17 noite, R073)
+
+- `regras.validar_saldo(..., peso_peca_kg, lote)` → `CONSUMO_LOTE_INTEIRO`; `ItemCalculado.reserva_kg` = saldo; `_preencher` grava `peso_previsto_kg` = reserva (o calculado vai na auditoria como `previsto_calculado_kg`). `regras.validar_pecas_da_op` em `solicitacoes.validar` (só no POST novo). Testes: 3 novos (caso fictício da OP de 50 = 4 + 46 e 50 + 1).
 
 ### Bitola estritamente maior que a peça (2026-11-17 noite, R072)
 

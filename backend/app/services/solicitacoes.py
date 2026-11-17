@@ -161,6 +161,12 @@ class ItemCalculado:
     calc: corte.CalculoCorte
     instrucao: str
     resultado: Resultado
+    reserva_kg: float | None = None   # = previsto; com "lote consumido por inteiro" = saldo do lote (2026-11-17)
+
+    @property
+    def lote_inteiro(self) -> bool:
+        return bool(self.calc.peso_previsto_kg and self.reserva_kg is not None
+                    and self.reserva_kg < self.calc.peso_previsto_kg)
 
 
 def _calcular_item(db: Session, cfg: Config, e: SolicitacaoEntrada, it: ItemEntrada,
@@ -199,7 +205,8 @@ def _calcular_item(db: Session, cfg: Config, e: SolicitacaoEntrada, it: ItemEntr
                                            parametro(db, "TOLERANCIA_SOBREMETAL_PCT", cfg)))
     if calc.peso_previsto_kg:
         outros = movimentos.reservado(db, [lote.id], exceto_solicitacao=ignorar_solicitacao).get(lote.id, 0.0)
-        r.juntar(regras.validar_saldo(float(lote.saldo_kg), outros, calc.peso_previsto_kg))
+        r.juntar(regras.validar_saldo(float(lote.saldo_kg), outros, calc.peso_previsto_kg, calc.peso_peca_kg or 0.0,
+                                      lote.codigo))
     r.juntar(regras.validar_destinacoes([regras.Destinacao(d.tipo, d.descricao, d.validade)
                                          for d in movimentos.destinacoes_vigentes(db, lote.id)]))
     r.juntar(_validar_liga(db, e.liga, lote))
@@ -210,7 +217,10 @@ def _calcular_item(db: Session, cfg: Config, e: SolicitacaoEntrada, it: ItemEntr
     instrucao = it.instrucao or corte.instrucao_padrao(it.modo, it.quantidade, calc.bruto.comprimento,
                                                        lote.item.liga.codigo, bitola(lote.item),
                                                        it.comprimento_barra_mm)
-    return ItemCalculado(lote, it, calc, instrucao, r)
+    reserva = calc.peso_previsto_kg
+    if reserva and any(o.codigo == "CONSUMO_LOTE_INTEIRO" for o in r.ocorrencias):
+        reserva = round(float(lote.saldo_kg), 3)
+    return ItemCalculado(lote, it, calc, instrucao, r, reserva)
 
 
 def validar(db: Session, cfg: Config, e: SolicitacaoEntrada, *, ignorar_solicitacao: int | None = None,
@@ -228,6 +238,10 @@ def validar(db: Session, cfg: Config, e: SolicitacaoEntrada, *, ignorar_solicita
     # (ERRO, nem o Admin libera); no rascunho vira aviso
     previa.resultado.juntar(peso_real.validar_envio(db, enviar))
     itens = [_calcular_item(db, cfg, e, it, ignorar_solicitacao) for it in e.itens]
+    if ignorar_solicitacao is None:   # edição de rascunho/troca de lote valida uma solicitação só (uma parte da OP)
+        previa.resultado.juntar(regras.validar_pecas_da_op(
+            dados.quantidade, sum(it.quantidade for it in e.itens),
+            so_corte=all(it.modo == "CORTAR_RJ" for it in e.itens)))
     frases = []
     for i, ic in enumerate(itens):
         previa.resultado.juntar(_sufixo(ic.resultado, i))
@@ -241,12 +255,19 @@ def validar(db: Session, cfg: Config, e: SolicitacaoEntrada, *, ignorar_solicita
             "sobremetal_largura_mm": c.sobremetal_largura_mm, "usa_largura_inteira": c.usa_largura_inteira,
             "comprimento_corte_mm": c.bruto.comprimento, "peso_peca_kg": c.peso_peca_kg,
             "peso_previsto_kg": c.peso_previsto_kg, "sobremetal_pct": c.sobremetal_pct, "instrucao": ic.instrucao,
-            "saldo_kg": round(float(ic.lote.saldo_kg), 3)})
-        if c.peso_previsto_kg:
+            "saldo_kg": round(float(ic.lote.saldo_kg), 3), "reserva_kg": ic.reserva_kg,
+            "consome_lote_inteiro": ic.lote_inteiro})
+        if ic.lote_inteiro:
+            frases.append(f"{ic.entrada.quantidade} peça(s) do lote {ic.lote.codigo} "
+                          f"({material_texto_lote(ic.lote)}), consumido por inteiro: {kg_br(ic.reserva_kg)} "
+                          f"(previsto {kg_br(c.peso_previsto_kg)})")
+        elif c.peso_previsto_kg:
             frases.append(f"{ic.entrada.quantidade} peça(s), {kg_br(c.peso_previsto_kg)} previstos do lote "
                           f"{ic.lote.codigo} ({material_texto_lote(ic.lote)})"
                           + (f", sobremetal {pct_br(c.sobremetal_pct, 1)}" if c.sobremetal_pct is not None else ""))
-    previa.frase = f"OP {e.op}: " + "; ".join(frases) + ". O peso previsto fica reservado no lote." if frases else None
+    fim = (". Fica reservado o previsto (no lote consumido por inteiro, o saldo todo)."
+           if any(ic.lote_inteiro for ic in itens) else ". O peso previsto fica reservado no lote.")
+    previa.frase = f"OP {e.op}: " + "; ".join(frases) + fim if frases else None
     previa.extra["op"] = {"numero": dados.numero, "item_codigo": dados.item_codigo,
                           "item_descricao": dados.item_descricao, "cliente": dados.cliente, "pedido": dados.pedido,
                           "situacao": dados.situacao, "confirmada_mega": dados.confirmada_mega}
@@ -273,7 +294,9 @@ def _preencher(sol: SolicitacaoCorte, e: SolicitacaoEntrada, dados: ops.DadosOp,
     sol.sobremetal_largura_mm = c.sobremetal_largura_mm
     sol.bruto_espessura, sol.bruto_largura = c.bruto.espessura, c.bruto.largura
     sol.bruto_diametro, sol.bruto_comprimento = c.bruto.diametro, c.bruto.comprimento
-    sol.peso_peca_kg, sol.peso_previsto_kg, sol.sobremetal_pct = c.peso_peca_kg, c.peso_previsto_kg or 0, \
+    # "Lote consumido por inteiro" (2026-11-17): o previsto gravado = saldo do lote, e é ele que fica reservado e que
+    # serve de base à tolerância do peso real no corte (o previsto calculado fica na prévia e na auditoria)
+    sol.peso_peca_kg, sol.peso_previsto_kg, sol.sobremetal_pct = c.peso_peca_kg, ic.reserva_kg or 0, \
         c.sobremetal_pct
     sol.comprimento_barra_mm = ic.entrada.comprimento_barra_mm
     sol.instrucao, sol.instrucao_processo = ic.instrucao, ic.entrada.instrucao_processo
@@ -300,7 +323,9 @@ def criar(db: Session, cfg: Config, e: SolicitacaoEntrada, *, enviar: bool, usua
             _enviar(db, sol, usuario)
         auditoria.registrar(db, "SOLICITACAO_CRIADA", usuario_id=usuario.id, entidade="solicitacao",
                             entidade_id=sol.id, depois={"op": sol.op, "lote": ic.lote.codigo, "situacao": sol.situacao,
-                                                        "previsto_kg": sol.peso_previsto_kg, "confirmacoes": conf},
+                                                        "previsto_kg": sol.peso_previsto_kg,
+                                                        "previsto_calculado_kg": ic.calc.peso_previsto_kg,
+                                                        "confirmacoes": conf},
                             ip=ip)
         criadas.append(sol)
     db.commit()

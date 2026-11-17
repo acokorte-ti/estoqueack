@@ -22,13 +22,33 @@ def validar_quantidade_kg(kg: float, campo: str = "peso") -> Resultado:
     return r
 
 
-def validar_saldo(saldo_kg: float, reservado_outros_kg: float, solicitado_kg: float) -> Resultado:
-    """Saldo físico do lote menos reservas de outros destinos deve cobrir o solicitado."""
+def validar_saldo(saldo_kg: float, reservado_outros_kg: float, solicitado_kg: float,
+                  peso_peca_kg: float | None = None, lote: str | None = None) -> Resultado:
+    """Saldo físico do lote menos reservas de outros destinos deve cobrir o solicitado.
+
+    Com `peso_peca_kg` (pedido ao RJ, Eduardo 2026-11-17): saldo menor que o previsto, mas que cobre o peso da peça
+    acabada sem sobremetal, vira CIÊNCIA "o lote será consumido por inteiro" e a reserva fica com o saldo todo.
+    Continua ERRO se o saldo não cobrir nem a peça acabada [proposta, P39]."""
     r = validar_quantidade_kg(solicitado_kg)
     if r.erros:
         return r
     disponivel = round(saldo_kg - max(reservado_outros_kg, 0), 3)
-    if solicitado_kg > saldo_kg + EPS:
+    if solicitado_kg > saldo_kg + EPS and peso_peca_kg is not None and saldo_kg + EPS >= peso_peca_kg:
+        r.adicionar("CONSUMO_LOTE_INTEIRO", Nivel.CIENCIA,
+                    f"O lote {lote or 'escolhido'} será consumido por inteiro ({kg_br(saldo_kg)}); previsto "
+                    f"{kg_br(solicitado_kg)}.",
+                    saldo_kg=saldo_kg, previsto_kg=solicitado_kg, reserva_kg=saldo_kg)
+        if reservado_outros_kg > EPS:
+            r.adicionar("USA_SALDO_RESERVADO", Nivel.CIENCIA,
+                        f"O lote inteiro ({kg_br(saldo_kg)}) invade {kg_br(saldo_kg - disponivel)} reservados "
+                        f"para outro destino. Disponível livre: {kg_br(disponivel)}.",
+                        disponivel_kg=disponivel, solicitado_kg=saldo_kg)
+    elif solicitado_kg > saldo_kg + EPS and peso_peca_kg is not None:
+        r.adicionar("SALDO_INSUFICIENTE", Nivel.ERRO,
+                    f"Saldo do lote ({kg_br(saldo_kg)}) não cobre nem o peso da peça acabada "
+                    f"({kg_br(peso_peca_kg)}); previsto {kg_br(solicitado_kg)}.",
+                    saldo_kg=saldo_kg, solicitado_kg=solicitado_kg, peso_peca_kg=peso_peca_kg)
+    elif solicitado_kg > saldo_kg + EPS:
         r.adicionar("SALDO_INSUFICIENTE", Nivel.ERRO,
                     f"Saldo do lote ({kg_br(saldo_kg)}) é menor que o solicitado ({kg_br(solicitado_kg)}).",
                     saldo_kg=saldo_kg, solicitado_kg=solicitado_kg)
@@ -37,6 +57,27 @@ def validar_saldo(saldo_kg: float, reservado_outros_kg: float, solicitado_kg: fl
                     f"O solicitado ({kg_br(solicitado_kg)}) invade {kg_br(solicitado_kg - disponivel)} reservados "
                     f"para outro destino. Disponível livre: {kg_br(disponivel)}.",
                     disponivel_kg=disponivel, solicitado_kg=solicitado_kg)
+    return r
+
+
+def validar_pecas_da_op(quantidade_op: float | None, pecas_pedido: int, *, so_corte: bool = True) -> Resultado:
+    """Soma das peças dos lotes do pedido × quantidade da OP (Eduardo, 2026-11-17, OP de 50 com 50 + 1).
+
+    Acima = ERRO; abaixo = ALERTA (só quando todos os itens são "cortar no RJ": em "trazer inteira" a quantidade
+    é de barras, não de peças da OP). Sem quantidade da OP (Mega fora do ar) não compara."""
+    r = Resultado()
+    if not quantidade_op or quantidade_op <= 0:
+        return r
+    q = int(round(quantidade_op)) if abs(quantidade_op - round(quantidade_op)) < EPS else quantidade_op
+    if pecas_pedido > quantidade_op + EPS:
+        r.adicionar("PECAS_ACIMA_OP", Nivel.ERRO,
+                    f"A soma das peças ({pecas_pedido}) passa da quantidade da OP ({q}).",
+                    pecas=pecas_pedido, quantidade_op=quantidade_op)
+    elif so_corte and pecas_pedido < quantidade_op - EPS:
+        falta = quantidade_op - pecas_pedido
+        falta = int(round(falta)) if abs(falta - round(falta)) < EPS else falta
+        r.adicionar("PECAS_ABAIXO_OP", Nivel.ALERTA, f"Faltam {falta} peça(s) da OP ({pecas_pedido} de {q}).",
+                    pecas=pecas_pedido, quantidade_op=quantidade_op, faltam=falta)
     return r
 
 

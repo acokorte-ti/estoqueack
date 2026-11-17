@@ -179,3 +179,95 @@ def test_pedido_com_lote_igual_a_peca_da_erro(amb_bitola):
         corpo["itens"][0]["quantidade"] = 1
         v = client.post("/api/solicitacoes/validar", json=corpo, headers=h).json()
         assert ("BITOLA_MENOR_QUE_PECA" in [o["codigo"] for o in v["ocorrencias"]]) is erro, (nome, v)
+
+
+# ---- lote consumido por inteiro e peças × quantidade da OP (Eduardo, 2026-11-17; dados fictícios) ----
+
+@pytest.fixture()
+def amb_op50(client):
+    from datetime import date
+
+    from app.core.db import SessionLocal
+    from app.integrations.mega.gateway import OrdemProducao
+    from app.models import Conteiner, ItemMP, Liga
+    from app.services import movimentos as mov
+    u = criar_usuarios(client)
+    ids = {}
+    with SessionLocal() as db:
+        h13 = Liga(codigo="H13", nome="H13", densidade=7.8, apelidos=[])
+        db.add(h13)
+        db.flush()
+        ct = Conteiner(codigo="CH88W")
+        db.add(ct)
+        for nome, e, larg, kg in (("fim", 47, 153, 35), ("curto", 47, 153, 30), ("grande", 50, 610, 900)):
+            it = ItemMP(descricao=f"H13 {e}x{larg}", liga_id=h13.id, formato="RETANGULAR", espessura=e, largura=larg)
+            db.add(it)
+            db.flush()
+            lote = mov.criar_lote(db, item=it, planta_fiscal="RJ", local_fisico="RJ", conteiner_id=ct.id,
+                                  peso_inicial_kg=kg)
+            mov.lancar(db, lote, "SALDO_INICIAL", kg, usuario_id=None)
+            ids[nome] = lote.id
+        db.commit()
+    fab = mega_falso(OrdemProducao(100957, 999, "PECA 40X150X180MM", "CLIENTE W", "AB", date(2026, 10, 1), 50,
+                                   date(2026, 12, 20)))
+    yield client, u, ids
+    fab.definir(None)
+
+
+def _pedido_op50(ids, partes):
+    return {"op": 100957, "liga": "H13",
+            "medida": {"formato": "RETANGULAR", "espessura": 40, "largura": 150, "comprimento": 180},
+            "itens": [{"lote_id": ids[n], "modo": "CORTAR_RJ", "quantidade": q} for n, q in partes],
+            "enviar": True, "confirmacoes": {}}
+
+
+def test_lote_menor_que_previsto_e_consumido_por_inteiro(amb_op50):
+    client, u, ids = amb_op50
+    h = entrar(client, u["itu"])
+    corpo = _pedido_op50(ids, [("fim", 4), ("grande", 46)])
+    v = client.post("/api/solicitacoes/validar", json=corpo, headers=h).json()
+    oc = {o["codigo"]: o for o in v["ocorrencias"]}
+    assert "SALDO_INSUFICIENTE" not in oc and oc["CONSUMO_LOTE_INTEIRO"]["nivel"] == "CIENCIA"
+    ef = v["resultado"]["efeitos"][0]
+    assert ef["peso_previsto_kg"] > 35 > ef["peso_peca_kg"]                  # previsto > saldo > peça acabada
+    assert ef["reserva_kg"] == 35 and ef["consome_lote_inteiro"] is True
+    assert v["resultado"]["efeitos"][1]["consome_lote_inteiro"] is False
+    assert "consumido por inteiro (35,0 kg)" in oc["CONSUMO_LOTE_INTEIRO"]["mensagem"]
+    assert "PECAS_ACIMA_OP" not in oc and "PECAS_ABAIXO_OP" not in oc
+    assert "consumido por inteiro: 35,0 kg" in v["resultado"]["frase"]
+    corpo["confirmacoes"] = {o["codigo"]: "fim de lote" for o in v["ocorrencias"] if o["nivel"] == "CIENCIA"}
+    r = client.post("/api/solicitacoes", json=corpo, headers=h)
+    assert r.status_code == 201, r.text
+    sol = r.json()["solicitacoes"][0]
+    assert client.get(f"/api/solicitacoes/{sol['id']}").json()["reserva_kg"] == 35
+    assert client.get(f"/api/lotes/{ids['fim']}").json()["disponivel_kg"] == 0
+    # RJ corta as 4 peças com o lote inteiro: sem "estou ciente" de excesso
+    h = entrar(client, u["rj"])
+    corte = {"linhas": [{"lote_id": ids["fim"], "pecas": 4, "peso_real_kg": 35}]}
+    v = client.post(f"/api/solicitacoes/{sol['id']}/corte/validar", json=corte, headers=h).json()
+    assert [o["codigo"] for o in v["ocorrencias"] if o["nivel"] != "ALERTA"] == []
+    assert client.post(f"/api/solicitacoes/{sol['id']}/corte", json=corte, headers=h).status_code == 201
+
+
+def test_saldo_abaixo_da_peca_acabada_continua_erro(amb_op50):
+    client, u, ids = amb_op50
+    h = entrar(client, u["itu"])
+    v = client.post("/api/solicitacoes/validar", json=_pedido_op50(ids, [("curto", 4), ("grande", 46)]),
+                    headers=h).json()
+    oc = {o["codigo"]: o for o in v["ocorrencias"]}
+    assert oc["SALDO_INSUFICIENTE"]["nivel"] == "ERRO" and "CONSUMO_LOTE_INTEIRO" not in oc
+
+
+def test_soma_das_pecas_contra_a_op(amb_op50):
+    client, u, ids = amb_op50
+    h = entrar(client, u["itu"])
+    v = client.post("/api/solicitacoes/validar", json=_pedido_op50(ids, [("grande", 50), ("fim", 1)]),
+                    headers=h).json()
+    oc = {o["codigo"]: o for o in v["ocorrencias"]}
+    assert oc["PECAS_ACIMA_OP"]["nivel"] == "ERRO"
+    assert oc["PECAS_ACIMA_OP"]["mensagem"] == "A soma das peças (51) passa da quantidade da OP (50)."
+    r = client.post("/api/solicitacoes", json=_pedido_op50(ids, [("grande", 50), ("fim", 1)]), headers=h)
+    assert r.status_code == 409
+    v = client.post("/api/solicitacoes/validar", json=_pedido_op50(ids, [("grande", 40)]), headers=h).json()
+    oc = {o["codigo"]: o for o in v["ocorrencias"]}
+    assert oc["PECAS_ABAIXO_OP"]["nivel"] == "ALERTA" and "Faltam 10 peça(s)" in oc["PECAS_ABAIXO_OP"]["mensagem"]

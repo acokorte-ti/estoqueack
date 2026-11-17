@@ -14,6 +14,14 @@ Regras novas conferidas sem gravar nada a mais (só prévias, rodada de 2026-11-
   B2  corte em Itu marcado "consumo misto" (P26, opção A): a solicitação ao RJ marcada da mesma OP não avisa
       OP_DUPLICADA; a mesma solicitação sem a marca avisa
 
+Pendência do peso real da peça inteira do RJ (spec v3.11 §2.2 passo 7, T07, §9; R058, rodada de 2026-11-17):
+  antes  se a cópia já tem peça inteira sem peso real há mais de PENDENCIA_PESO_REAL_DIAS, a prévia de "Enviar ao RJ"
+         tem de vir com ERRO PESO_REAL_PENDENTE; o teste encerra essas pendências na CÓPIA (justificativa de teste)
+         para os caminhos poderem enviar, e confere que o bloqueio sai
+  B      depois do recebimento a peça aparece como pendência (não vencida); o recebimento do COP do teste é
+         envelhecido na cópia para além do prazo: "Enviar ao RJ" bloqueia (ERRO) e o rascunho só avisa; a T13 com
+         consumo diferente do previsto resolve a pendência, o bloqueio sai e o SA continua com o peso previsto
+
 O Mega é só lido. A ÚNICA simulação é a confirmação do SA: um SA que o teste informou e que não teve carga real no
 Mega é tratado como confirmado (no aceite real, o Fabiano faz a carga no Mega).
 
@@ -225,7 +233,43 @@ def caminho_a(c: Cliente, u: dict, lote, op: int, mega: MegaE2E, num_cop: int) -
     return {"solicitacao": sol["id"], "cop": cop, "situacao_final": _situacao(c, u, sol["id"])}
 
 
-def caminho_b(c: Cliente, u: dict, lote, op: int, mega: MegaE2E, num_cop: int) -> dict:
+def _corpo_envio(lote, op: int, enviar: bool = True) -> dict:
+    return {"op": op, "liga": lote.item.liga.codigo, "medida": medida_para(lote),
+            "itens": [{"lote_id": lote.id, "modo": "CORTAR_RJ", "quantidade": 1}], "enviar": enviar}
+
+
+def _niveis(c: Cliente, url: str, corpo: dict) -> dict[str, str]:
+    st, v = c.req("POST", url, corpo)
+    esperar(st == 200, f"{url}: {st} {v}")
+    return {o["codigo"].split("#")[0]: o["nivel"] for o in v.get("ocorrencias", [])}
+
+
+def pendencias_da_copia(c: Cliente, u: dict, lote, op: int) -> dict:
+    """R058: peça inteira do RJ já vencida na cópia → o envio tem de estar bloqueado; encerra (só na cópia)."""
+    c.entrar(u["itu"])
+    st, s = c.req("GET", "/api/pendencias-peso-real")
+    esperar(st == 200, f"pendências do peso real: {st} {s}")
+    out = {"quantidade": s["quantidade"], "vencidas": s["vencidas"], "dias_limite": s["dias_limite"],
+           "encerradas_na_copia": []}
+    if not s["bloqueado"]:
+        esperar("PESO_REAL_PENDENTE" not in _niveis(c, "/api/solicitacoes/validar", _corpo_envio(lote, op)),
+                "sem pendência vencida e o envio veio bloqueado por PESO_REAL_PENDENTE")
+        return out
+    esperar(_niveis(c, "/api/solicitacoes/validar", _corpo_envio(lote, op)).get("PESO_REAL_PENDENTE") == "ERRO",
+            f"{s['vencidas']} peça(s) vencida(s) na cópia e o envio não bloqueou (PESO_REAL_PENDENTE)")
+    for x in s["itens"]:
+        if x["vencida"]:
+            st, d = c.req("POST", f"/api/pendencias-peso-real/{x['pendencia_id']}/encerrar",
+                          {"justificativa": f"{JUST}: encerrada só na cópia do banco"})
+            esperar(st == 200, f"encerrar pendência {x['pendencia_id']}: {st} {d}")
+            out["encerradas_na_copia"].append({"op": x["op"], "lote": x["lote"], "recebido_em": x["recebido_em"],
+                                               "dias": x["dias"]})
+    esperar("PESO_REAL_PENDENTE" not in _niveis(c, "/api/solicitacoes/validar", _corpo_envio(lote, op)),
+            "pendências encerradas e o envio continua bloqueado")
+    return out
+
+
+def caminho_b(c: Cliente, u: dict, lote, op: int, mega: MegaE2E, num_cop: int, envelhecer=None) -> dict:
     c.entrar(u["itu"])
     corpo = {"op": op, "liga": lote.item.liga.codigo, "medida": medida_para(lote),
              "itens": [{"lote_id": lote.id, "modo": "TRAZER_INTEIRA", "quantidade": 1}], "enviar": True,
@@ -244,9 +288,23 @@ def caminho_b(c: Cliente, u: dict, lote, op: int, mega: MegaE2E, num_cop: int) -
     _receber(c, u, cop)
     esperar(_situacao(c, u, sol["id"]) == "AGUARDANDO_CORTE_ITU", "B: depois de receber deveria aguardar corte em Itu")
     c.entrar(u["itu"])
+    peso_real = {}
+    st, pend = c.req("GET", "/api/pendencias-peso-real")
+    minha = [x for x in pend["itens"] if x["solicitacao_id"] == sol["id"]]
+    esperar(minha and not minha[0]["vencida"], f"B: peça recebida deveria virar pendência do peso real ({minha})")
+    if envelhecer is not None:          # R058: recebimento envelhecido na cópia → "Enviar ao RJ" bloqueia
+        envelhecer(cop, int(pend["dias_limite"]) + 2)
+        com = _niveis(c, "/api/solicitacoes/validar", _corpo_envio(lote, op))
+        esperar(com.get("PESO_REAL_PENDENTE") == "ERRO", f"B: pendência vencida não bloqueou o envio ({com})")
+        rasc = _niveis(c, "/api/solicitacoes/validar", _corpo_envio(lote, op, enviar=False))
+        esperar(rasc.get("PESO_REAL_AGUARDANDO") == "ALERTA" and "PESO_REAL_PENDENTE" not in rasc,
+                f"B: rascunho deveria só avisar ({rasc})")
+        peso_real["bloqueio"] = "OK: envio com ERRO PESO_REAL_PENDENTE; rascunho só com aviso"
+    st, sas = c.req("GET", f"/api/sas?op={op}")
+    sa_antes = {s["id"]: s["peso_kg"] for s in sas["itens"] if s["solicitacao_id"] == sol["id"]}
+    esperar(sa_antes, f"B: SA da solicitação {sol['id']} não encontrado")
     st, sug = c.req("GET", f"/api/cortes-itu/sugestao?op={op}")
     esperar(st == 200 and sug.get("lote_id"), f"B: sem lote RJ em Itu sugerido ({st} {sug})")
-    sobra = round(barra - previsto - 1, 3)
     base = {"op": op, "lote_id": sug["lote_id"], "sobra_kg": 0, "pecas": 1, "previsto_kg": previsto,
             "peso_usado_kg": barra}
     sete = _codigos(c, "/api/cortes-itu/validar", {**base, "consumo_kg": round(previsto * 1.07, 3)})
@@ -254,10 +312,24 @@ def caminho_b(c: Cliente, u: dict, lote, op: int, mega: MegaE2E, num_cop: int) -
     st, v = c.req("POST", "/api/cortes-itu/validar", {**base, "consumo_kg": round(previsto * 1.09, 3)})
     exc = [o["mensagem"] for o in v.get("ocorrencias", []) if o["codigo"].startswith("EXCESSO_TOLERANCIA")]
     esperar(exc and "8 %" in exc[0], f"B: 9 % acima deveria pedir justificativa com o limite de 8 % ({exc})")
+    real = round(previsto * 1.05, 3)     # peso real ≠ previsto (dentro dos 8 %): só ajusta consumo e lote RJ em Itu
+    sobra = round(barra - real - 1, 3)
     corte = gravar(c, "/api/cortes-itu/validar", "/api/cortes-itu",
-                   {"op": op, "lote_id": sug["lote_id"], "consumo_kg": previsto, "sobra_kg": max(sobra, 0.5),
+                   {"op": op, "lote_id": sug["lote_id"], "consumo_kg": real, "sobra_kg": max(sobra, 0.5),
                     "sobra_na_bitola": False, "pecas": 1, "observacao": "TESTE E2E caminho B"})
-    return {"solicitacao": sol["id"], "cop": cop, "corte_itu": corte["id"],
+    esperar(corte.get("pendencia_peso_real_resolvida") is True, "B: a T13 deveria resolver a pendência do peso real")
+    c.entrar(u["itu"])
+    st, pend = c.req("GET", "/api/pendencias-peso-real")
+    esperar(not [x for x in pend["itens"] if x["solicitacao_id"] == sol["id"]], "B: pendência continua depois da T13")
+    if envelhecer is not None:
+        depois = _niveis(c, "/api/solicitacoes/validar", _corpo_envio(lote, op))
+        esperar("PESO_REAL_PENDENTE" not in depois, f"B: bloqueio continua depois da T13 ({depois})")
+        peso_real["bloqueio"] += "; sai depois da T13"
+    st, sas = c.req("GET", f"/api/sas?op={op}")
+    sa_depois = {s["id"]: s["peso_kg"] for s in sas["itens"] if s["id"] in sa_antes}
+    esperar(sa_depois == sa_antes, f"B: o SA da peça inteira mudou de peso ({sa_antes} → {sa_depois})")
+    peso_real["sa"] = f"SA com o previsto ({sorted(sa_antes.values())} kg); consumo real {real} kg"
+    return {"solicitacao": sol["id"], "cop": cop, "corte_itu": corte["id"], "peso_real": peso_real,
             "lote_reto": (corte.get("lote_reto") or {}).get("codigo"), "situacao_final": _situacao(c, u, sol["id"])}
 
 
@@ -356,6 +428,19 @@ def _situacao(c: Cliente, u: dict, sol_id: int) -> str:
     return c.req("GET", f"/api/solicitacoes/{sol_id}")[1]["situacao"]
 
 
+def envelhecedor(sessao):
+    """Só no ponta a ponta (cópia do banco) e no ensaio: recua o recebimento dos itens de um COP em `dias`."""
+    def envelhecer(cop_id: int, dias: int) -> None:
+        from datetime import datetime, timedelta, timezone
+
+        from app.models import CopItem
+        with sessao() as db:
+            for ci in db.query(CopItem).filter(CopItem.cop_id == cop_id, CopItem.recebido_em.is_not(None)):
+                ci.recebido_em = datetime.now(timezone.utc) - timedelta(days=dias)
+            db.commit()
+    return envelhecer
+
+
 def conferir_saldos(db) -> dict:
     from sqlalchemy import text
     neg = db.execute(text("SELECT count(*) FROM lote WHERE saldo_kg < 0")).scalar()
@@ -390,8 +475,12 @@ def executar(app, sessao, gateway, ops_informadas: list[int] | None = None) -> d
         rel["dados"] = {"ops": ops, "lotes": {"A": la.codigo, "B": lb.codigo, "B2": lb2.codigo, "C": lc.codigo}}
         db.expunge_all()
     c = Cliente(app)
+    try:
+        rel["peso_real_na_copia"] = {"ok": True, **pendencias_da_copia(c, u, la, ops[0])}
+    except Exception as e:  # noqa: BLE001
+        rel["peso_real_na_copia"] = {"ok": False, "erro": f"{type(e).__name__}: {e}"}
     passos = [("A", lambda: caminho_a(c, u, la, ops[0], mega, base_cop)),
-              ("B", lambda: caminho_b(c, u, lb, ops[1], mega, base_cop + 1)),
+              ("B", lambda: caminho_b(c, u, lb, ops[1], mega, base_cop + 1, envelhecedor(sessao))),
               ("B2", lambda: caminho_b2(c, u, lb2, ops[2], mega, la)),
               ("C", lambda: caminho_c(c, u, lc, ops[3])),
               ("D", lambda: caminho_d(c, u, la.item.liga.codigo))]
@@ -408,7 +497,8 @@ def executar(app, sessao, gateway, ops_informadas: list[int] | None = None) -> d
     with sessao() as db:
         rel["conferencia"] = conferir_saldos(db)
     rel["sa_confirmacao_simulada"] = sorted(set(mega.simulados))
-    rel["ok"] = all(r.get("ok") for r in rel["caminhos"].values()) and rel["conferencia"]["negativos"] == 0 \
+    rel["ok"] = all(r.get("ok") for r in rel["caminhos"].values()) and rel["peso_real_na_copia"]["ok"] \
+        and rel["conferencia"]["negativos"] == 0 \
         and rel["conferencia"]["qtd_diferentes"] == 0 and rel["conferencia"]["lotes_rj_com_codigo_mega"] == 0
     return rel
 

@@ -47,7 +47,8 @@ Como registrar um problema: anote na tabela do §7 **a tela, o que fez, o que es
 | 1 | T07 com a OP do §6 (caminho B), modo **Trazer peça inteira** | Peso previsto da peça (bitola + sobremetal), não da barra | ☐ |
 | 2 | (depois do Marcelo separar a barra, fechar o COP e enviar) T14: o SA vem com o **peso previsto** | SA com o previsto, não com o peso da barra | ☐ |
 | 3 | T12: receber | Nasce um lote **RJ em Itu** com o peso da barra; solicitação **Aguardando corte em Itu** | ☐ |
-| 4 | **T13 Corte em Itu**: consumo, sobra e se a sobra ficou na bitola | Perda calculada; sobra fora da bitola vira lote **RETO**; solicitação **Concluída** | ☐ |
+| 3b | Antes da T13: Painel T03 e T07 de outra OP | Card "Peças inteiras do RJ aguardando peso real" com os dias desde o recebimento; na T07, aviso cinza (o "Enviar ao RJ" continua). Passando de 7 dias (T23 `PENDENCIA_PESO_REAL_DIAS`) o card fica vermelho e o "Enviar ao RJ" bloqueia para todos (testado no automático e no ponta a ponta; no aceite só se houver peça vencida de verdade) | ☐ |
+| 4 | **T13 Corte em Itu**: consumo (o **peso real**), sobra e se a sobra ficou na bitola | Perda calculada; sobra fora da bitola vira lote **RETO**; solicitação **Concluída**; a pendência do peso real some do Painel; o **SA continua com o previsto** (não é corrigido, v3.11) | ☐ |
 | 5 | Pôr um consumo **até 8 %** acima do previsto (lote RJ em Itu) e depois **mais de 8 %** | Até 8 % grava direto; acima pede justificativa (amarelo) dizendo "Limite: 8 % para material do RJ"; com justificativa, grava | ☐ |
 
 ### 1.4 Caminho B2 — corte em Itu de material RJ que já está em Itu

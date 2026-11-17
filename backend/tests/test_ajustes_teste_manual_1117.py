@@ -102,3 +102,80 @@ def test_emitente_novo_so_fio_certo():
         with pytest.raises(ErroNegocio):
             sas.obter_nf(None, "1", valor)
     assert "MEDIO_VALE" in sas.EMITENTES_HISTORICO                          # histórico continua lido
+
+
+# ---- bitola estritamente maior que a peça (Eduardo, 2026-11-17) ----
+
+def test_validar_bitola_estritamente_maior():
+    from app.domain import regras
+
+    def cods(r):
+        return [o.codigo for o in r.ocorrencias]
+    assert cods(regras.validar_bitola(45, 600, None, 45, 600, None)) == ["BITOLA_MENOR_QUE_PECA"]   # igual: erro
+    assert cods(regras.validar_bitola(46, 601, None, 45, 600, None)) == []
+    assert cods(regras.validar_bitola(46, 600, None, 45, 600, None)) == ["BITOLA_MENOR_QUE_PECA"]
+    r = regras.validar_bitola(45, 600, None, 45, 600, None)
+    assert r.ocorrencias[0].mensagem == "A bitola precisa ser maior que a peça em todas as medidas."
+    assert cods(regras.validar_bitola(None, None, 90, None, None, 90)) == ["BITOLA_MENOR_QUE_PECA"]   # redondo
+    assert cods(regras.validar_bitola(None, None, 91, None, None, 90)) == []
+    # (a) comprimento: só quando os dois têm
+    assert cods(regras.validar_bitola(46, 601, None, 45, 600, None, 3000, 3000)) == ["COMPRIMENTO_MENOR_QUE_PECA"]
+    assert cods(regras.validar_bitola(46, 601, None, 45, 600, None, 3001, 3000)) == []
+    assert cods(regras.validar_bitola(46, 601, None, 45, 600, None, None, 3000)) == []
+
+
+@pytest.fixture()
+def amb_bitola(client):
+    u = criar_usuarios(client)
+    from app.core.db import SessionLocal
+    from app.models import Conteiner, ItemMP, Liga
+    from app.services import movimentos as mov
+    ids = {}
+    with SessionLocal() as db:
+        h13 = Liga(codigo="H13", nome="H13", densidade=7.8, apelidos=[])
+        db.add(h13)
+        db.flush()
+        ct = Conteiner(codigo="CH77Q")
+        db.add(ct)
+        for nome, desc, e, larg in (("igual", "H13 45x600", 45, 600), ("maior", "H13 46x601", 46, 601),
+                                    ("so_esp", "H13 46x600", 46, 600), ("curto", "H13 50x650x200", 50, 650)):
+            it = ItemMP(descricao=desc, liga_id=h13.id, formato="RETANGULAR", espessura=e, largura=larg)
+            db.add(it)
+            db.flush()
+            lote = mov.criar_lote(db, item=it, planta_fiscal="RJ", local_fisico="RJ", conteiner_id=ct.id,
+                                  peso_inicial_kg=900)
+            mov.lancar(db, lote, "SALDO_INICIAL", 900, usuario_id=None)
+            ids[nome] = lote.id
+        reto = ItemMP(descricao="H13 RETO", liga_id=h13.id, formato="RETO")
+        db.add(reto)
+        db.flush()
+        lote = mov.criar_lote(db, item=reto, planta_fiscal="RJ", local_fisico="RJ", conteiner_id=ct.id,
+                              peso_inicial_kg=80, tipo="RETO")
+        mov.lancar(db, lote, "SALDO_INICIAL", 80, usuario_id=None)
+        ids["reto"] = lote.id
+        db.commit()
+    fab = mega_falso()
+    yield client, u, ids
+    fab.definir(None)
+
+
+def test_sugestao_so_oferece_lote_maior(amb_bitola):
+    client, u, ids = amb_bitola
+    entrar(client, u["itu"])
+    r = client.get("/api/lotes/compativeis?liga=H13&espessura=45&largura=600&comprimento=250&quantidade=1").json()
+    achou = {i["id"]: i for i in r["itens"]}
+    assert ids["maior"] in achou and ids["curto"] not in achou          # 200 de comprimento < 250 (proposta a)
+    assert ids["igual"] not in achou and ids["so_esp"] not in achou
+    assert achou[ids["reto"]]["aviso_medida"] == "RETO sem medida: confira se é maior que a peça."   # proposta b
+    assert achou[ids["maior"]]["aviso_medida"] is None
+
+
+def test_pedido_com_lote_igual_a_peca_da_erro(amb_bitola):
+    client, u, ids = amb_bitola
+    h = entrar(client, u["itu"])
+    medida = {"formato": "RETANGULAR", "espessura": 45, "largura": 600, "comprimento": 250}
+    for nome, erro in (("igual", True), ("so_esp", True), ("maior", False)):
+        corpo = corpo_solicitacao(ids[nome], medida=medida)
+        corpo["itens"][0]["quantidade"] = 1
+        v = client.post("/api/solicitacoes/validar", json=corpo, headers=h).json()
+        assert ("BITOLA_MENOR_QUE_PECA" in [o["codigo"] for o in v["ocorrencias"]]) is erro, (nome, v)

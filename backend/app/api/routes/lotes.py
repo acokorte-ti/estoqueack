@@ -14,9 +14,10 @@ from app.core.db import get_db
 from app.models import Destinacao, Lote, Nota, Usuario
 from app.services import auditoria, estoque
 from app.services import movimentos as mov
+from app.domain import regras
 from app.domain.medidas import chave_multiplo
 from app.services.base import lote_visivel, so_rj_no_rio
-from app.services.solicitacoes import ligas_equivalentes
+from app.services.solicitacoes import comprimento_do_item, ligas_equivalentes
 
 router = APIRouter(prefix="/lotes", tags=["estoque"])
 
@@ -120,15 +121,24 @@ def compativeis(liga: str, formato: Literal["RETANGULAR", "REDONDO"] = "RETANGUL
     saida = []
     for l, base in zip(lotes, estoque.lote_resumo(db, lotes), strict=True):
         it = l.item
-        if it.formato != "RETO":
-            if formato == "REDONDO" and (it.formato != "REDONDO" or (diametro and it.diametro < diametro)):
+        aviso = None
+        if it.formato == "RETO":
+            aviso = "RETO sem medida: confira se é maior que a peça."   # proposta da COORDENAÇÃO, 2026-11-17
+        else:
+            # Eduardo, 2026-11-17: só lote ESTRITAMENTE maior que a peça em todas as medidas (igual fica fora)
+            if formato == "REDONDO" and (it.formato != "REDONDO"
+                                         or (diametro and not regras.maior_que_peca(it.diametro, diametro))):
                 continue
             if formato == "RETANGULAR":
                 if it.formato != "RETANGULAR":
                     continue
-                bit, pec = sorted([it.espessura or 0, it.largura or 0]), sorted([espessura or 0, largura or 0])
-                if pec[0] > bit[0] + 1e-9 or pec[1] > bit[1] + 1e-9:
+                bit = sorted([float(it.espessura or 0), float(it.largura or 0)])
+                pec = sorted([float(espessura or 0), float(largura or 0)])
+                if not (regras.maior_que_peca(bit[0], pec[0]) and regras.maior_que_peca(bit[1], pec[1])):
                     continue
+            comp_lote = comprimento_do_item(it)
+            if comp_lote and comprimento and not regras.maior_que_peca(comp_lote, comprimento):
+                continue
         disponivel = round(float(l.saldo_kg) - res.get(l.id, 0.0), 3)
         if disponivel <= 0:
             continue
@@ -136,7 +146,7 @@ def compativeis(liga: str, formato: Literal["RETANGULAR", "REDONDO"] = "RETANGUL
         c = calc.calcular(bitola=bitola, acabada=acabada, quantidade=quantidade, densidade=float(it.liga.densidade),
                           sobremetal_comprimento_mm=5, sobremetal_largura_mm=None)
         # P28(1): equivalência sem MOD (1.2344 = H13, 1.2379 = D2, outras da T22) é a mesma liga: sem selo
-        saida.append({**base, "disponivel_kg": disponivel,
+        saida.append({**base, "disponivel_kg": disponivel, "aviso_medida": aviso,
                       "liga_equivalente": not estoque.mesma_liga(mapa, it.liga.codigo, alvo.codigo),
                       "multiplo": chave_multiplo(it.descricao, it.comprimento_fixado),
                       "peso_previsto_kg": c.peso_previsto_kg, "peso_peca_kg": c.peso_peca_kg,

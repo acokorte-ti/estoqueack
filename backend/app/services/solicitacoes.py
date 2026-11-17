@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.config import Config
 from app.domain import corte, regras
 from app.domain.formato import kg_br, pct_br
+from app.domain.medidas import chave_multiplo, interpretar
 from app.domain.validacao import Nivel, Ocorrencia, Resultado
 from app.integrations.mega.consultas import SITUACOES_OP
 from app.models import (CadastroSa, Conteiner, CorteItu, ItemMP, LiberacaoCorte, Liga, LigaEquivalente, Lote,
@@ -76,6 +77,14 @@ def _bitola_lote(lote: Lote) -> corte.Dimensoes | None:
     if it.formato == "RETO":
         return None
     return corte.Dimensoes(it.formato, it.espessura, it.largura, it.diametro)
+
+
+def comprimento_do_item(it: ItemMP) -> float | None:
+    """Comprimento informado na descrição do item (ex.: 'H13 70x610x3905', 'Ø90X2425'); None se não houver.
+    Múltiplo fica de fora: o comprimento dele é o do múltiplo, não o da barra (proposta, 2026-11-17)."""
+    if it.formato == "RETO" or chave_multiplo(it.descricao, it.comprimento_fixado):
+        return None
+    return interpretar(it.descricao or "").comprimento
 
 
 def ligas_equivalentes(db: Session, liga_id: int) -> set[int]:
@@ -184,7 +193,7 @@ def _calcular_item(db: Session, cfg: Config, e: SolicitacaoEntrada, it: ItemEntr
     b = _bitola_lote(lote)
     if b is not None and acabada is not None:
         r.juntar(regras.validar_bitola(b.espessura, b.largura, b.diametro, acabada.espessura, acabada.largura,
-                                       acabada.diametro))
+                                       acabada.diametro, comprimento_do_item(lote.item), acabada.comprimento))
     if calc.peso_previsto_kg and calc.peso_peca_kg:
         r.juntar(regras.validar_sobremetal(calc.peso_previsto_kg, calc.peso_peca_kg,
                                            parametro(db, "TOLERANCIA_SOBREMETAL_PCT", cfg)))
@@ -556,7 +565,8 @@ def validar_corte(db: Session, cfg: Config, sol: SolicitacaoCorte, e: CorteEntra
         if lote.id != original.id:
             b = _bitola_lote(lote)
             if b is not None:
-                ri.juntar(regras.validar_bitola(b.espessura, b.largura, b.diametro, *acabada))
+                ri.juntar(regras.validar_bitola(b.espessura, b.largura, b.diametro, *acabada,
+                                                comprimento_do_item(lote.item), sol.acabada_comprimento))
             if lote.item.liga_id != original.item.liga_id and \
                     lote.item.liga_id not in ligas_equivalentes(db, original.item.liga_id):
                 ri.adicionar("LIGA_DIFERENTE", Nivel.ERRO,

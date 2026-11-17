@@ -1,6 +1,6 @@
 # Estado — BACKEND / TÉCNICO
 
-Atualizado: 2026-11-17 (noite) pelo TÉCNICO: **ajustes do teste manual** (R071: liga por "contém", justificativa sem mínimo, NF só Fio Certo). Antes, à tarde: **ferramenta "Confirmar SA (teste)"** no ar (`fc4b808`, R070 ao FRONTEND) e **recarga do zero** da homologação às 10h23 (números em §2). Aguardando: R070 (botão na T14), R066, R067, R068, R069, P35/P36/P37, 1.2746 × 1.2767 RETO (Fabiano). **No dia da implantação: `MODO_TESTE=false`** (06_implantacao §2.3).
+Atualizado: 2026-11-17 (noite) pelo TÉCNICO: **bitola estritamente maior que a peça** (R072) e **ajustes do teste manual** (R071: liga por "contém", justificativa sem mínimo, NF só Fio Certo). Antes, à tarde: **ferramenta "Confirmar SA (teste)"** no ar (`fc4b808`, R070 ao FRONTEND) e **recarga do zero** da homologação às 10h23 (números em §2). Aguardando: R070 (botão na T14), R066, R067, R068, R069, P35/P36/P37, 1.2746 × 1.2767 RETO (Fabiano). **No dia da implantação: `MODO_TESTE=false`** (06_implantacao §2.3).
 
 > Para retomar a parte técnica do zero: `estoqueack/docs/tecnico/00_RETOMAR_PROJETO.md` (inventário, onde fica cada segredo, operação, lições e incidentes; §7.2 e §7.3 = Fase 1).
 
@@ -14,6 +14,11 @@ Atualizado: 2026-11-17 (noite) pelo TÉCNICO: **ajustes do teste manual** (R071:
 - **Comigo daqui para frente:** recarregar a T25 quando o Fabiano devolver as correções do R032 (avisar antes no R033); campos da impressão da Fila RJ se o FUNCIONAL pedir; na implantação, a carga final (roteiro do BANCO E TESTES, em `deploy/implantacao/`). PDFs de romaneio e ficha do lote ficaram para a F1.1.
 
 ## 2. Feito
+
+### Bitola estritamente maior que a peça (2026-11-17 noite, R072)
+
+- `regras.maior_que_peca`/`validar_bitola` (igual = ERRO), `/compativeis` (igual fica fora; RETO com `aviso_medida`), pedido e corte RJ com lote trocado. Comprimento (proposta a): `solicitacoes.comprimento_do_item` (descrição, sem múltiplo) → `COMPRIMENTO_MENOR_QUE_PECA`. Corte em Itu não compara bitola (nada a mudar).
+- Testes: 3 novos em `tests/test_ajustes_teste_manual_1117.py`.
 
 ### Ajustes do teste manual (2026-11-17 noite, R071)
 

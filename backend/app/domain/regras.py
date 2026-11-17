@@ -108,18 +108,28 @@ def validar_sobremetal(peso_bruto_kg: float, peso_peca_kg: float,
     return r
 
 
+def maior_que_peca(bitola: float | None, peca: float | None) -> bool:
+    """Medida do lote ESTRITAMENTE maior que a da peça (Eduardo, 2026-11-17: 45x600 não serve para 45x600)."""
+    return float(bitola or 0) > float(peca or 0) + EPS
+
+
 def validar_bitola(bitola_esp: float | None, bitola_larg: float | None, bitola_diam: float | None,
-                   peca_esp: float | None, peca_larg: float | None, peca_diam: float | None) -> Resultado:
-    """A bitola precisa comportar a medida acabada (comparação dimensão a dimensão, ordenada)."""
+                   peca_esp: float | None, peca_larg: float | None, peca_diam: float | None,
+                   bitola_comp: float | None = None, peca_comp: float | None = None) -> Resultado:
+    """A bitola precisa ser ESTRITAMENTE maior que a medida acabada em todas as medidas (comparação dimensão a
+    dimensão, ordenada; redondo: Ø do lote > Ø da peça). Decisão do Eduardo de 2026-11-17 (antes: maior ou igual).
+    Comprimento: só quando o lote e a peça têm comprimento [proposta da COORDENAÇÃO, 2026-11-17]."""
     r = Resultado()
-    bit = sorted([v for v in (bitola_esp, bitola_larg) if v]) if not bitola_diam else [bitola_diam, bitola_diam]
-    pec = sorted([v for v in (peca_esp, peca_larg) if v]) if not peca_diam else [peca_diam, peca_diam]
-    if len(bit) < 2 or len(pec) < 2:
-        return r
-    if any(p > b + EPS for p, b in zip(pec, bit, strict=False)):
+    bit = sorted([float(v) for v in (bitola_esp, bitola_larg) if v]) if not bitola_diam else [bitola_diam] * 2
+    pec = sorted([float(v) for v in (peca_esp, peca_larg) if v]) if not peca_diam else [peca_diam] * 2
+    if len(bit) == 2 and len(pec) == 2 and not all(maior_que_peca(b, p) for p, b in zip(pec, bit, strict=True)):
         r.adicionar("BITOLA_MENOR_QUE_PECA", Nivel.ERRO,
-                    "A bitola do lote é menor que a medida acabada da peça.",
+                    "A bitola precisa ser maior que a peça em todas as medidas.",
                     bitola=bit, peca=pec)
+    if bitola_comp and peca_comp and not maior_que_peca(bitola_comp, peca_comp):
+        r.adicionar("COMPRIMENTO_MENOR_QUE_PECA", Nivel.ERRO,
+                    "O comprimento do lote precisa ser maior que o da peça.",
+                    comprimento_lote=float(bitola_comp), comprimento_peca=float(peca_comp))
     return r
 
 

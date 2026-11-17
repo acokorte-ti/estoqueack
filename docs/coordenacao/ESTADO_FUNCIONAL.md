@@ -1,9 +1,10 @@
 # Estado — FUNCIONAL
 
-Atualizado: 2026-11-17 (T07 + T13 unificadas e ajustes do teste manual, especificação v3.14)
+Atualizado: 2026-11-17 (pedidos do teste manual: uso parcial de dois lotes, NF enriquecida e anexos, fechamento mensal do RJ, especificação v3.15)
 
 ## No ar
 
+- **Especificação v3.15:** pedidos do Eduardo de 17/11 (DECISOES). (1) **Uso parcial de mais de um lote na mesma OP** a partir do que já existe (uma solicitação = OP + lote; vários lotes RJ, no máximo 1 de Itu): balanceamento das peças (soma = OP; acima `PECAS_ACIMA_OP` bloqueia, abaixo `PECAS_ABAIXO_OP` avisa), lote menor consumido por inteiro (`CONSUMO_LOTE_INTEIRO`, limite P39), peso previsto por parte com a bitola do lote, SA com uma linha por parte e o mesmo código; bitola estritamente maior + comprimento + RETO com aviso (R072) (T07, §9). (2) **T06/T15 enriquecidas** (série, emissão, entrada, emitente, chave, packing list, DI, NCM, peso líquido/bruto, R$/kg do precificador, observações) e **documentos anexos** (NF, packing list, precificador do contêiner; PDF/JPG/PNG até 10 MB; sem trava por perfil; apagar esconde; no backup), no T05 "Entrada e documentos", T04 com R$/kg e clipe (T04, T05, T06, T15, T23, §9, §11). (3) **Fechamento mensal do RJ** (T19 item 10) como modelo [a validar com a Inês]; F1 como Excel só depois da validação. (4) Registrados T09 impressa limpa com peso estimado e T12 com código do SA (feitos pelo FRONTEND); P36(a) respondida (Amanda informa). Novas **P39–P43**. Pedidos **R074** (TÉCNICO), **R075** (FRONTEND), **R076** (BANCO E TESTES); R072 e R073 respondidos na parte do FUNCIONAL (códigos da spec iguais aos do TÉCNICO: `CONSUMO_LOTE_INTEIRO`, `PECAS_ACIMA_OP`, `PECAS_ABAIXO_OP`).
 - **Especificação v3.14:** as 2 decisões de 17/11 da DECISOES. (1) T07 é a única porta de entrada; com lote de Itu continua no lançamento do corte (conteúdo da T13); T13 fora do menu, só pelos atalhos do T03 (peso real) e do T05 (botão novo "Registrar corte em Itu" no lote RJ em Itu) (§2, §4, §4.1, §4.2, T07, T13, §9). (2) Filtro de liga por "contém" (T04, RETO por origem, T08, T19), instrução de processo múltipla (T07), justificativa sem mínimo, não vazia (§9, T15), T09 com pesquisa e cartões que expandem, emitente só Fio Certo (§2.1, T11, T14). Nova **P38** (detalhes que são proposta). Sem pedido novo (a COORDENAÇÃO já acionou as frentes).
 - **Especificação v3.13:** observações do Eduardo de 17/11 (SA cadastrado no Mega pela **Amanda**, Fabiano só pede: §2, T14; peso real da peça inteira = consumo da OP, resto = estoque em Itu: §2.2, T13; **regra do RETO** por E × L com "Conferi a regra" e 3 parâmetros na T23: T13, T10, §9) e R062 respondido (§10.3, §10.9 A.1/A.7/B/E: 41 contêineres corrigidos dentro do aprovado, 1 com material diferente; CH35SH = H13 nas três planilhas; Planilha1 com SA). Novas **P35** (RETO), **P36** (quem informa o código do SA), **P37** (carga 17/11); P34(d) com evidência. Pedidos **R063** (TÉCNICO) e **R064** (FRONTEND).
 - **Especificação v3.12:** nomes novos do menu (aprovados pelo Eduardo em 17/11) no §4, matriz §4.1, títulos T03–T16 e fluxos do §2; códigos das telas mantidos. T17, T18 e T24 ficaram fora do menu aprovado.
@@ -24,14 +25,14 @@ Atualizado: 2026-11-17 (T07 + T13 unificadas e ajustes do teste manual, especifi
 ## Próximo
 
 - Responder o R068 (leituras do TÉCNICO no R063/R065).
-- Aplicar P33, P34, P35, P36, P37 e P38 quando o Eduardo (e o Fabiano, P34 a/c) responder; aplicar a resposta do 1.2767 × 1.2746 RETO (PENDENCIAS 17/11) no §10.9 D.
+- Aplicar P33, P34, P35, P36(b), P37, P38 e P39–P43 quando o Eduardo (e o Fabiano, P34 a/c) responder; aplicar a resposta do 1.2767 × 1.2746 RETO (PENDENCIAS 17/11) no §10.9 D.
 - Aplicar a P27 quando o Eduardo responder.
 - Depois da implantação: lista do BLOCO 2 (OPs mal digitadas, SEM OP, cortes sem peso, solicitações sem lote), contêiner digitado errado, comentário com várias OPs, corte dividido entre contêineres, "PESO INICIAL" (B05 a B08).
 
 ## Aguardando
 
-- **Eduardo:** P33, P34, P35, P36, P38. **Marcelo:** P37(a). **Fabiano:** P37(b), P34(d) (10 discordantes), aviso da paridade do contêiner H13. **Fabiano:** 1.2767 × 1.2746 RETO (`carga/PENDENCIAS_USUARIOS_2026-11-17.txt`). (55322: resolvido, A8 MOD do RJ fica separado.) Avisar o Fabiano sobre o IPI do NCM 82089000 (se ainda não foi).
-- **TÉCNICO / FRONTEND:** R045, R046, R047, R049, R050, R051, R052, R054, R058, R059, R063, R064.
+- **Eduardo:** P33, P34, P35, P36(b), P38, P39, P40, P41, P42. **Inês (pelo Eduardo):** P43 (modelo do fechamento mensal). **Marcelo:** P37(a). **Fabiano:** P37(b), P34(d) (10 discordantes), aviso da paridade do contêiner H13. **Fabiano:** 1.2767 × 1.2746 RETO (`carga/PENDENCIAS_USUARIOS_2026-11-17.txt`). (55322: resolvido, A8 MOD do RJ fica separado.) Avisar o Fabiano sobre o IPI do NCM 82089000 (se ainda não foi).
+- **TÉCNICO / FRONTEND:** R045, R046, R047, R049, R050, R051, R052, R054, R058, R059, R063, R064, R074, R075, R076.
 
 ## Instruções permanentes desta frente
 
@@ -63,4 +64,4 @@ Atualizado: 2026-11-17 (T07 + T13 unificadas e ajustes do teste manual, especifi
 9. **Quando eu gerar uma lista para o Fabiano revisar:** Excel com aba "Leia-me", colunas amarelas só para ele preencher, sugestão minha em coluna separada e o arquivo em `carga/` (fora do repositório).
 10. **Pedidos (`PEDIDOS.md`):**
     - Ao responder, mudar o status e escrever no máximo ~5 linhas, sem quebra de linha na célula. O detalhe vai na especificação ou neste ESTADO.
-    - Próximo número de pedido: o maior R0xx em `PEDIDOS.md` + 1 (em 17/11 o último era R064).
+    - Próximo número de pedido: o maior R0xx em `PEDIDOS.md` + 1 (em 17/11 o último era R076).

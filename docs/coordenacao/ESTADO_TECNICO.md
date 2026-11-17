@@ -1,6 +1,6 @@
 # Estado — BACKEND / TÉCNICO
 
-Atualizado: 2026-11-12 pelo TÉCNICO: conferência da leitura das planilhas antes da recarga (`2ca30ea`, leitor corrigido em 3 escritas; R057 ao FUNCIONAL; perguntas ao Fabiano em `carga/perguntas_fabiano_2026-11-12b.txt`). Antes: R055, P31, R053 (1)–(5), R054(3). Recarga só com o ok do Eduardo e do Fabiano (paridade `_0904` + perguntas 12b).
+Atualizado: 2026-11-17 pelo TÉCNICO: correções da carga da spec v3.11 §10.9 (P33 B05–B09, P34 pelas propostas), faixa da seção pelo maior valor, arquivo de correções com tipos novos, R058 (pendência do peso real e bloqueio `PESO_REAL_PENDENTE` no formato do R060), migração 0009 (R061 ao BANCO E TESTES). Planilhas de 17/11. Próximo: CI verde, deploy, recarga do zero na homologação (aviso no R033).
 
 > Para retomar a parte técnica do zero: `estoqueack/docs/tecnico/00_RETOMAR_PROJETO.md` (inventário, onde fica cada segredo, operação, lições e incidentes; §7.2 e §7.3 = Fase 1).
 
@@ -14,6 +14,13 @@ Atualizado: 2026-11-12 pelo TÉCNICO: conferência da leitura das planilhas ante
 - **Comigo daqui para frente:** recarregar a T25 quando o Fabiano devolver as correções do R032 (avisar antes no R033); campos da impressão da Fila RJ se o FUNCIONAL pedir; na implantação, a carga final (roteiro do BANCO E TESTES, em `deploy/implantacao/`). PDFs de romaneio e ficha do lote ficaram para a F1.1.
 
 ## 2. Feito
+
+### Spec v3.11: correções da carga e R058 (2026-11-17)
+
+- **Carga (§10.9, planilhas `planilhas\2026-11-17\` + `carga\correcoes_carga.json`):** contêiner do Corte pelo da ESTOQUE 2026 + SA da mesma OP (41 linhas; 10 discordantes ficam com o do Corte, P34(d)); corte dividido quando o peso do Corte = soma das partes (8, ex. da P33 650 = 198 + 452); peso inicial = ENTRADA do HISTORICO em 77 lotes (91.850,5 kg de "saídas anteriores a 2026"; abertura confere em 0 linhas diferentes); sem packing list: PESO INICIAL + pendência (7); restrição no item (13 itens RJ, 10 criados sem lote); faixa da seção pelo maior valor + nota; arquivo de correções com `leitura` (liga/descrição/contêiner em ESTOQUE 2026, HISTORICO, Corte e SA), `consumo_sem_op`, `paridade_manual` (item RJ mantém a medida, `item_mp.paridade_item_id`) e `avisos` (1.2746 RETO em aberto). A correção do DC53 saiu do arquivo (a planilha de 17/11 já vem certa).
+- **Relatórios** (`carga\relatorios\*_20261117_0829`): RJ no Rio 181 materiais / 232.222,5 kg: mesma linha 63 (58 iguais, 1 liga equivalente, 1 comprimento do HISTORICO, 3 por exceção), só no RJ 118; RJ em Itu 31 linhas / 28.820,8 kg: 19 mesma linha. Antes (código de 12/11, mesmas planilhas): 183 / 62 / 121. Solicitações 833 → 841 (8 voltaram), sem lote 17 → 9, lotes RJ no Rio sem data 8 → 2, itens com liga não informada 10 → 0 (linhas lidas como NAO-INFORMADA 182 → 70).
+- **R058/R060:** `services/peso_real.py`, `GET /api/pendencias-peso-real`, `POST /api/pendencias-peso-real/{id}/encerrar`, `PESO_REAL_PENDENTE` (ERRO com `enviar: true`) / `PESO_REAL_AGUARDANDO` (ALERTA), card do Painel com `limite_dias`/`vencidas`, sino `PESO_REAL_PENDENTE`, `pendencia_peso_real_resolvida` na T13, parâmetro `PENDENCIA_PESO_REAL_DIAS`. Contrato §16.2 e §16.3.
+- **Aguardando:** R061 (revisão da 0009), R062 (achados ao FUNCIONAL), P33/P34 do Eduardo (propostas já no código), 1.2746 × 1.2767 RETO (Fabiano).
 
 ### Conferência da leitura antes da recarga (2026-11-12, `2ca30ea`)
 

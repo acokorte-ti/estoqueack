@@ -81,7 +81,7 @@ function Lista({ itens }: { itens: Item[] }) {
 }
 
 export default function Layout() {
-  const { usuario, sair } = useSessao();
+  const { usuario, sair, modoTeste } = useSessao();
   const [menuAberto, setMenuAberto] = useState(false);
   const local = useLocation();
   const planta = usuario?.planta === "RJ" ? "Barra Mansa" : "Itu";
@@ -165,6 +165,9 @@ export default function Layout() {
       {menuAberto && <div className="fundo-menu" onClick={() => setMenuAberto(false)} aria-hidden="true" />}
 
       <main className="conteudo">
+        {modoTeste && (
+          <p className="faixa-teste" role="note">Ambiente de teste (homologação): os dados podem ser apagados na próxima recarga.</p>
+        )}
         <Outlet />
       </main>
     </div>

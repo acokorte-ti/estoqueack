@@ -1,6 +1,11 @@
 # Estado — FRONTEND / UX
 
-Atualizado: 2026-11-17 (R064, spec v3.13)
+Atualizado: 2026-11-17 (R070)
+
+## 2026-11-17 R070 "Confirmar SA (teste)"
+
+- **No ar:** T14 com "Confirmar SA (teste)" (secundário, etiqueta "só homologação") em cada linha não confirmada, só com `modo_teste` true e perfil ADMIN; linha sem código abre janela pedindo o código; resposta atualiza a linha e mostra "confirmado em teste" (`confirmacao_teste`). Faixa discreta "Ambiente de teste" no topo do conteúdo. `modo_teste` lido da sessão (`/auth/eu`/login, no nível da sessão ou do usuário) ou, se ausente, de `/api/saude`; ausente/false = nada aparece.
+- **Testado:** `tsc` + `build`; sem navegador (o Eduardo testa à mão).
 
 ## 2026-11-17 R064 (commit 260ec5c, bundle `index-r69rhZ8w.js` no site)
 

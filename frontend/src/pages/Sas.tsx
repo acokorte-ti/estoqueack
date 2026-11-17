@@ -16,6 +16,8 @@ interface Sa {
   nf: { numero: string; emitente: string } | null; cop: { id: number; numero: number; situacao: string } | null;
   exportado_renato_em: string | null; alterado_apos_exportar: boolean; atrasado: boolean;
   avisos?: { codigo: string; nivel: string; mensagem: string }[];
+  /** contrato §7.1 (R070): confirmado pela ferramenta de teste, sem ler o Mega */
+  confirmacao_teste?: boolean;
 }
 interface CopResumo { id: number; numero: number; situacao: string; qtd_itens: number; peso_total_kg: number }
 interface Lista { itens: Sa[]; total: number; cops_aguardando_sa: CopResumo[] }
@@ -43,7 +45,9 @@ const nomeEmitente = (v: string) => EMITENTES.find((e) => e.valor === v)?.nome ?
 /* ------------------------------------------------------------------ tela */
 
 export default function Sas() {
-  const { usuario } = useSessao();
+  const { usuario, modoTeste } = useSessao();
+  // contrato §7.1 (R070): ferramenta só da homologação, só ADMIN
+  const confirmaTeste = modoTeste && usuario?.perfil === "ADMIN";
   const altera = usuario?.perfil === "ESTOQUE" || usuario?.perfil === "ADMIN";
   const editaRs = altera || usuario?.perfil === "ANALISE";
   // spec v3.13 T14 / contrato §7 [P36]: a Amanda (perfil Análise) também informa o código do SA depois de cadastrar no Mega
@@ -114,7 +118,19 @@ export default function Sas() {
       return `${r.verificados} SA(s) verificado(s) no Mega, ${r.confirmados} confirmado(s).`;
     });
 
+  const atualizarLinha = (r: Sa) => setLista((l) => (l ? { ...l, itens: l.itens.map((i) => (i.id === r.id ? { ...i, ...r } : i)) } : l));
+
+  const confirmarTeste = (s: Sa) => {
+    if (!s.sa_codigo) return setTesteDe(s);
+    void acao(async () => {
+      const r = await api.post<Sa>(`/sas/${s.id}/confirmar-teste`, {});
+      atualizarLinha(r);
+      return `SA ${r.sa_codigo ?? s.sa_codigo} da OP ${s.op} confirmado em teste (sem ler o Mega).`;
+    });
+  };
+
   // janelas
+  const [testeDe, setTesteDe] = useState<Sa | null>(null);
   const [codigoDe, setCodigoDe] = useState<Sa | null>(null);
   const [editarDe, setEditarDe] = useState<Sa | null>(null);
   const [nfAberta, setNfAberta] = useState(false);
@@ -215,6 +231,7 @@ export default function Sas() {
                     <span className={`etiqueta ${SITUACAO[s.situacao]?.classe ?? ""}`}>{SITUACAO[s.situacao]?.nome ?? s.situacao}</span>
                     {SITUACAO[s.situacao]?.dica && <><br /><span className="desc">{SITUACAO[s.situacao].dica}</span></>}
                     {s.atrasado && <><br /><span className="etiqueta ruim">mais de 48 h</span></>}
+                    {s.confirmacao_teste && <><br /><span className="etiqueta atencao" title="Confirmado pela ferramenta de teste, sem ler o Mega">confirmado em teste</span></>}
                   </td>
                   <td>
                     {s.cop ? `COP ${s.cop.numero}` : s.origem === "CORTE_ITU" ? "Corte em Itu" : "—"}
@@ -223,6 +240,11 @@ export default function Sas() {
                   <td className="num">{s.rs_kg !== null ? s.rs_kg.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "—"}</td>
                   <td className="acoes">
                     {informaCodigo && s.situacao !== "CONFIRMADO" && <button className="link" onClick={() => setCodigoDe(s)}>Informar código do SA</button>}
+                    {confirmaTeste && s.situacao !== "CONFIRMADO" && (
+                      <button className="secundario botao-teste" disabled={ocupado} onClick={() => confirmarTeste(s)} title="Marca como confirmado sem ler o Mega. Só existe na homologação.">
+                        Confirmar SA (teste) <span className="etiqueta atencao">só homologação</span>
+                      </button>
+                    )}
                     {editaRs && <button className="link" onClick={() => setEditarDe(s)}>{altera && s.situacao !== "CONFIRMADO" ? "Editar" : "R$/kg"}</button>}
                   </td>
                 </tr>
@@ -247,6 +269,10 @@ export default function Sas() {
         </div>
       )}
 
+      {testeDe && (
+        <JanelaTeste sa={testeDe} aoFechar={() => setTesteDe(null)}
+          aoGravar={(r) => { setTesteDe(null); atualizarLinha(r); setAviso(`SA ${r.sa_codigo ?? ""} da OP ${testeDe.op} confirmado em teste (sem ler o Mega).`); void carregar(); }} />
+      )}
       {codigoDe && <JanelaCodigo sa={codigoDe} aoFechar={() => setCodigoDe(null)} aoGravar={(m) => { setCodigoDe(null); setAviso(m); void carregar(); }} />}
       {editarDe && (
         <JanelaEditar sa={editarDe} soRs={!altera || editarDe.situacao === "CONFIRMADO"} aoFechar={() => setEditarDe(null)}
@@ -337,6 +363,48 @@ function JanelaCodigo({ sa, aoFechar, aoGravar }: { sa: Sa; aoFechar: () => void
           <button type="button" className="secundario" onClick={() => ref.current?.close()}>Cancelar</button>
         </div>
       </div>
+    </dialog>
+  );
+}
+
+/** contrato §7.1 (R070): linha sem código pede o código antes de confirmar em teste */
+function JanelaTeste({ sa, aoFechar, aoGravar }: { sa: Sa; aoFechar: () => void; aoGravar: (r: Sa) => void }) {
+  const ref = useJanela();
+  const [codigo, setCodigo] = useState(String(sa.sa_codigo_sugerido ?? ""));
+  const [erro, setErro] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+
+  async function confirmar(e: FormEvent) {
+    e.preventDefault();
+    setErro("");
+    const n = Number(codigo);
+    if (!Number.isInteger(n) || n <= 0) return setErro("Digite o código do SA (só números).");
+    setOcupado(true);
+    try {
+      aoGravar(await api.post<Sa>(`/sas/${sa.id}/confirmar-teste`, { sa_codigo: n }));
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Não foi possível confirmar em teste.");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  return (
+    <dialog ref={ref} className="janela" aria-labelledby="titulo-teste" onClose={aoFechar}>
+      <form className="painel-form" onSubmit={(e) => void confirmar(e)}>
+        <h2 id="titulo-teste">Confirmar SA (teste) · OP {sa.op} <span className="etiqueta atencao">só homologação</span></h2>
+        <p className="desc">{sa.item_codigo} · {sa.item_descricao}</p>
+        <p className="dica">Esta linha ainda não tem código do SA. Informe um código para marcar como confirmado sem ler o Mega.</p>
+        <label>
+          Código do SA
+          <input inputMode="numeric" autoFocus value={codigo} onChange={(e) => setCodigo(e.target.value)} required />
+        </label>
+        {erro && <p className="erro" role="alert">{erro}</p>}
+        <div className="botoes">
+          <button className="primario" disabled={ocupado}>Confirmar SA (teste)</button>
+          <button type="button" className="secundario" onClick={() => ref.current?.close()}>Cancelar</button>
+        </div>
+      </form>
     </dialog>
   );
 }

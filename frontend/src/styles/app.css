@@ -271,6 +271,7 @@ details.avancado summary { cursor: pointer; font-weight: 600; color: var(--aco-g
 tr.atrasado td:first-child { box-shadow: inset 4px 0 0 var(--bloqueio); }
 tr.selecionada td { background: #f4f4f4; }
 .aviso-topo { border: 1px solid var(--ciencia); border-left-width: 4px; background: var(--ciencia-fundo); padding: var(--esp-3) var(--esp-4); margin-bottom: var(--esp-4); }
+.faixa-teste { margin: calc(-1 * var(--esp-4)) 0 var(--esp-4); padding: var(--esp-1) var(--esp-3); border: 1px dashed var(--ciencia); background: var(--ciencia-fundo); color: var(--aco-medio); font-size: .875rem; }
 .aviso-topo ul { margin: var(--esp-1) 0 0; padding-left: var(--esp-5); }
 .estado-vazio { background: var(--branco); border: 1px dashed var(--aco-borda); border-radius: var(--raio-painel); padding: var(--esp-6); text-align: center; color: var(--aco-medio); }
 .estado-vazio strong { display: block; color: var(--aco-preto); font-size: 1.125rem; margin-bottom: var(--esp-2); }
@@ -380,6 +381,7 @@ tr.linha-aviso .validacao { margin: 0 0 var(--esp-2); font-size: var(--t-pequeno
 .tabela tr.inativo td { color: #8a8f95; }
 .acoes { text-align: right; white-space: nowrap; }
 .acoes > * + * { margin-left: var(--esp-3); }
+.botao-teste .etiqueta { margin-left: var(--esp-2); }
 .campo-curto { width: 6.5rem; text-align: right; }
 .senha-gerada {
   border: 1px solid var(--ciencia); border-left-width: 4px; background: var(--ciencia-fundo);

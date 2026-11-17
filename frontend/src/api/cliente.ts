@@ -119,12 +119,16 @@ export interface Usuario {
   ativo: boolean;
   trocar_senha: boolean;
   ultimo_login: string | null;
+  /** contrato §7.1: alguns backends podem mandar dentro do usuário; o oficial é no nível da sessão */
+  modo_teste?: boolean;
 }
 
 export interface Sessao {
   usuario: Usuario;
   csrf: string;
   expira_em: string;
+  /** contrato §7.1 (R070): true só na homologação com MODO_TESTE ligado */
+  modo_teste?: boolean;
 }
 
 export interface Ocorrencia {

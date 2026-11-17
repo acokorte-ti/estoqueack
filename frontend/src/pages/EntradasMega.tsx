@@ -110,7 +110,7 @@ export default function EntradasMega() {
           </table>
         </div>
       )}
-      <p className="dica" style={{ marginTop: "var(--esp-3)" }}>A lista é refeita a cada sincronização com o Mega (6h, 13h e "Sincronizar agora"). A diferença que você explicar aparece como "explicada na T15" na <Link to="/conciliacao">Conciliação</Link>.</p>
+      <p className="dica" style={{ marginTop: "var(--esp-3)" }}>A lista é refeita a cada sincronização com o Mega (6h, 13h e "Sincronizar agora"). A diferença que você explicar aparece como "explicada" em <Link to="/conciliacao">Conferir estoque com o Mega</Link>.</p>
 
       {acao?.tipo === "criar" && <JanelaCriarLote p={acao.p} aoFechar={() => setAcao(null)} aoGravar={feito} />}
       {acao?.tipo === "nao" && <JanelaNaoEntrada p={acao.p} aoFechar={() => setAcao(null)} aoGravar={() => feito(`Código ${acao.p.codigo}: diferença marcada como "não é entrada".`)} />}
@@ -163,7 +163,7 @@ function JanelaCriarLote({ p, aoFechar, aoGravar }: { p: Pendencia; aoFechar: ()
           <div><dt>Material</dt><dd>{item ? `${item.liga} ${item.bitola} (${item.formato})` : "—"}{!p.item && item && <> <span className="etiqueta info">item novo no catálogo</span></>}</dd></div>
           <div><dt>Diferença</dt><dd>{kg(p.diferenca_kg)} kg (Mega {kg(p.saldo_mega_kg)} − lotes {kg(p.soma_lotes_kg)})</dd></div>
         </dl>
-        {ilegivel && <p className="validacao erro">{p.item_sugerido?.mensagem ?? "Não consegui ler liga e bitola desta descrição. Peça ao Admin para cadastrar o item no Catálogo (T22)."}</p>}
+        {ilegivel && <p className="validacao erro">{p.item_sugerido?.mensagem ?? "Não consegui ler liga e bitola desta descrição. Peça ao Admin para cadastrar o item em Ligas e densidades."}</p>}
         {p.aviso && <p className="validacao alerta">{p.aviso}</p>}
         <div className="grade-form">
           <label>Peso do lote (kg)<input inputMode="decimal" autoFocus value={f.peso} onChange={(e) => mudar({ peso: e.target.value })} />

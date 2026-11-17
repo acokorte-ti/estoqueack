@@ -30,7 +30,9 @@ export interface Nota { id: number; texto: string; usuario: string | null; criad
 
 /** Linha do "agrupado por liga × bitola" (contrato v1 §3, spec v3.7 §1.4). `chave`, `codigos_itu` e `ligas` são novos (opcionais). */
 export interface Agrupado { liga: string; formato: string; bitola: string; lotes: number; saldo_kg: number; reservado_kg: number; disponivel_kg: number;
-  por_estoque: Record<string, number>; chave?: string; codigos_itu?: number[]; ligas?: string[]; codigo_mega?: number | null }
+  por_estoque: Record<string, number>; chave?: string; codigos_itu?: number[]; ligas?: string[]; codigo_mega?: number | null;
+  /** spec v3.11 §1.4 item 8 (R058/R059): material do RJ na mesma linha de Itu por confirmação do usuário */
+  paridade_manual?: boolean }
 
 export const chaveAgrupado = (g: Agrupado) => g.chave ?? `${g.liga} ${g.bitola}`;
 

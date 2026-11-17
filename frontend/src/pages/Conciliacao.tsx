@@ -67,7 +67,7 @@ export default function Conciliacao() {
                     <span className={`etiqueta ${STATUS[i.status].classe}`}>{STATUS[i.status].nome}</span>
                     {i.explicada_na_t15 && (
                       <span className="etiqueta info" title={(i.explicacoes ?? []).map((x) => `${kg(x.kg)} kg · ${x.motivo_descricao}: ${x.justificativa} (${x.usuario})`).join(" | ")}>
-                        explicada na T15{i.explicada_t15_kg ? ` · ${kg(i.explicada_t15_kg)} kg` : ""}
+                        explicada em Entradas do Mega sem lote{i.explicada_t15_kg ? ` · ${kg(i.explicada_t15_kg)} kg` : ""}
                       </span>
                     )}
                     {i.explicada_na_t15 && i.explicacoes?.map((x) => <small key={x.pendencia_id} className="desc" style={{ display: "block" }}>{x.motivo_descricao}: {x.justificativa}</small>)}
@@ -79,7 +79,7 @@ export default function Conciliacao() {
           </table>
         </div>
       )}
-      <p className="dica" style={{ marginTop: "var(--esp-3)" }}>"Mega maior": há saldo no Mega que não está em lote (ex.: entrada nova ainda não classificada). "Mega menor": faltou fazer a baixa no Mega (o "Fazer no Mega" do corte em Itu).</p>
+      <p className="dica" style={{ marginTop: "var(--esp-3)" }}>"Mega maior": há saldo no Mega que não está em lote (ex.: entrada nova ainda sem lote, veja "Entradas do Mega sem lote"). "Mega menor": faltou fazer a baixa no Mega (o "Fazer no Mega" do corte em Itu).</p>
     </>
   );
 }

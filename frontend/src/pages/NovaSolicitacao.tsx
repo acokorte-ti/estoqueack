@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api, data, ErroApi, ESTOQUE_NOME, kg, num, qs, validacaoDoErro, type Validacao } from "../api/cliente";
 import PainelValidacao, { confirmacoesValidas, podeGravar, type Confirmacoes } from "../components/PainelValidacao";
+import { bloqueiaEm, linkPeca, textoPeca, usePesoReal, type ResumoPesoReal } from "../api/pesoReal";
 
 /* ------------------------------------------------------------------ tipos da API */
 
@@ -95,6 +96,9 @@ export default function NovaSolicitacao() {
   const [validacao, setValidacao] = useState<Validacao<ResultadoSolic> | null>(null);
   const [conf, setConf] = useState<Confirmacoes>({});
   const [gravado, setGravado] = useState<{ enviada: boolean; r: Gravado } | null>(null);
+
+  // bloqueio PESO_REAL_PENDENTE (spec v3.11 T07, R059): peça inteira do RJ sem peso real há mais de N dias
+  const { resumo: pesoReal } = usePesoReal();
 
   useEffect(() => {
     api.get<Liga[]>("/ligas").then((l) => setLigas(l.filter((x) => x.ativo))).catch(() => setLigas([]));
@@ -286,7 +290,9 @@ export default function NovaSolicitacao() {
     setConf({}); setGravado(null); setErro(""); setObservacao(""); setPrazo("");
   }
 
-  const liberaEnviar = !!validacao && podeGravar(validacao.ocorrencias, conf);
+  const bloqueioPesoReal = validacao?.ocorrencias.find((o) => o.codigo.startsWith("PESO_REAL_PENDENTE")) ?? null;
+  const bloqueadoPesoReal = (pesoReal?.vencidas ?? 0) > 0 || !!bloqueioPesoReal;
+  const liberaEnviar = !!validacao && podeGravar(validacao.ocorrencias, conf) && !bloqueadoPesoReal;
   const temErro = !!validacao?.ocorrencias.some((o) => o.nivel === "ERRO");
 
   /* ---------- tela de sucesso ---------- */
@@ -312,9 +318,9 @@ export default function NovaSolicitacao() {
             {misto && itemItu ? (
               <>
                 <Link className="primario" to={linkItu}>Registrar corte em Itu agora</Link>
-                <button className="secundario" onClick={recomecar}>Nova solicitação</button>
+                <button className="secundario" onClick={recomecar}>Pedir outro corte</button>
               </>
-            ) : <button className="primario" onClick={recomecar}>Nova solicitação</button>}
+            ) : <button className="primario" onClick={recomecar}>Pedir outro corte</button>}
           </div>
         </div>
       </>
@@ -336,6 +342,7 @@ export default function NovaSolicitacao() {
         ))}
       </ol>
 
+      {pesoReal && <FaixaPesoReal r={pesoReal} bloqueioApi={bloqueioPesoReal?.mensagem ?? null} />}
       {erro && <p className="erro" role="alert">{erro}</p>}
 
       {/* ============ PASSO 1 ============ */}
@@ -545,7 +552,8 @@ export default function NovaSolicitacao() {
           )}
           <PainelValidacao ocorrencias={validacao.ocorrencias} confirmacoes={conf} aoMudar={setConf} semOcorrencias="Tudo certo. Pode enviar ao RJ." />
           <div className="rodape-acao">
-            {temErro && <span className="resultado-frase">Corrija os itens em vermelho para enviar.</span>}
+            {temErro && !bloqueioPesoReal && <span className="resultado-frase">Corrija os itens em vermelho para enviar.</span>}
+            {bloqueadoPesoReal && <span className="resultado-frase">Envio ao RJ bloqueado pelo peso real pendente. O rascunho pode ser salvo.</span>}
             <button className="secundario" onClick={() => setPasso(3)} disabled={ocupado}>Voltar</button>
             <button className="secundario" onClick={() => void gravar(false)} disabled={ocupado}>Salvar rascunho</button>
             <button className="primario" onClick={() => void gravar(true)} disabled={ocupado || !liberaEnviar}>
@@ -559,6 +567,30 @@ export default function NovaSolicitacao() {
 }
 
 /* ------------------------------------------------------------------ partes */
+
+/** Faixa do topo: vermelha com o bloqueio PESO_REAL_PENDENTE, cinza antes do prazo (spec v3.11 T07, [proposta, P33]). */
+function FaixaPesoReal({ r, bloqueioApi }: { r: ResumoPesoReal; bloqueioApi: string | null }) {
+  const antiga = r.maisAntiga;
+  if (r.vencidas > 0 || bloqueioApi) {
+    const ex = antiga ? ` (ex.: ${textoPeca(antiga)})` : "";
+    const texto = r.vencidas > 0
+      ? `Há ${r.vencidas} peça(s) inteira(s) do RJ sem peso real há mais de ${r.limite} dias${ex}. Informe o peso real em Registrar corte em Itu para voltar a enviar solicitações.`
+      : bloqueioApi!;
+    return (
+      <div className="faixa-bloqueio" role="alert">
+        <p className="validacao erro"><span><strong>Enviar ao RJ bloqueado.</strong> {texto} Salvar rascunho e Cortar em Itu continuam liberados.</span></p>
+        <Link className="secundario" to={linkPeca(antiga)}>Informar peso real</Link>
+      </div>
+    );
+  }
+  if (!r.pecas.length) return null;
+  const em = antiga ? bloqueiaEm(antiga, r.limite) : null;
+  return (
+    <p className="validacao alerta">
+      <span>{r.pecas.length} peça(s) inteira(s) do RJ aguardando peso real{em ? `; a partir de ${em}, novas solicitações ficam bloqueadas` : ""}. <Link to={linkPeca(antiga)}>Informar peso real</Link></span>
+    </p>
+  );
+}
 
 function FichaOp({ op, megaFora, bloqueada }: { op: OpMega; megaFora: boolean; bloqueada: boolean }) {
   if (megaFora) {

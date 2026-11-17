@@ -63,7 +63,7 @@ export default function Estoque() {
     <>
       <header className="cabecalho">
         <h1>Consultar estoque</h1>
-        <p>{soRj ? "Lotes do RJ no Rio." : "Lotes dos três estoques. Clique num lote para ver movimentos, origem, reservas e notas."}</p>
+        <p>{soRj ? "Lotes do RJ no Rio." : "Lotes dos três estoques. Clique num lote para ver movimentos, origem e notas, reservar, ajustar o saldo ou estornar."}</p>
       </header>
 
       {!soRj && (
@@ -209,6 +209,7 @@ function LinhaAgrupada({ g, soRj, filtroEstoque, comSaldo }: { g: Agrupado; soRj
     <>
       <tr onClick={() => void abrir()} aria-expanded={aberta}>
         <td><strong>{chave}</strong>{marca && <> <span className={`etiqueta ${marca === "só no RJ" ? "atencao" : "info"}`}>{marca}</span></>}
+          {g.paridade_manual && <> <span className="etiqueta info" title="O Estoque Itu confirmou que o material do RJ é o mesmo do código de Itu, apesar da medida escrita diferente">mesma linha por exceção</span></>}
           {g.ligas && g.ligas.length > 1 && <><br /><span className="desc">ligas: {g.ligas.join(", ")}</span></>}</td>
         {!soRj && <td>{codigos.length ? codigos.join(", ") : "—"}</td>}
         <td className="num">{g.lotes}</td>

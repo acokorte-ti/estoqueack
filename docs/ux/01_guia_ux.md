@@ -36,7 +36,11 @@ Operador de chão de fábrica (Marcelo no RJ, Fabiano e Matheus em Itu), muitas 
 ## 4. Navegação
 
 - Menu lateral **só com o que o perfil usa** (§4 da especificação). Itens sem permissão não aparecem; não ficam cinza.
-- Grupos do menu iguais aos da especificação: Estoque, Barra Mansa, Itu, Controle, Administração.
+- Grupos do menu iguais aos da especificação (v3.12, 2026-11-17): Estoque, Pedidos de corte, Rio de Janeiro, Itu, Ferramentas, Administração. Grupo sem item para o perfil não aparece. Texto de botão, aviso e mensagem usa o **nome do menu** ("Cortes a fazer no RJ", "Receber material do RJ", "Entradas do Mega sem lote", "Conferir estoque com o Mega", "Pedir corte de material"), nunca o código da tela nem o nome antigo.
+- **Telas sem item no menu (spec §4, 2026-11-17):**
+  - **T17 Reservas e restrições** e **T18 Ajuste / estorno**: abrem do **detalhe do lote (T05)**, que se abre clicando no lote em "Consultar estoque" (T04), na árvore de origem ou nos links dos outros cards. Botões no T05: "Adicionar reserva ou restrição" e "Encerrar" (T17, Estoque Itu, Análise, Admin), "Ajustar saldo" (T18, Estoque Itu, Admin) e "Estornar" em cada movimento estornável (T18). A reserva vencendo também chega pelo card do Painel (Análise).
+  - **T24 Auditoria**: ainda **não tem tela** (só a API grava). Quando existir, entra em **Administração** (Admin), sem item novo no menu principal.
+  - T10 Registrar corte abre de "Cortes a fazer no RJ"; T05 de "Consultar estoque".
 - **Painel = "o que eu tenho para fazer agora"**: as pendências do perfil (T03) vêm primeiro, como cartões grandes com contador ("3 COPs para receber"). A barra de estoque fica abaixo.
 - **Busca global** no topo de todas as telas (§4). Um resultado: abre direto. Mais de um (ex.: número que é OP e COP ao mesmo tempo): lista curta com o tipo de cada um.
 - Sino de notificações no topo (§6); clicar no aviso abre o item.

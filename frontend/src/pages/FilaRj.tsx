@@ -23,7 +23,7 @@ export default function FilaRj() {
       const r = await api.get<SolicItem[] | { itens: SolicItem[] }>("/fila-rj");
       setFila(Array.isArray(r) ? r : r.itens);
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não foi possível carregar a fila.");
+      setErro(e instanceof Error ? e.message : "Não foi possível carregar os cortes a fazer.");
     }
   }, []);
   useEffect(() => {
@@ -75,7 +75,7 @@ export default function FilaRj() {
       {aviso && <p className="validacao ok" role="status">{aviso}</p>}
 
       {fila && !fila.length && (
-        <div className="estado-vazio"><strong>Fila vazia</strong>Nenhuma solicitação esperando corte no RJ.</div>
+        <div className="estado-vazio"><strong>Nenhum corte a fazer</strong>Nenhuma solicitação esperando corte no RJ.</div>
       )}
 
       <ul className="cartoes nao-imprimir">

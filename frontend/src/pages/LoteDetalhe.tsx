@@ -90,7 +90,7 @@ export default function LoteDetalhe() {
             {l.indicadores.origem_nao_identificada && <span className="etiqueta atencao">origem não identificada</span>}
           </p>
         </div>
-        {pode.solicitar && l.disponivel_kg > 0 && <Link className="primario" to="/solicitacoes/nova">Nova solicitação</Link>}
+        {pode.solicitar && l.disponivel_kg > 0 && <Link className="primario" to="/solicitacoes/nova">Pedir corte de material</Link>}
       </header>
 
       {erro && <p className="erro" role="alert">{erro}</p>}

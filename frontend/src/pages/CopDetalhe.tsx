@@ -215,7 +215,7 @@ function JanelaFechar({ cop, aoFechar, aoGravar }: { cop: Cop; aoFechar: () => v
   }
   return (
     <Janela titulo={`Fechar COP ${cop.numero}`} aoFechar={aoFechar}>
-      <p>Ao fechar, o COP não aceita mais itens e o sistema cria <strong>um pedido de SA por item ({cop.qtd_itens})</strong> na fila de Itu.</p>
+      <p>Ao fechar, o COP não aceita mais itens e o sistema cria <strong>um pedido de SA por item ({cop.qtd_itens})</strong> em "Cadastro de SA", em Itu.</p>
       <p className="desc">Depois, informe a NF de transferência. O botão "Enviar" libera quando todos os SAs estiverem confirmados e a NF informada.</p>
       {erro && <p className="erro" role="alert">{erro}</p>}
       <div className="botoes">

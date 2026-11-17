@@ -95,7 +95,7 @@ export default function RegistrarCorte() {
       <>
         <header className="cabecalho"><h1>Corte registrado · OP {s.op}</h1></header>
         <p className="validacao ok" role="status">O peso real foi baixado do lote e a reserva liberada. O corte já aparece em "Cortes prontos" para entrar no COP.</p>
-        <div className="botoes"><button className="primario" onClick={() => nav("/fila-rj")}>Voltar para a fila</button></div>
+        <div className="botoes"><button className="primario" onClick={() => nav("/fila-rj")}>Voltar para Cortes a fazer no RJ</button></div>
       </>
     );
   }

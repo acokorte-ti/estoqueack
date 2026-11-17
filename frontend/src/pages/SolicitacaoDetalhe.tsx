@@ -64,7 +64,7 @@ export default function SolicitacaoDetalhe() {
 
   return (
     <>
-      <p><Link to="/solicitacoes">← Solicitações</Link></p>
+      <p><Link to="/solicitacoes">← Acompanhar pedidos de corte</Link></p>
       <header className="cabecalho cabecalho-acao">
         <div>
           <h1>{s.numero} · OP {s.op}</h1>

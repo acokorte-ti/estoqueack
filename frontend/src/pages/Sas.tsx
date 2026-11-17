@@ -209,7 +209,7 @@ export default function Sas() {
                     {s.sa_codigo && s.sa_codigo_sugerido && s.sa_codigo !== s.sa_codigo_sugerido && <><br /><span className="desc">sugerido {s.sa_codigo_sugerido}</span></>}
                   </td>
                   <td>
-                    <span className={`etiqueta ${SITUACAO[s.situacao].classe}`}>{SITUACAO[s.situacao].nome}</span>
+                    <span className={`etiqueta ${SITUACAO[s.situacao]?.classe ?? ""}`}>{SITUACAO[s.situacao]?.nome ?? s.situacao}</span>
                     {s.atrasado && <><br /><span className="etiqueta ruim">mais de 48 h</span></>}
                   </td>
                   <td>

@@ -59,7 +59,7 @@ export default function Solicitacoes() {
         </div>
         <div className="botoes">
           <a className="secundario" href={exportar} download>Exportar para Excel</a>
-          {podeCriar && <Link className="primario" to="/solicitacoes/nova">Nova solicitação</Link>}
+          {podeCriar && <Link className="primario" to="/solicitacoes/nova">Pedir corte de material</Link>}
         </div>
       </header>
 
@@ -92,7 +92,7 @@ export default function Solicitacoes() {
       {r && !itens.length ? (
         <div className="estado-vazio">
           <strong>Nenhuma solicitação aqui</strong>
-          {podeCriar ? "Use \"Nova solicitação\" para pedir um corte ao RJ." : "Mude o filtro para ver outras situações."}
+          {podeCriar ? "Use \"Pedir corte de material\" para pedir um corte ao RJ." : "Mude o filtro para ver outras situações."}
         </div>
       ) : (
         <div className="tabela-rolagem">

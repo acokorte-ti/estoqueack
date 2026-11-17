@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, ErroApi, ESTOQUE_NOME, kg, num, qs, validacaoDoErro, type Ocorrencia, type Validacao } from "../api/cliente";
 import PainelValidacao, { confirmacoesValidas, podeGravar, type Confirmacoes } from "../components/PainelValidacao";
+import { diasDe, textoPeca, usePesoReal, vencida, type PecaPesoReal } from "../api/pesoReal";
 
 interface Lote { id: number; codigo: string; conteiner: string | null; liga: string; bitola: string; estoque: string; tipo: string;
   saldo_kg: number; disponivel_kg: number; codigo_mega?: number | null }
@@ -12,7 +13,9 @@ interface Resultado { frase?: string; perda_kg?: number; perda_esperada_kg?: num
   /** spec v3.5 P22(a): 8 % para material fiscal RJ em Itu, 5 % para lote do Estoque Mega */
   tolerancia_excesso_pct?: number; consumo_misto?: boolean }
 interface Gravado { id: number; op: number; consumo_kg: number; sobra_kg: number; perda_kg: number; lote_reto: { id: number; codigo: string } | null;
-  sa_id: number | null; instrucao_mega: string | null }
+  sa_id: number | null; instrucao_mega: string | null;
+  /** R058: o corte resolveu a pendência "Informar o peso real" (opcional; sem ele, vale a peça sugerida) */
+  pendencia_peso_real_resolvida?: boolean }
 
 const hojeIso = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 const emItu = (l: Lote) => l.estoque !== "RJ_NO_RIO";
@@ -48,6 +51,16 @@ export default function CorteItu() {
   const [ocupado, setOcupado] = useState(false);
   const [gravado, setGravado] = useState<Gravado | null>(null);
   const [copiado, setCopiado] = useState(false);
+  const { resumo: pesoReal } = usePesoReal();
+  // peça inteira do RJ aguardando peso real (spec v3.11 §2.2 passo 7): a T13 sugere e resolve a pendência
+  const pecaPendente = pesoReal?.pecas.find((p) => (p.lote_id ? p.lote_id === lote?.id : !!op && p.op === op.numero)) ?? null;
+
+  function usarPeca(p: PecaPesoReal) {
+    if (!p.op) return;
+    setOpNum(String(p.op)); setV(null);
+    if (p.lote_id) api.get<Lote>(`/lotes/${p.lote_id}`).then(setLote).catch(() => undefined);
+    void buscarOp(String(p.op), !!p.lote_id);
+  }
 
   // vindo do T07 ("Registrar corte em Itu agora") ou do recebimento de peça inteira
   useEffect(() => {
@@ -57,7 +70,7 @@ export default function CorteItu() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function buscarOp(n: string) {
+  async function buscarOp(n: string, temLote = !!params.get("lote_id")) {
     setErro("");
     setOp(null);
     setMegaFora(false);
@@ -69,7 +82,7 @@ export default function CorteItu() {
       if (e instanceof ErroApi && e.status === 503) { setMegaFora(true); setOp({ numero, item_codigo: null, item_descricao: null, cliente: null, pedido: null, situacao: null, situacao_descricao: null }); }
       else setErro(e instanceof Error ? e.message : "Não foi possível consultar a OP.");
     }
-    if (!params.get("lote_id")) {
+    if (!temLote) {
       const s = await api.get<{ lote_id: number | null }>(`/cortes-itu/sugestao?op=${numero}`).catch(() => null);
       if (s?.lote_id) api.get<Lote>(`/lotes/${s.lote_id}`).then(setLote).catch(() => undefined);
     }
@@ -135,6 +148,7 @@ export default function CorteItu() {
             Consumo {kg(gravado.consumo_kg)} kg, sobra {kg(gravado.sobra_kg)} kg, perda {kg(gravado.perda_kg)} kg.
             {gravado.lote_reto && <> Novo lote RETO <strong>{gravado.lote_reto.codigo}</strong>.</>}
             {gravado.sa_id && <> Pedido de SA criado: <Link to="/sa">abrir SA</Link>.</>}
+            {(gravado.pendencia_peso_real_resolvida ?? !!pecaPendente) && <> Peso real informado: a pendência da peça inteira saiu do Painel.</>}
           </span>
         </p>
         {gravado.instrucao_mega && (
@@ -146,7 +160,7 @@ export default function CorteItu() {
                 {copiado ? "Copiado" : "Copiar instrução"}
               </button>
             </div>
-            <p className="dica">A baixa na OP e a transferência para o código RETO continuam sendo feitas no Mega. A conciliação confere depois.</p>
+            <p className="dica">A baixa na OP e a transferência para o código RETO continuam sendo feitas no Mega. A tela "Conferir estoque com o Mega" confere depois.</p>
           </section>
         )}
         <div className="botoes" style={{ marginTop: "var(--esp-4)" }}><button className="secundario" onClick={recomecar}>Novo corte em Itu</button></div>
@@ -161,6 +175,24 @@ export default function CorteItu() {
         <p>Consumo da OP, sobra e RETO para material que já está em Itu (RJ em Itu ou Estoque Mega).</p>
       </header>
       {erro && <p className="erro" role="alert">{erro}</p>}
+
+      {!op && !lote && !!pesoReal?.pecas.length && (
+        <section className="painel-form" aria-label="Peças inteiras do RJ aguardando peso real">
+          <h2>Peças inteiras do RJ aguardando peso real ({pesoReal.pecas.length})</h2>
+          <p className="dica">Depois do corte, informe o consumo pesado na balança. Com mais de {pesoReal.limite} dias sem peso real, novas solicitações ao RJ ficam bloqueadas.</p>
+          <ul className="escolhas">
+            {pesoReal.pecas.slice(0, 10).map((p, k) => (
+              <li key={p.pendencia_id ?? p.lote_id ?? k}>
+                <button type="button" className="escolha-lote" style={{ width: "100%", textAlign: "left" }} onClick={() => usarPeca(p)} disabled={!p.op}>
+                  <span />
+                  <span><span className="titulo">{textoPeca(p)}</span><span className="linha2">{[p.lote, p.conteiner].filter(Boolean).join(" · ")}</span></span>
+                  <span className="kg"><strong className={vencida(p, pesoReal.limite) ? "texto-bloqueio" : undefined}>{diasDe(p)} dia(s)</strong><span className="desc">desde o recebimento</span></span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <form className="painel-form linha-form" onSubmit={(e) => { e.preventDefault(); void buscarOp(opNum); }}>
         <label>Nº da OP<input inputMode="numeric" autoFocus={!opNum} value={opNum} onChange={(e) => setOpNum(e.target.value)} required /></label>
@@ -207,6 +239,12 @@ export default function CorteItu() {
 
       <section className="painel-form" style={{ marginTop: "var(--esp-4)" }}>
         <h2>Corte</h2>
+        {pecaPendente && (
+          <p className="validacao alerta">
+            Peça inteira do RJ aguardando peso real ({textoPeca(pecaPendente)}{diasDe(pecaPendente) !== null ? `, há ${diasDe(pecaPendente)} dia(s)` : ""}).
+            O consumo pesado vale para a OP e para o saldo do lote RJ em Itu; o SA e a NF ficam com o peso previsto.
+          </p>
+        )}
         {misto && <p className="validacao alerta">Parte de Itu de uma OP com consumo misto (Itu + RJ). A parte do RJ segue pela solicitação enviada.</p>}
         {previstoUrl && <p className="dica">Peso previsto: {kg(previstoUrl)} kg. Tolerância: {pctBr(limitePadrao(lote))} {limiteDe(limitePadrao(lote))}.</p>}
         <div className="grade-form">

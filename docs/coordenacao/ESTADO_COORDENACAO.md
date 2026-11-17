@@ -1,6 +1,6 @@
 # Estado — COORDENAÇÃO (arquiteto-chefe)
 
-Chat COORDENAÇÃO (Claude Code). Atualizado 2026-11-12 (rodada da auditoria + respostas P19–P32).
+Chat COORDENAÇÃO (Claude Code). Atualizado 2026-11-17 (recarga do zero com as regras v3.13, ponta a ponta OK, teste manual liberado).
 
 > **Sem prazo fixo (decisão do Eduardo, 2026-11-04).** Não existe data alvo nem marcos com data. O que vale é a **ordem** abaixo; a implantação acontece quando os critérios de go/no-go (§4) estiverem atendidos e o Eduardo liberar. Documentos que citam 13/11 (ex.: roteiro de implantação) leem "dia da implantação".
 
@@ -18,10 +18,10 @@ Chat COORDENAÇÃO (Claude Code). Atualizado 2026-11-12 (rodada da auditoria + r
 | 8 | Revisão da prévia da carga com o Fabiano (R032, bloco 1) | Eduardo + FUNCIONAL | ✅ feito (spec v3.3 §10.7) |
 | 9 | Spec atualizada com as decisões de 04/11 + R037 + R024 (perda até 6 %) | FUNCIONAL | ✅ feito (v3.3) |
 | 9b | Correção da auditoria de 06/11 (RETO do RJ em Itu em sub-lotes + RETO, leitor Ø/RED/ROUND, solicitação parcial; T15 mínima, RETO por origem; telas; testes) | todas | ✅ feito (até `d339372`) |
-| 10 | **Regras novas (spec v3.5–v3.10):** 8 % RJ, consumo misto A, paridade por liga × bitola (sem código no RJ), P27–P31; erro 500 da T04 corrigido (R055) | TÉCNICO + FRONTEND + BANCO E TESTES | ✅ código no ar; **falta R054** (pendência do peso real / "Corrigir no Mega", espera P32) |
-| 10b | **Eduardo + Fabiano conferem o relatório de paridade** `../carga/relatorios/paridade_rj_itu_previa_20261112_0904.xlsx` | Eduardo + Fabiano | ⏳ **caminho crítico** |
-| 11 | Recarga do zero (planilhas 2026-11-11 + `correcoes_carga.json`) e ponta a ponta dos 5 caminhos (`deploy/e2e/rodar_e2e.sh`) | TÉCNICO + BANCO E TESTES | depois do 10b |
-| 12 | Aceite com Fabiano, Matheus, Marcelo e Renato | Eduardo + BANCO E TESTES | depois do 11 e dos usuários criados |
+| 10 | Regras novas (spec v3.5–v3.13): paridade liga × bitola, 8 % RJ, consumo misto, peso real com bloqueio, regra do RETO, menu renomeado | TÉCNICO + FRONTEND | ✅ no ar (até `b0cf389`) |
+| 10b | Paridade conferida pelo Fabiano (3 exceções) e respostas de 17/11 aplicadas | Eduardo + Fabiano | ✅ (restam dúvidas menores em `../carga/PENDENCIAS_USUARIOS_2026-11-17.txt`) |
+| 11 | Recarga do zero (planilhas 2026-11-17) + conferência + ponta a ponta 5 caminhos | TÉCNICO + BANCO E TESTES | ✅ 2026-11-17: Estoque Mega = Mega; RJ no Rio = ESTOQUE 2026; 5 caminhos OK |
+| 12 | Teste manual do Eduardo (roteiro `../carga/ROTEIRO_TESTE_MANUAL_2026-11-17.md`, botão "Confirmar SA (teste)" só na homologação) → aceite com Fabiano, Matheus, Marcelo e Renato | Eduardo | ⏳ em andamento |
 | 13 | Go/no-go → implantação pelo roteiro | Eduardo + COORDENAÇÃO | depois do 12 |
 
 ## 2. Escopo da F1 (validado 2026-11-04)
@@ -41,8 +41,8 @@ Entra: T03–T14, T15 mínima e aba RETO por origem (v3.4, 06/11), T16 mínima, 
 
 ## 4. Go/no-go
 
-1. Carga conferida pelo Fabiano (Estoque Mega = saldo Mega ± 5 kg; RJ = ESTOQUE 2026).
-2. Os 5 caminhos ponta a ponta OK sobre a carga final.
+1. Carga conferida pelo Fabiano: ✅ números (Estoque Mega = Mega ± 5 kg; RJ = ESTOQUE 2026); paridade conferida.
+2. Os 5 caminhos ponta a ponta OK sobre a carga final ✅ (2026-11-17).
 3. Concorrência OK no PostgreSQL ✅.
 4. Backup + restauração ✅ local; **cópia externa pendente** (bucket + PARs na OCI, Eduardo).
 5. Os 4 usuários fizeram o aceite.
@@ -60,6 +60,7 @@ Entra: T03–T14, T15 mínima e aba RETO por origem (v3.4, 06/11), T16 mínima, 
 
 ## 6. Rodadas
 
+- **R7 (17/11):** respostas dos usuários de 17/11; spec v3.11–v3.13; menu renomeado; bloqueio do peso real; regra do RETO; recarga do zero conferida; ponta a ponta 5/5; ferramenta "Confirmar SA (teste)" (só fora de produção; desligar na implantação, `06_implantacao.md` §2.3).
 - **R6 (06–12/11, auditoria + respostas):** P19–P31 respondidas e registradas em DECISOES; spec v3.5–v3.10; TÉCNICO R044–R049, R053, R055 (500 da T04); FRONTEND R041–R052 conferido na homologação; BANCO E TESTES R042, R048, e2e preparado. Git autentica pelo `gh` (credential helper local do repo).
 - **R5 (06/11, auditoria):** spec v3.4 commitada (`4b383d6`); pedidos R040 (TÉCNICO), R041 (FRONTEND), R042 (BANCO E TESTES). TÉCNICO corrigindo carga/bug (em andamento). Depende do Eduardo: P19–P25 e perguntas ao Fabiano (`../carga/texto_fabiano_auditoria_2026-11-06.md`).
 

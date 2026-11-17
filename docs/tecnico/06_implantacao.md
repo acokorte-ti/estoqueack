@@ -76,7 +76,8 @@ docker compose exec -T api alembic heads           # uma só cabeça
 
 ```bash
 sed -i 's/^APP_ENV=.*/APP_ENV=prod/' .env && grep '^APP_ENV' .env
-docker compose up -d api && sleep 10 && curl -fsS http://127.0.0.1:8090/api/saude    # {"status":"ok"}
+sed -i 's/^MODO_TESTE=.*/MODO_TESTE=false/' .env && grep '^MODO_TESTE' .env      # desliga "Confirmar SA (teste)"
+docker compose up -d api && sleep 10 && curl -fsS http://127.0.0.1:8090/api/saude    # {"status":"ok","modo_teste":false}
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8090/api/docs             # 404 (documentação fechada)
 ```
 

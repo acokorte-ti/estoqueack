@@ -69,6 +69,8 @@ curl -s http://127.0.0.1:8090/api/saude               # saúde da API
 
 **Publicar uma versão nova:** basta fazer `push` na `main`. O CI roda (segredos, backend, frontend e build ARM64, em cerca de 3 min). Se ficar verde, o servidor publica sozinho em até 5 min, com backup prévio e rollback automático se o teste falhar. Para publicar só o frontend na mão: `ssh system-lab 'bash -s' < scripts/deploy_web.sh`.
 
+**Modo de teste (só homologação, 2026-11-17):** `MODO_TESTE=true` no `.env` do system-lab liga a ferramenta "Confirmar SA (teste)" (contrato §7.1; `/api/saude` mostra `"modo_teste": true`). Com `APP_ENV=prod` ela fica desligada mesmo com a chave. **No dia da implantação:** `sed -i 's/^MODO_TESTE=.*/MODO_TESTE=false/' .env` junto com o `APP_ENV=prod` (`docs/tecnico/06_implantacao.md` §2.3) e recriar a API. Mudou o `.env`: `docker compose up -d --no-deps --force-recreate api` e `docker compose restart web`.
+
 **Mudanças em `deploy/nginx-host/`** não são automáticas. Copie o arquivo para `/etc/nginx/...` e rode `sudo nginx -t && sudo systemctl reload nginx`, nunca com pipe no meio.
 
 ## 6. Lições aprendidas (não repetir)

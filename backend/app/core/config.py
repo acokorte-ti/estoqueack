@@ -57,9 +57,16 @@ class Config(BaseSettings):
     # Pasta do Oracle Instant Client 19 (o banco exige Native Network Encryption → modo thick)
     mega_instant_client: str = ""
 
+    # Ferramenta de teste "Confirmar SA (teste)" (contrato §7.1). Desligada por padrão; nunca liga com APP_ENV=prod.
+    modo_teste: bool = False
+
     @property
     def producao(self) -> bool:
         return self.app_env in ("prod", "homolog")
+
+    @property
+    def modo_teste_ativo(self) -> bool:
+        return self.modo_teste and self.app_env != "prod"
 
 
 @lru_cache

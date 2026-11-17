@@ -263,6 +263,33 @@ def verificar(db: Session, sas: list[CadastroSa]) -> dict[str, Any]:
     return {"verificados": len(sas), "confirmados": confirmados, "erro": None}
 
 
+def confirmar_teste(db: Session, sa_id: int, sa_codigo: int | None, *, usuario: Usuario,
+                    ip: str | None) -> CadastroSa:
+    """Ferramenta de teste (contrato §7.1, só fora de produção; quem chama confere o modo de teste): marca o SA como
+    CONFIRMADO sem ler o Mega, para o teste manual dos caminhos A e B, e segue igual à confirmação real."""
+    sa = obter(db, sa_id, travar=True)
+    if sa.situacao == "CONFIRMADO":
+        raise ErroNegocio("Este SA já está confirmado.")
+    codigo = sa_codigo or sa.sa_codigo
+    if not codigo:
+        raise ErroNegocio("Informe o código do SA para confirmar em teste.")
+    antes = {"situacao": sa.situacao, "sa_codigo": sa.sa_codigo}
+    sa.sa_codigo, sa.situacao = codigo, "CONFIRMADO"
+    sa.informado_em = sa.informado_em or agora()
+    sa.confirmado_em = agora()
+    sa.dados_extra = {**(sa.dados_extra or {}),
+                      "confirmacao_teste": {"usuario": usuario.login, "em": sa.confirmado_em.isoformat()}}
+    _marcar_alteracao(db, sa)
+    auditoria.registrar(db, "SA_CONFIRMADO_TESTE", usuario_id=usuario.id, entidade="sa", entidade_id=sa.id,
+                        antes=antes, depois={"situacao": "CONFIRMADO", "sa_codigo": codigo,
+                                             "confirmacao": "confirmação de teste", "usuario": usuario.login},
+                        ip=ip)
+    db.flush()
+    _ao_confirmar(db, sa)
+    db.commit()
+    return sa
+
+
 def _ao_confirmar(db: Session, sa: CadastroSa) -> None:
     if sa.solicitacao_id:
         sol = db.get(SolicitacaoCorte, sa.solicitacao_id)
@@ -363,6 +390,7 @@ def para_dict(db: Session, sa: CadastroSa) -> dict[str, Any]:
         "alterado_apos_exportar": sa.alterado_apos_exportar,
         "atrasado": atrasado(db, sa),
         "avisos": avisos(sa),
+        "confirmacao_teste": bool((sa.dados_extra or {}).get("confirmacao_teste")),
     }
 
 

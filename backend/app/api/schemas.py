@@ -42,6 +42,7 @@ class SessaoSaida(BaseModel):
     usuario: UsuarioSaida
     csrf: str
     expira_em: datetime
+    modo_teste: bool = False      # contrato §7.1: botão "Confirmar SA (teste)" (só ADMIN, fora de produção)
 
 
 class TrocaSenhaEntrada(BaseModel):

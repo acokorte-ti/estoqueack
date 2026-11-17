@@ -31,7 +31,8 @@ def login(dados: LoginEntrada, request: Request, response: Response,
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(e)) from None
     duracao = cfg.sessao_lembrar_dias * 86400 if dados.lembrar else cfg.sessao_horas * 3600
     _gravar_cookies(response, cfg, s.token, s.csrf, duracao)
-    return SessaoSaida(usuario=UsuarioSaida.model_validate(s.usuario), csrf=s.csrf, expira_em=s.expira_em)
+    return SessaoSaida(usuario=UsuarioSaida.model_validate(s.usuario), csrf=s.csrf, expira_em=s.expira_em,
+                       modo_teste=cfg.modo_teste_ativo)
 
 
 @router.post("/logout", status_code=204)
@@ -43,9 +44,9 @@ def logout(request: Request, response: Response, sessao: Sessao = Depends(deps.s
 
 
 @router.get("/eu", response_model=SessaoSaida)
-def eu(sessao: Sessao = Depends(deps.sessao_atual)):
+def eu(sessao: Sessao = Depends(deps.sessao_atual), cfg: Config = Depends(deps.config)):
     return SessaoSaida(usuario=UsuarioSaida.model_validate(sessao.usuario), csrf=sessao.csrf,
-                       expira_em=sessao.expira_em)
+                       expira_em=sessao.expira_em, modo_teste=cfg.modo_teste_ativo)
 
 
 @router.post("/trocar-senha", status_code=204)

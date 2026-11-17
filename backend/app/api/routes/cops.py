@@ -4,11 +4,12 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.core.config import Config
 from app.core.db import get_db
 from app.models import Usuario
 from app.services import cops, sas
@@ -246,6 +247,24 @@ def verificar(c: Verificar, db: Session = Depends(get_db), _: Usuario = Depends(
     res = sas.verificar(db, alvo)
     db.commit()
     return res
+
+
+class ConfirmarTeste(BaseModel):
+    sa_codigo: int | None = Field(None, gt=0)
+
+
+def _exigir_modo_teste(cfg: Config = Depends(deps.config)) -> None:
+    """Ferramenta de teste (contrato §7.1): só com MODO_TESTE=true fora de produção; senão 404 antes de qualquer outra
+    checagem (login, perfil, corpo), igual a uma rota que não existe."""
+    if not cfg.modo_teste_ativo:
+        raise HTTPException(404, "Not Found")
+
+
+@router.post("/sas/{sa_id}/confirmar-teste", include_in_schema=False, dependencies=[Depends(_exigir_modo_teste)])
+def confirmar_teste(sa_id: int, request: Request, c: ConfirmarTeste | None = None, db: Session = Depends(get_db),
+                    u: Usuario = Depends(deps.exigir_perfil())) -> dict:
+    return sas.para_dict(db, sas.confirmar_teste(db, sa_id, c.sa_codigo if c else None, usuario=u,
+                                                 ip=deps.ip_cliente(request)))
 
 
 class NfB2(BaseModel):

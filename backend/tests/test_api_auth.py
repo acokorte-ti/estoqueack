@@ -6,7 +6,7 @@ pytest.importorskip("fastapi")
 
 
 def test_saude(client):
-    assert client.get("/api/saude").json() == {"status": "ok"}
+    assert client.get("/api/saude").json() == {"status": "ok", "modo_teste": False}
 
 
 def test_login_errado_mensagem_generica(client):

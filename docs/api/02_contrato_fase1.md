@@ -223,6 +223,14 @@ Vale quando `sobra_kg > 0` e `sobra_na_bitola: false` (sobra na bitola continua 
 - `POST /api/sas/nf` `{ ids, numero, emitente, data? }`: NF só fiscal do caminho B2 (linhas `CORTE_ITU`).
 - 📋 F1.1: "Exportar pedidos selecionados" e "Exportar SAs novos para o Renato" (Excel, layout da planilha de SA).
 
+### 7.1 Ferramenta de teste "Confirmar SA (teste)" ✅ (2026-11-17, COORDENAÇÃO; só fora de produção)
+
+Para o teste manual dos caminhos A e B na homologação, onde o SA não recebe carga real no Mega (TPM 1, filial 13) e a linha ficaria em *Aguardando Mega*.
+
+- **Ligada só com `MODO_TESTE=true` no `.env` e `APP_ENV` diferente de `prod`** (padrão: desligada). Em produção, ou com a chave ausente, a rota responde **404** (igual a rota inexistente) e não aparece no OpenAPI.
+- `GET /api/saude` → `{ "status": "ok", "modo_teste": true|false }` e `GET /api/auth/eu` (e a resposta do login) ganham `"modo_teste": true|false`. O FRONTEND mostra o botão **"Confirmar SA (teste)"** na T14 só se `modo_teste` for `true` **e** o perfil for ADMIN.
+- `POST /api/sas/{id}/confirmar-teste` `{ "sa_codigo": 50001 }` (opcional; obrigatório se a linha ainda não tem código) — só **ADMIN** (outro perfil: 403). Aceita linha `PENDENTE`, `PREPARADO` ou `AGUARDANDO_MEGA`; já `CONFIRMADO` → 400. Marca `CONFIRMADO` sem ler o Mega e segue igual à confirmação real (recalcula a solicitação; aviso `COP_SA_PRONTO` quando todos os SAs do COP ficam prontos). Grava auditoria `SA_CONFIRMADO_TESTE` com `"confirmacao": "confirmação de teste"` e o login do usuário. Resposta: a linha do SA (formato acima) com `"confirmacao_teste": true` (nas outras linhas, `false`), para a tela marcar "(teste)".
+
 ## 8. T06 Entrada por NF ✅ (Operação RJ)
 
 - `GET /api/conteineres?busca=` (lista para o campo contêiner) e `GET /api/entradas-nf`.

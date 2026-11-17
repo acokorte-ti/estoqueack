@@ -139,7 +139,8 @@ curl -s http://127.0.0.1:8090/api/saude               # saúde da API
 
 ## 7.6 Situação em 2026-11-17 (TÉCNICO, spec v3.11, R058)
 
-- **Migração 0009** aplicada na homologação (deploy do `e2f54fb`, 08h47): `item_mp.restricao_uso`, `item_mp.paridade_item_id`, colunas do "Encerrar pendência" do peso real em `solicitacao_corte` e o parâmetro `PENDENCIA_PESO_REAL_DIAS`. Revisão do BANCO E TESTES pedida no R061. A próxima é a **0010**.
+- **Migração 0009** aplicada na homologação (deploy do `e2f54fb`, 08h47): `item_mp.restricao_uso`, `item_mp.paridade_item_id`, colunas do "Encerrar pendência" do peso real em `solicitacao_corte` e o parâmetro `PENDENCIA_PESO_REAL_DIAS`. Revisão do BANCO E TESTES pedida no R061.
+- **Migração 0010** (spec v3.13, R063): colunas da regra do RETO em `corte_itu` e os parâmetros `RETO_ESP_LIMITE`, `RETO_LARG_MAX_ATE_LIMITE`, `RETO_LARG_MAX_ACIMA`; entra no próximo deploy automático. Revisão pedida no R066. A próxima é a **0011**.
 - **Recarga do zero** da homologação em 17/11 08h47 (planilhas `~/estoqueack-carga/planilhas/2026-11-17/` + `~/estoqueack-carga/correcoes_carga.json`, backup antes `estoqueack_20261117_084553`), numa conexão SSH: `tar` (planilhas + correções + script) por `ssh system-lab 'tar -x … && bash recarga.sh <sha>'`; o script confere o commit publicado, faz backup, sincroniza o Mega (`app.jobs.agendador --forcar`), prévia, `--importar --limpar`, conferência no banco e devolve os relatórios em base64 na mesma saída. Números em `docs/coordenacao/ESTADO_TECNICO.md`.
 
 ## 8. Registro de incidentes

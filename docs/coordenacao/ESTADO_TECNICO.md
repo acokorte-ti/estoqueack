@@ -1,6 +1,6 @@
 # Estado — BACKEND / TÉCNICO
 
-Atualizado: 2026-11-17 pelo TÉCNICO: spec v3.11 no ar (`9102bc9`, `6df07e3`, `e2f54fb`; CI 4/4 verde; migração 0009) e **recarga do zero da homologação feita** (17/11 08h47, planilhas de 17/11, conferência abaixo). Aguardando: R061 (revisão da 0009), R062 (achados ao FUNCIONAL), P33/P34 (Eduardo), 1.2746 × 1.2767 RETO (Fabiano).
+Atualizado: 2026-11-17 pelo TÉCNICO: **spec v3.13 (R063) e R065** no código (migração 0010, commits locais/push nesta rodada; ver §2). **Carga mudou mas NÃO recarreguei** (efeito abaixo; a coordenação decide). Aguardando: R066 (revisão da 0010), R067 (FRONTEND), R068 (FUNCIONAL), R061, P35/P36/P37 (propostas padrão já no código), 1.2746 × 1.2767 RETO (Fabiano).
 
 > Para retomar a parte técnica do zero: `estoqueack/docs/tecnico/00_RETOMAR_PROJETO.md` (inventário, onde fica cada segredo, operação, lições e incidentes; §7.2 e §7.3 = Fase 1).
 
@@ -14,6 +14,14 @@ Atualizado: 2026-11-17 pelo TÉCNICO: spec v3.11 no ar (`9102bc9`, `6df07e3`, `e
 - **Comigo daqui para frente:** recarregar a T25 quando o Fabiano devolver as correções do R032 (avisar antes no R033); campos da impressão da Fila RJ se o FUNCIONAL pedir; na implantação, a carga final (roteiro do BANCO E TESTES, em `deploy/implantacao/`). PDFs de romaneio e ficha do lote ficaram para a F1.1.
 
 ## 2. Feito
+
+### Spec v3.13 (R063) e R065 (2026-11-17)
+
+- **T13 regra do RETO** (contrato §6.1, propostas da P35): sobra fora da bitola pede E × L (placa) e "Conferi a regra do RETO"; E ≤ `RETO_ESP_LIMITE` e L < `RETO_LARG_MAX_ATE_LIMITE`, ou E > limite e L < `RETO_LARG_MAX_ACIMA` → RETO; senão lote `SOBRA` com a medida nova, filho do de origem (`GERA_SOBRA`), sem transferência no Mega; no Estoque Mega o lote novo conta no código de origem (`estoque.codigo_mega_do_lote`, T15/T16, próximo "Fazer no Mega"). Redondo: operador escolhe (`sobra_vai_para_reto`, Ø se lote novo). Migração **0010** (colunas em `corte_itu` + 3 parâmetros; revisão R066).
+- **T14 (P36):** "Informar código do SA" também para Análise (a Amanda; criar o usuário dela com perfil Análise na T23 quando o Eduardo quiser).
+- **R065:** (2) totais da T16 de todos os códigos; (4) `codigo_paridade` em `/lotes` e em `codigos_itu` (60824 não tem lote nem saldo no Mega); (3) 502 das 12:00:20 UTC = tick do auto-deploy (diagnóstico numa conexão SSH, nada mudado no servidor).
+- **Carga (efeito da próxima recarga, prévia local com as planilhas de 17/11 + `correcoes_carga.json`):** solicitações 841 → **842** (+1: OP da Planilha1, P37(a), concluída, 98,5 kg, ligada ao SA); a OP da P37(b) passa ao lote A8 MOD 21x204 múltiplo de onde a ESTOQUE 2026 baixa (1.265 kg; antes ligada ao 21x203 do mesmo contêiner); **prazo sem ano** corrigido em 18 linhas (2 abertas na Fila RJ → jan/2027, 16 concluídas); pendência nova `CONSUMO_EM_OUTRO_MATERIAL` em 4 OPs (R068). **Saldo não muda** (mesmos 1.529 movimentos; nenhum kg a mais). Backup do arquivo de correções antes da mudança em `%TEMP%\r063\`.
+- Testes: `tests/test_v313_r063.py` (16) + ponta a ponta ajustado; ruff limpo.
 
 ### Spec v3.11: correções da carga e R058 (2026-11-17)
 

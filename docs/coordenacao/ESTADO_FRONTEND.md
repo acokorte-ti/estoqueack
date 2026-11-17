@@ -1,6 +1,12 @@
 ﻿# Estado — FRONTEND / UX
 
-Atualizado: 2026-11-17 (menu da apresentação)
+Atualizado: 2026-11-17 (R059 peso real)
+
+## 2026-11-17 R059 (commit 505ba19)
+
+- **No ar:** Painel com o card "Peças inteiras do RJ aguardando peso real" (dias desde o recebimento, vermelho acima de `limite_dias`, "Informar peso real", "Encerrar pendência" com justificativa); **T07** faixa vermelha `PESO_REAL_PENDENTE` / aviso cinza antes do prazo, "Enviar ao RJ" desabilitado; **T13** lista as peças pendentes e abre com a sugerida (`?op&lote_id`), sem correção de SA; **T04** etiqueta "mesma linha por exceção" (`paridade_manual`); T14 tolerante a situação desconhecida. Módulo comum `src/api/pesoReal.ts`.
+- **Textos:** botões e mensagens com os nomes do menu ("Pedir corte de material", "Cortes a fazer no RJ", "Conferir estoque com o Mega", "Entradas do Mega sem lote"). T17/T18 seguem pelo T05; T24 sem tela (anotado em `docs/ux/01_guia_ux.md` §4).
+- **Aguardando TÉCNICO (R060):** formato da API do R058(2). Sem os campos novos, as telas ficam como antes (a pendência antiga sem `recebido_em` não conta para o bloqueio). T23 mostra `PENDENCIA_PESO_REAL_DIAS` sozinha quando a API criar.
 
 ## 2026-11-17 Menu por etapa (só texto)
 

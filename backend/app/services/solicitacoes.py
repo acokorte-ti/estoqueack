@@ -19,7 +19,7 @@ from app.integrations.mega.consultas import SITUACOES_OP
 from app.models import (CadastroSa, Conteiner, CorteItu, ItemMP, LiberacaoCorte, Liga, LigaEquivalente, Lote,
                         SolicitacaoCorte, Usuario)
 
-from . import auditoria, movimentos, ops
+from . import auditoria, movimentos, ops, peso_real
 from .base import (ErroNegocio, NaoEncontrado, Previa, agora, exigir_sem_pendencias, hoje, notificar, parametro,
                    so_rj_no_rio)
 from .estoque import BALDE, bitola, mapa_mesma_linha, mesma_liga
@@ -204,8 +204,8 @@ def _calcular_item(db: Session, cfg: Config, e: SolicitacaoEntrada, it: ItemEntr
     return ItemCalculado(lote, it, calc, instrucao, r)
 
 
-def validar(db: Session, cfg: Config, e: SolicitacaoEntrada, *, ignorar_solicitacao: int | None = None
-            ) -> tuple[Previa, ops.DadosOp, list[ItemCalculado]]:
+def validar(db: Session, cfg: Config, e: SolicitacaoEntrada, *, ignorar_solicitacao: int | None = None,
+            enviar: bool = False) -> tuple[Previa, ops.DadosOp, list[ItemCalculado]]:
     if not e.itens:
         raise ErroNegocio("Escolha pelo menos um lote.")
     dados = ops.consultar(db, e.op)
@@ -215,6 +215,9 @@ def validar(db: Session, cfg: Config, e: SolicitacaoEntrada, *, ignorar_solicita
         dados.cliente = e.op_manual.get("cliente") or dados.cliente
     previa = Previa()
     previa.resultado.juntar(_validar_op(db, dados, ignorar_solicitacao, e.consumo_misto))
+    # R058 (spec v3.11 T07; R060): peça inteira do RJ sem peso real há mais de N dias bloqueia só "Enviar ao RJ"
+    # (ERRO, nem o Admin libera); no rascunho vira aviso
+    previa.resultado.juntar(peso_real.validar_envio(db, enviar))
     itens = [_calcular_item(db, cfg, e, it, ignorar_solicitacao) for it in e.itens]
     frases = []
     for i, ic in enumerate(itens):
@@ -272,7 +275,7 @@ def _preencher(sol: SolicitacaoCorte, e: SolicitacaoEntrada, dados: ops.DadosOp,
 
 def criar(db: Session, cfg: Config, e: SolicitacaoEntrada, *, enviar: bool, usuario: Usuario,
           ip: str | None) -> list[SolicitacaoCorte]:
-    previa, dados, itens = validar(db, cfg, e)
+    previa, dados, itens = validar(db, cfg, e, enviar=enviar)
     conf = exigir_sem_pendencias(previa, e.confirmacoes) if enviar else {}
     if not enviar and any(o.codigo.startswith(("MODO_", "LOTE_SEM_SALDO", "DIMENSOES")) for o in
                           previa.resultado.erros):
@@ -320,7 +323,7 @@ def atualizar_rascunho(db: Session, cfg: Config, sol_id: int, e: SolicitacaoEntr
         raise ErroNegocio("Só um rascunho pode ser editado.")
     if len(e.itens) != 1:
         raise ErroNegocio("Um rascunho tem exatamente um lote.")
-    previa, dados, itens = validar(db, cfg, e, ignorar_solicitacao=sol.id)
+    previa, dados, itens = validar(db, cfg, e, ignorar_solicitacao=sol.id, enviar=enviar)
     conf = exigir_sem_pendencias(previa, e.confirmacoes) if enviar else {}
     _preencher(sol, e, dados, itens[0])
     sol.confirmacoes = conf or None

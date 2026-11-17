@@ -321,6 +321,31 @@ Excel: `GET /api/exportar/reto-por-origem.xlsx` (mesmos filtros), duas abas "Res
 - `GET /api/lotes/{id}/arvore`: filhos que não são do RJ no Rio (ex.: sobra e RETO em Itu) não aparecem, nem os saldos; a raiz é o ancestral mais alto ainda visível.
 - T14: `GET /api/sas`, `GET /api/sas/{id}` e `/api/exportar/sas.xlsx` só devolvem SAs de itens de COP; SA de corte em Itu (B2) dá 404 no detalhe.
 
+## 16.2 Pendência do peso real da peça inteira do RJ e bloqueio `PESO_REAL_PENDENTE` ✅ (2026-11-17, R058, R060, spec v3.11 §2.2 passo 7, T07, §9; migração 0009)
+
+A pendência "Informar o peso real" = solicitação **`AGUARDANDO_CORTE_ITU`** (peça inteira do RJ recebida no COP, T12) que ainda não teve a T13 e não foi encerrada; `pendencia_id` = id da solicitação. Conta do **recebimento do COP** (`cop_item.recebido_em`), prazo `PENDENCIA_PESO_REAL_DIAS` (T23, padrão 7) [proposta, P33(b)]; vencida = mais de N dias. O SA da peça inteira **não é corrigido** (fica com o previsto, como a NF): não existe "Corrigir no Mega". Formato combinado com o FRONTEND no R060.
+
+- **Painel (§11), grupo ESTOQUE:** o card `PECA_INTEIRA_AGUARDANDO_CORTE` ("Peças inteiras do RJ aguardando peso real") traz só as pendências abertas, mais antiga primeiro, com `limite_dias` e `vencidas`; `nivel` = `ALERTA` quando há vencida; `link` = `/corte-itu`. Cada item (além dos campos de solicitação do §11):
+
+```json
+{ "pendencia_id": 31, "solicitacao_id": 31, "op": 90010, "lote_id": 77, "lote": "L-000077", "material": "H13 70X610",
+  "conteiner": "CH92XB", "cop": 601, "recebido_em": "2026-11-03", "dias": 14, "dias_desde_recebimento": 14,
+  "vence_em": "2026-11-10", "vencida": true }
+```
+
+  `lote_id` = lote RJ em Itu da peça (o que a T13 usa: `/corte-itu?op={op}&lote_id={lote_id}&peso_real=1`).
+- `GET /api/pendencias-peso-real` (todos; Operação RJ recebe lista vazia, P10): `{dias_limite, bloqueado, quantidade, vencidas, bloqueia_a_partir_de, mensagem, aviso, itens: [<item acima>]}`. `mensagem` (com vencida): "Há N peça(s) inteira(s) do RJ sem peso real há mais de 7 dias (ex.: OP 90010, H13 70X610, recebida em 03/11). Informe o peso real em Registrar corte em Itu para voltar a enviar solicitações."; `aviso` (sem vencida): "N peça(s) inteira(s) do RJ aguardando peso real; a partir de DD/MM, novas solicitações ficam bloqueadas.".
+- **T07:** `POST /api/solicitacoes/validar` com `enviar: true`, `POST /api/solicitacoes` com `enviar: true`, `PUT …/{id}` com `enviar: true` e `POST …/{id}/enviar` trazem `PESO_REAL_PENDENTE` (**ERRO**, ninguém libera, nem o Admin; `dados: {quantidade, solicitacao_id, op, lote_itu_id}`) quando há vencida. Com `enviar: false` (rascunho) ou antes do prazo vem `PESO_REAL_AGUARDANDO` (**ALERTA**, não bloqueia) com a mensagem/aviso. Trocar lote, T13 e o resto seguem liberados.
+- `POST /api/pendencias-peso-real/{pendencia_id}/encerrar` `{ "justificativa": "OP cancelada pelo cliente" }` (Estoque Itu e Admin; 10 a 500 caracteres, senão 422) → `200` `{solicitacao_id, encerrada_em, encerrada_por, justificativa}`. A solicitação continua `AGUARDANDO_CORTE_ITU` (a T13 ainda pode ser feita), mas sai da pendência e não bloqueia mais; auditoria `PESO_REAL_PENDENCIA_ENCERRADA`. Já encerrada ou não aguardando o peso real → `400`.
+- **T13:** o `201` de `POST /api/cortes-itu` ganha `pendencia_peso_real_resolvida` (true quando o corte foi da peça inteira recebida: a solicitação fica Concluída e sai do Painel).
+- **Sino (§14):** tipo novo `PESO_REAL_PENDENTE`, uma vez por peça, quando vence: Estoque Itu e Admin; `link` = o da T13 acima.
+- **T23:** parâmetro novo `PENDENCIA_PESO_REAL_DIAS` (NUMERO, 7), em `GET /api/parametros` como os outros.
+
+## 16.3 Restrição gravada no item e paridade manual ✅ (2026-11-17, §10.9, migração 0009)
+
+- `item_mp.restricao_uso` (carga, B09): todo **lote novo** do item (T06, T13 sobra/recebimento, T15) já nasce com a destinação `RESTRICAO` com esse texto (pede "estou ciente" na baixa, como as outras). Nada muda na API: a destinação aparece em `GET /api/lotes/{id}` como as criadas na T17.
+- `item_mp.paridade_item_id` (carga, paridade manual, §1.4 item 8): o lote RJ mantém a própria descrição e medida, mas `chave_material` (T04 agrupado e sugestão da T07) é a do item de Itu indicado. Os itens de `GET /api/lotes` ganham `paridade_manual` (bool) e a linha de `GET /api/lotes/agrupado` também (true quando algum lote da linha está nela por exceção: "mesma linha por exceção", R060).
+
 ## 17. Ainda não implementado
 
 📋 F1.1: tratamento da T16 (ver movimentos, ajustar, marcar como explicada), T19 Relatórios, T26, exportação para o Renato com marca, PDFs (romaneio do COP, ficha do lote). A **impressão da Fila RJ (T09)** usa `GET /api/fila-rj`; se faltar campo, o FUNCIONAL indica e eu acrescento.

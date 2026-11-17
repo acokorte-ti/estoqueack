@@ -70,6 +70,8 @@ PADROES: dict[str, float] = {
     "AVISO_RESERVA_DIAS": 7, "CORTE_DIAS_RETROATIVOS": 7,
     # 0008 (spec v3.5): P22(a) material inteiro do RJ na T13; P24 janela do SA no Mega
     "TOLERANCIA_EXCESSO_RJ_INTEIRO_PCT": 8, "SA_JANELA_ANTES_DIAS": 7,
+    # 0009 (R058, spec v3.11 T07/T23): peça inteira do RJ sem peso real bloqueia "Enviar ao RJ" depois de N dias
+    "PENDENCIA_PESO_REAL_DIAS": 7,
 }
 
 

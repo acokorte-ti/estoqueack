@@ -183,6 +183,8 @@ def para_dict(db: Session, c: CorteItu) -> dict:
             "perda_kg": c.perda_kg, "previsto_kg": c.previsto_kg, "consumo_misto": c.consumo_misto,
             "lote_reto": {"id": reto.id, "codigo": reto.codigo} if reto else None,
             "sa_id": sa.id if sa else None, "instrucao_mega": c.instrucao_mega,
+            # R058/R060: o corte foi da peça inteira do RJ recebida → a pendência do peso real saiu do Painel
+            "pendencia_peso_real_resolvida": c.solicitacao_id is not None,
             "data_corte": c.data_corte.isoformat()}
 
 

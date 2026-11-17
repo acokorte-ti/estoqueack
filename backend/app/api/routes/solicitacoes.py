@@ -15,6 +15,7 @@ from app.api import deps
 from app.core.config import Config
 from app.core.db import get_db
 from app.models import Usuario
+from app.services import peso_real
 from app.services import solicitacoes as svc
 
 router = APIRouter(tags=["solicitações"])
@@ -89,7 +90,7 @@ def _entrada(c: SolicitacaoCorpo) -> svc.SolicitacaoEntrada:
 @router.post("/solicitacoes/validar")
 def validar(c: SolicitacaoCorpo, db: Session = Depends(get_db), cfg: Config = Depends(deps.config),
             _: Usuario = Depends(ITU)) -> dict:
-    previa = svc.validar(db, cfg, _entrada(c))[0]
+    previa = svc.validar(db, cfg, _entrada(c), enviar=c.enviar)[0]
     db.rollback()   # a consulta da OP atualiza o cache; a prévia não grava nada
     return previa.como_dict()
 
@@ -186,6 +187,22 @@ def encerrar(sol_id: int, c: Justificativa, request: Request, db: Session = Depe
              u: Usuario = Depends(ITU)) -> dict:
     return svc.detalhe(db, svc.encerrar_saldo_pendente(db, sol_id, c.justificativa, usuario=u,
                                                        ip=deps.ip_cliente(request)))
+
+
+@router.get("/pendencias-peso-real")
+def pendencias_peso_real(db: Session = Depends(get_db), u: Usuario = Depends(deps.usuario_liberado)) -> dict:
+    """R058 (contrato §16.2): peças inteiras do RJ aguardando o peso real e o bloqueio da T07."""
+    s = peso_real.situacao(db)
+    if u.perfil == "OPERACAO_RJ":            # P10: a Operação RJ não enxerga o estoque de Itu
+        s = {**s, "itens": [], "quantidade": 0, "vencidas": 0, "bloqueado": False, "mensagem": None, "aviso": None,
+             "bloqueia_a_partir_de": None}
+    return s
+
+
+@router.post("/pendencias-peso-real/{sol_id}/encerrar")
+def encerrar_pendencia_peso_real(sol_id: int, c: Justificativa, request: Request, db: Session = Depends(get_db),
+                                 u: Usuario = Depends(ITU)) -> dict:
+    return peso_real.encerrar(db, sol_id, c.justificativa, usuario=u, ip=deps.ip_cliente(request))
 
 
 @router.post("/solicitacoes/{sol_id}/trocar-op")

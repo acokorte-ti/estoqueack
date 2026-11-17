@@ -97,7 +97,7 @@ def test_avisos_automaticos_sem_repetir(amb):
         n2 = avisos.rodar(db)
         tipos = [n.tipo for n in db.query(Notificacao)]
     assert n1["sa_48h"] == 1 and n1["atrasadas"] == 1 and n1["reservas"] == 1
-    assert n2 == {"sa_48h": 0, "atrasadas": 0, "reservas": 0, "resumo_excecoes": n2["resumo_excecoes"]}
+    assert n2 == {"sa_48h": 0, "atrasadas": 0, "reservas": 0, "resumo_excecoes": n2["resumo_excecoes"], "peso_real": 0}
     assert "SA_SEM_CONFIRMACAO" in tipos and "SOLICITACAO_ATRASADA" in tipos and "RESERVA_VENCENDO" in tipos
 
 

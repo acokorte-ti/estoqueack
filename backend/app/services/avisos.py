@@ -4,6 +4,8 @@
 - Solicitação que passou para Atrasado (> ATRASO_ATRASADO_DIAS, 15 dias) → Estoque Itu e Operação RJ.
 - Reserva/restrição vencendo em AVISO_RESERVA_DIAS (7 dias) → quem criou (ou Análise).
 - Resumo diário das exceções de tolerância justificadas (dia anterior) → Admin, a partir das 07h.
+- Peça inteira do RJ sem peso real depois de PENDENCIA_PESO_REAL_DIAS (7 dias do recebimento) → Estoque Itu e Admin
+  (R058, spec v3.11 §2.2 passo 7; [proposta, P33(d)]).
 """
 from __future__ import annotations
 
@@ -15,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.models import CadastroSa, Destinacao, Movimento, Notificacao, SolicitacaoCorte
 
+from . import peso_real
 from . import sas as svc_sas
 from . import solicitacoes as svc_sol
 from .base import hoje, notificar, parametro
@@ -29,7 +32,16 @@ def _ja_avisado(db: Session, tipo: str, link: str) -> bool:
 
 def rodar(db: Session, agora_local: datetime | None = None) -> dict[str, int]:
     agora_local = agora_local or datetime.now(TZ)
-    n = {"sa_48h": 0, "atrasadas": 0, "reservas": 0, "resumo_excecoes": 0}
+    n = {"sa_48h": 0, "atrasadas": 0, "reservas": 0, "resumo_excecoes": 0, "peso_real": 0}
+
+    limite = int(parametro(db, "PENDENCIA_PESO_REAL_DIAS"))
+    for x in peso_real.itens(db):
+        link = peso_real.link_t13(x)
+        if x["vencida"] and not _ja_avisado(db, "PESO_REAL_PENDENTE", link):
+            notificar(db, perfis=("ESTOQUE", "ADMIN"), tipo="PESO_REAL_PENDENTE", link=link,
+                      texto=f"Peça inteira do RJ da OP {x['op']} ({x['material']}) sem peso real há mais de {limite} "
+                            "dias: novas solicitações ao RJ estão bloqueadas até informar o peso real (T13).")
+            n["peso_real"] += 1
 
     horas = int(parametro(db, "PRAZO_CONFIRMACAO_SA_H"))
     for sa in db.scalars(select(CadastroSa).where(CadastroSa.situacao != "CONFIRMADO", CadastroSa.origem != "CARGA")):

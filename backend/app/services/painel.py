@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.models import CadastroSa, Cop, Destinacao, ItemMP, Lote, MegaSaldo, Movimento, SolicitacaoCorte, Usuario
 
 from . import cops as svc_cops
-from . import entradas_mega
+from . import entradas_mega, peso_real
 from . import sas as svc_sas
 from . import solicitacoes as svc_sol
 from . import sync_mega
@@ -105,8 +105,14 @@ def _sol_item(db: Session, s: SolicitacaoCorte) -> dict:
 def pendencias_itu(db: Session) -> list[dict]:
     segurando = _cops_segurando(db)
     transito = [svc_cops.cop_dict(db, c, com_itens=False) for c in svc_cops.listar(db, ["ENVIADO", "RECEBIDO_PARCIAL"])]
-    inteiras = [_sol_item(db, s) for s in db.scalars(select(SolicitacaoCorte).where(
-        SolicitacaoCorte.situacao == "AGUARDANDO_CORTE_ITU").order_by(SolicitacaoCorte.id))]
+    # R058/R060 (spec v3.11 §2.2 passo 7): só as pendências do peso real não encerradas, com os dias desde o
+    # recebimento do COP; os campos da pendência (peso_real.itens) por cima do resumo da solicitação
+    pend = {x["solicitacao_id"]: x for x in peso_real.itens(db)}
+    inteiras = [_sol_item(db, s) | pend[s.id] | {"dias_desde_recebimento": pend[s.id]["dias"]}
+                for s in db.scalars(select(SolicitacaoCorte).where(
+                    SolicitacaoCorte.id.in_(list(pend))).order_by(SolicitacaoCorte.id))]
+    inteiras.sort(key=lambda x: (x["recebido_em"], x["id"]))
+    limite_peso = int(parametro(db, "PENDENCIA_PESO_REAL_DIAS"))
     abertos = list(db.scalars(select(CadastroSa).where(CadastroSa.situacao != "CONFIRMADO",
                                                        CadastroSa.origem != "CARGA").order_by(CadastroSa.criado_em)))
     atrasados = [{"id": s.id, "op": s.op, "situacao": s.situacao, "sa_codigo": s.sa_codigo,
@@ -119,7 +125,9 @@ def pendencias_itu(db: Session) -> list[dict]:
         _p("ENTRADA_MEGA_A_CLASSIFICAR", "Entradas Mega a classificar", entradas, "/entradas-mega", nivel="ALERTA"),
         _p("SA_SEGURANDO_COP", "SAs pendentes segurando COP no RJ", segurando, "/sa", nivel="ALERTA"),
         _p("COP_EM_TRANSITO", "COPs em trânsito para receber", transito, "/recebimentos"),
-        _p("PECA_INTEIRA_AGUARDANDO_CORTE", "Peças inteiras aguardando corte em Itu", inteiras, "/cortes-itu"),
+        _p("PECA_INTEIRA_AGUARDANDO_CORTE", "Peças inteiras do RJ aguardando peso real", inteiras, "/corte-itu",
+           nivel="ALERTA" if any(x["vencida"] for x in inteiras) else "NORMAL")
+        | {"limite_dias": limite_peso, "vencidas": sum(1 for x in inteiras if x["vencida"])},
         _p("SA_SEM_CONFIRMACAO", "SAs sem confirmação no Mega há mais do prazo", atrasados, "/sa", nivel="ALERTA"),
         _p("MATERIAL_INSUFICIENTE", "Solicitações com material insuficiente (trocar lote ou cancelar)", insuf,
            "/solicitacoes?situacao=MATERIAL_INSUFICIENTE", nivel="ALERTA"),

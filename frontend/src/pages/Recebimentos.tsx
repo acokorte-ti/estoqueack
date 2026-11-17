@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, data, kg, num, qs, validacaoDoErro, type Validacao } from "../api/cliente";
 import { useSessao } from "../api/sessao";
-import { nfTexto, SITUACAO_COP, type Cop, type CopItem } from "../api/cop";
+import { nfTexto, SA_ITEM, SITUACAO_COP, type Cop, type CopItem } from "../api/cop";
 import { MODO_NOME } from "../api/solicitacao";
 import Janela, { fecharJanela } from "../components/Janela";
 import PainelValidacao, { confirmacoesValidas, podeGravar, type Confirmacoes } from "../components/PainelValidacao";
@@ -153,6 +153,7 @@ export function ReceberCop() {
                 <div><dt>Modo</dt><dd>{MODO_NOME[i.modo]}</dd></div>
                 <div><dt>Peças</dt><dd>{i.pecas}</dd></div>
                 <div><dt>Peso enviado</dt><dd>{kg(i.peso_kg)} kg</dd></div>
+                <div><dt>SA</dt><dd><TextoSa sa={i.sa} /></dd></div>
                 {i.peso_conferido_kg !== null && <div><dt>Conferido em Itu</dt><dd>{kg(i.peso_conferido_kg)} kg</dd></div>}
               </dl>
               {emTransito && recebe && l && (
@@ -184,6 +185,18 @@ export function ReceberCop() {
       )}
 
       {divDe && <JanelaDivergencia cop={c} item={divDe} aoFechar={() => setDivDe(null)} aoGravar={() => { setDivDe(null); void carregar(); }} />}
+    </>
+  );
+}
+
+/** Código e situação do SA do item, para o Fabiano conferir ao receber (Eduardo, 2026-11-17). */
+function TextoSa({ sa }: { sa: CopItem["sa"] }) {
+  if (!sa) return <>—</>;
+  const s = SA_ITEM[sa.situacao];
+  return (
+    <>
+      {sa.sa_codigo ? <strong>{sa.sa_codigo}</strong> : <span className="desc">sem código</span>}{" "}
+      <span className={`etiqueta ${s?.classe ?? ""}`}>{s?.nome ?? sa.situacao}</span>
     </>
   );
 }

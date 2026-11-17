@@ -350,14 +350,22 @@ tr.linha-aviso .validacao { margin: 0 0 var(--esp-2); font-size: var(--t-pequeno
   .moldura { display: block; min-height: 0; }
   .conteudo { padding: 0; max-width: none; }
   .so-impressao { display: block; }
-  .lista-corte-cabeca { display: flex; gap: 6mm; align-items: center; border-bottom: 2px solid #000; padding-bottom: 3mm; margin-bottom: 3mm; }
-  .lista-corte-cabeca h1 { font-size: 16pt; }
-  .lista-corte table { width: 100%; border-collapse: collapse; }
-  .lista-corte th, .lista-corte td { border: 1px solid #555; padding: 1.5mm 2mm; text-align: left; vertical-align: top; color: #000; }
-  .lista-corte th { background: #e6e6e6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size: 9pt; }
-  .lista-corte tr { break-inside: avoid; }
+  /* Lista de corte do RJ (T09): só a tabela no papel; a folha tem margem 0 (o navegador não põe cabeçalho/rodapé)
+     e o respiro vem do padding lateral e das linhas de cabeça e pé da tabela, repetidas em cada página. */
+  body:has(.lista-corte) .conteudo > :not(.lista-corte) { display: none !important; }
+  .lista-corte { padding: 0 10mm; color: #000; }
+  .lista-corte table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .lista-corte th, .lista-corte td { border: 1px solid #555; padding: 2mm 2mm; text-align: left; vertical-align: top; color: #000; font-size: 10.5pt; line-height: 1.3; overflow-wrap: anywhere; }
+  .lista-corte .lista-corte-colunas th { background: #e6e6e6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size: 9.5pt; vertical-align: bottom; }
+  .lista-corte .lista-corte-titulo th { border: none; padding: 8mm 0 2.5mm; font-size: 11pt; font-weight: 400; }
+  .lista-corte .lista-corte-titulo strong { font-size: 13pt; }
+  .lista-corte .lista-corte-pe td { border: none; padding: 0; height: 8mm; }
+  .lista-corte .lista-corte-total td { font-weight: 700; border-top: 2px solid #000; }
+  .lista-corte .num { text-align: right; }
+  .lista-corte .sem-quebra { white-space: nowrap; overflow-wrap: normal; }
+  .lista-corte tr { break-inside: avoid; page-break-inside: avoid; }
   .lista-corte thead { display: table-header-group; }
-  .lista-corte td.em-branco { width: 22mm; }
+  .lista-corte tfoot { display: table-footer-group; }
 }
 
 /* Sincronização com o Mega */

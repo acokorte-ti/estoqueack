@@ -10,6 +10,13 @@ import { JUSTIFICATIVA_MIN } from "../components/PainelValidacao";
 /** Pesquisa sem diferenciar maiúsculas nem acentos. */
 const normalizar = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
+/** Peso estimado (previsto com sobremetal) do que falta cortar; na parcial, proporcional às peças que faltam. */
+const estimado = (s: SolicItem) => {
+  if (s.peso_previsto_kg === null) return null;
+  const faltam = s.quantidade - s.pecas_cortadas;
+  return s.pecas_cortadas && s.quantidade > 0 ? (s.peso_previsto_kg * Math.max(faltam, 0)) / s.quantidade : s.peso_previsto_kg;
+};
+
 /** T09 Fila RJ: o que o Marcelo tem para cortar, por prazo. Cartões grandes para tablet/celular. */
 export default function FilaRj() {
   const { usuario } = useSessao();
@@ -29,6 +36,7 @@ export default function FilaRj() {
     if (!fila || !termo) return fila ?? [];
     return fila.filter((s) => normalizar([s.op, s.cliente, s.lote.liga, s.lote.bitola, s.lote.conteiner, s.lote.codigo, material(s.lote)].filter(Boolean).join(" ")).includes(termo));
   }, [fila, busca]);
+  const totalEstimado = useMemo(() => visiveis.reduce((t, s) => t + (estimado(s) ?? 0), 0), [visiveis]);
 
   const carregar = useCallback(async () => {
     try {
@@ -49,37 +57,55 @@ export default function FilaRj() {
           <h1>Cortes a fazer no RJ</h1>
           <p>Solicitações enviadas e parciais, da mais urgente para a menos urgente.</p>
         </div>
-        {!!fila?.length && <button className="secundario" onClick={() => window.print()}>Imprimir lista de corte</button>}
+        {!!visiveis.length && <button className="secundario" onClick={() => window.print()}>Imprimir lista de corte</button>}
       </header>
 
-      {/* Versão impressa (A4, sem menu): só aparece no papel */}
+      {/* Versão impressa (A4 deitada, sem menu nem cabeçalho/rodapé do navegador): só aparece no papel.
+          Margem da folha = 0 só enquanto esta tela está aberta; o respiro vem do padding e das linhas de cabeça/pé da tabela, que se repetem em cada página. */}
       {fila && (
         <section className="so-impressao lista-corte">
-          <div className="lista-corte-cabeca">
-            <img src="/logo-acokorte.png" alt="AçoKorte" width={150} height={30} />
-            <div>
-              <h1>Lista de corte · RJ</h1>
-              <p>Impressa em {new Date().toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })} · {fila.length} solicitação(ões), por prazo</p>
-            </div>
-          </div>
+          <style>{"@page { size: A4 landscape; margin: 0; }"}</style>
           <table>
+            <colgroup>
+              <col style={{ width: "17mm" }} /><col style={{ width: "36mm" }} /><col /><col style={{ width: "17mm" }} /><col style={{ width: "21mm" }} />
+              <col style={{ width: "23mm" }} /><col style={{ width: "11mm" }} /><col style={{ width: "36mm" }} /><col style={{ width: "21mm" }} /><col style={{ width: "23mm" }} />
+            </colgroup>
             <thead>
-              <tr><th>OP</th><th>Material · contêiner</th><th>Instrução de corte</th><th>Qtd</th><th>Prazo</th><th>Dias</th><th>Item · cliente</th><th>Peças cortadas</th><th>Peso real (kg)</th></tr>
+              <tr className="lista-corte-titulo">
+                <th colSpan={10}>
+                  <strong>Lista de corte · RJ</strong> · {new Date().toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  {" "}· {visiveis.length} item(ns) · {kg(totalEstimado)} kg estimados · por prazo{busca.trim() ? ` · pesquisa “${busca.trim()}”` : ""}
+                </th>
+              </tr>
+              <tr className="lista-corte-colunas">
+                <th>OP</th><th>Material · contêiner</th><th>Instrução de corte</th><th>Qtd</th><th className="num">Peso estimado (kg)</th>
+                <th>Prazo</th><th>Dias</th><th>Item · cliente</th><th>Peças cortadas</th><th>Peso real (kg)</th>
+              </tr>
             </thead>
             <tbody>
-              {fila.map((s) => (
-                <tr key={s.id}>
-                  <td><strong>{s.op}</strong></td>
-                  <td>{material(s.lote)}<br />{s.lote.conteiner ?? "—"}</td>
-                  <td><strong>{s.instrucao ?? `${s.quantidade} peça(s)`}</strong>{s.instrucao_processo && <><br />{s.instrucao_processo}</>}{s.modo === "TRAZER_INTEIRA" && <><br />(peça inteira)</>}</td>
-                  <td>{s.pecas_cortadas ? `${s.quantidade - s.pecas_cortadas} de ${s.quantidade}` : s.quantidade}</td>
-                  <td>{data(s.prazo)}</td>
-                  <td>{s.dias_em_aberto ?? "—"}{s.atraso === "ATRASADO" ? " !" : ""}</td>
-                  <td>{s.item_descricao ?? "—"}<br />{s.cliente ?? "—"}</td>
-                  <td className="em-branco" /><td className="em-branco" />
-                </tr>
-              ))}
+              {visiveis.map((s) => {
+                const est = estimado(s);
+                return (
+                  <tr key={s.id}>
+                    <td className="sem-quebra"><strong>{s.op}</strong></td>
+                    <td><strong>{material(s.lote)}</strong><br />{s.lote.conteiner ?? "—"}</td>
+                    <td><strong>{s.instrucao ?? `${s.quantidade} peça(s)`}</strong>{s.instrucao_processo && <><br />{s.instrucao_processo}</>}{s.modo === "TRAZER_INTEIRA" && <><br />(peça inteira)</>}</td>
+                    <td>{s.pecas_cortadas ? `faltam ${s.quantidade - s.pecas_cortadas} de ${s.quantidade}` : s.quantidade}</td>
+                    <td className="num sem-quebra">{est === null ? "—" : kg(est)}</td>
+                    <td className="sem-quebra">{data(s.prazo)}</td>
+                    <td className="sem-quebra">{s.dias_em_aberto ?? "—"}{s.atraso === "ATRASADO" ? " !" : ""}</td>
+                    <td>{s.item_descricao ?? "—"}<br />{s.cliente ?? "—"}</td>
+                    <td className="em-branco" /><td className="em-branco" />
+                  </tr>
+                );
+              })}
+              <tr className="lista-corte-total">
+                <td colSpan={4}>Total estimado · {visiveis.length} item(ns)</td>
+                <td className="num sem-quebra">{kg(totalEstimado)}</td>
+                <td colSpan={3} /><td className="em-branco" /><td className="em-branco" />
+              </tr>
             </tbody>
+            <tfoot><tr className="lista-corte-pe"><td colSpan={10} /></tr></tfoot>
           </table>
         </section>
       )}
@@ -95,7 +121,7 @@ export default function FilaRj() {
           <label style={{ flexBasis: "24rem" }}>Pesquisar
             <input type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="OP, cliente, liga, bitola, contêiner ou lote" />
           </label>
-          {busca.trim() && <span className="desc">{visiveis.length} de {fila.length}</span>}
+          <span className="desc">{busca.trim() ? `${visiveis.length} de ${fila.length}` : `${fila.length}`} corte(s) · {kg(totalEstimado)} kg estimados</span>
         </div>
       )}
       {fila && !!fila.length && !visiveis.length && (
@@ -107,12 +133,14 @@ export default function FilaRj() {
           const faltam = s.quantidade - s.pecas_cortadas;
           const pecas = s.pecas_cortadas ? `faltam ${faltam} de ${s.quantidade}` : `${s.quantidade}`;
           const aberto = abertos.has(s.id);
+          const est = estimado(s);
           return (
             <li key={s.id} className={["cartao", "cartao-compacto", s.atraso === "ATRASADO" ? "atrasado" : "", destaque === s.id ? "destaque" : ""].join(" ")}>
               <button type="button" className="cartao-linha" aria-expanded={aberto} onClick={() => alternar(s.id)}>
                 <span className="cartao-op">OP {s.op}</span>
                 <span className="cartao-linha-material">{material(s.lote)}</span>
                 <span>{pecas} peça(s)</span>
+                {est !== null && <span>≈ {kg(est)} kg</span>}
                 <span>prazo {data(s.prazo)}</span>
                 <span className="cartao-linha-etiquetas">
                   <EtiquetaAtraso a={s.atraso} dias={s.dias_em_aberto} />
@@ -130,7 +158,7 @@ export default function FilaRj() {
                     <div><dt>Lote</dt><dd>{s.lote.codigo}</dd></div>
                     <div><dt>Modo</dt><dd>{MODO_NOME[s.modo]}</dd></div>
                     <div><dt>Peças</dt><dd>{pecas}</dd></div>
-                    <div><dt>Previsto</dt><dd>{s.peso_previsto_kg !== null ? `${kg(s.peso_previsto_kg)} kg` : "—"}</dd></div>
+                    <div><dt>Peso estimado</dt><dd>{est === null ? "—" : `${kg(est)} kg`}{s.pecas_cortadas > 0 && s.peso_previsto_kg !== null && <span className="desc"> (das que faltam; {kg(s.peso_previsto_kg)} kg no total)</span>}</dd></div>
                     <div><dt>Prazo</dt><dd>{data(s.prazo)}</dd></div>
                     <div className="largo"><dt>Item / cliente</dt><dd>{s.item_descricao ?? "—"} · {s.cliente ?? "—"}</dd></div>
                   </dl>

@@ -7,7 +7,8 @@ export interface CopItem {
   id: number; liberacao_id: number; solicitacao_id: number; op: number; item_codigo: number | null; cliente: string | null;
   material: string; conteiner: string | null; lote: string; modo: Modo; pecas: number; peso_kg: number;
   situacao: "EM_COP" | "EM_TRANSITO" | "RECEBIDO";
-  sa: { id: number; situacao: string; sa_codigo: number | null } | null;
+  /** SA do item (contrato F1 §4); opcional para tolerar resposta sem o campo. */
+  sa?: { id: number; situacao: string; sa_codigo: number | null } | null;
   nf: { numero: string; emitente: string } | null;
   peso_conferido_kg: number | null; lote_itu_id: number | null;
   divergencias: { tipo: string; pecas: number | null; kg: number | null; observacao: string }[];

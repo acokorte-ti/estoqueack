@@ -106,8 +106,8 @@ def encerrar(db: Session, sol_id: int, justificativa: str, *, usuario: Usuario, 
     if sol is None:
         raise NaoEncontrado("Solicitação não encontrada.")
     texto = (justificativa or "").strip()
-    if len(texto) < 10:
-        raise ErroNegocio("Escreva a justificativa (pelo menos 10 letras).")
+    if not texto:   # sem mínimo de caracteres (spec v3.14 §9, Eduardo, 2026-11-17)
+        raise ErroNegocio("Escreva a justificativa.")
     if sol.situacao != "AGUARDANDO_CORTE_ITU" or sol.peso_real_encerrada_em is not None:
         raise ErroNegocio("Esta solicitação não está aguardando o peso real.")
     sol.peso_real_encerrada_em = agora()

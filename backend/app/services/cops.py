@@ -143,8 +143,8 @@ def reabrir(db: Session, cop_id: int, justificativa: str, *, usuario: Usuario, i
     cop = obter(db, cop_id, travar=True)
     if cop.situacao != "FECHADO":
         raise ErroNegocio("Só um COP fechado (ainda não enviado) pode ser reaberto.")
-    if len((justificativa or "").strip()) < 10:
-        raise ErroNegocio("A justificativa precisa ter pelo menos 10 caracteres.")
+    if not (justificativa or "").strip():   # sem mínimo de caracteres (spec v3.14 §9, Eduardo, 2026-11-17)
+        raise ErroNegocio("Escreva a justificativa.")
     linhas = [s for i in cop.itens if (s := _sa_do_item(db, i)) is not None]
     if any(s.situacao == "CONFIRMADO" for s in linhas):
         raise ErroNegocio("Há SA confirmado neste COP: não é possível reabrir.")

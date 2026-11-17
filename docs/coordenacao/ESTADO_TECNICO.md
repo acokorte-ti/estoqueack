@@ -1,6 +1,6 @@
 # Estado — BACKEND / TÉCNICO
 
-Atualizado: 2026-11-17 (tarde) pelo TÉCNICO: **ferramenta "Confirmar SA (teste)"** no ar (`fc4b808`, R070 ao FRONTEND) e **recarga do zero** da homologação às 10h23 (números em §2). Aguardando: R070 (botão na T14), R066, R067, R068, R069, P35/P36/P37, 1.2746 × 1.2767 RETO (Fabiano). **No dia da implantação: `MODO_TESTE=false`** (06_implantacao §2.3).
+Atualizado: 2026-11-17 (noite) pelo TÉCNICO: **ajustes do teste manual** (R071: liga por "contém", justificativa sem mínimo, NF só Fio Certo). Antes, à tarde: **ferramenta "Confirmar SA (teste)"** no ar (`fc4b808`, R070 ao FRONTEND) e **recarga do zero** da homologação às 10h23 (números em §2). Aguardando: R070 (botão na T14), R066, R067, R068, R069, P35/P36/P37, 1.2746 × 1.2767 RETO (Fabiano). **No dia da implantação: `MODO_TESTE=false`** (06_implantacao §2.3).
 
 > Para retomar a parte técnica do zero: `estoqueack/docs/tecnico/00_RETOMAR_PROJETO.md` (inventário, onde fica cada segredo, operação, lições e incidentes; §7.2 e §7.3 = Fase 1).
 
@@ -15,10 +15,17 @@ Atualizado: 2026-11-17 (tarde) pelo TÉCNICO: **ferramenta "Confirmar SA (teste)
 
 ## 2. Feito
 
+### Ajustes do teste manual (2026-11-17 noite, R071)
+
+- Liga por "contém" (`estoque.filtro_liga`/`liga_contem`) em `/api/lotes`, `/agrupado`, `/reto-por-origem`, `/api/solicitacoes` e Excel; `/compativeis` segue exata. **Aguardando P38(a)** (proposta da spec: "H13" trazer também 1.2344 pela equivalência sem MOD): não implementado.
+- `JUSTIFICATIVA_MINIMA` = 1 e toda justificativa da API só não vazia (spec v3.14 §9), inclusive a observação de "Material insuficiente".
+- NF nova só `FIO_CERTO` (padrão); `EMITENTES_HISTORICO` para leitura; e2e passa a usar `FIO_CERTO`. Instrução de processo: 300 basta, sem migração 0011.
+- Testes: `tests/test_ajustes_teste_manual_1117.py` (5) + 3 testes antigos ajustados.
+
 ### Ferramenta de teste e recarga do zero (2026-11-17 tarde)
 
 - **"Confirmar SA (teste)"** (contrato §7.1, `fc4b808`, CI verde): `POST /api/sas/{id}/confirmar-teste` só ADMIN, só com `MODO_TESTE=true` e `APP_ENV` ≠ `prod` (senão 404 antes do login; fora do OpenAPI); auditoria `SA_CONFIRMADO_TESTE` ("confirmação de teste" + login); `modo_teste` em `/api/saude`, `/api/auth/eu` e login; `confirmacao_teste` na linha do SA. `.env` da homologação com `MODO_TESTE=true` (backup `.env.bak.20261117b`). Testes `tests/test_modo_teste_sa.py` (4); 234 no total.
-- **Recarga do zero 10h23** (`fc4b808`, backup `estoqueack_20261117_102113`, saldo do Mega das 10h21, planilhas de 17/11 + `correcoes_carga.json` do R063): 990 lotes (373 esgotados), 1.939 movimentos. (a) Estoque Mega 410 lotes / 212.779,1 kg = saldo Mega, 0 códigos > 5 kg (maior diferença 0,000; RETO 23 lotes / 14.042,2 kg); (b) RJ no Rio 174 lotes / 232.222,5 kg = ESTOQUE 2026, 0 linhas diferentes, abertura 2026 confere; (c) RJ em Itu 33 lotes / 28.820,8 kg = Estoque Geral (sem RETO 25 / 19.881,0; RETO 8 / 8.939,8); lotes RJ com código Mega = 0; saldo = soma dos movimentos em 990 de 990, 0 negativos; (d) **842** de 851 solicitações (808 Concluídas, 10 Canceladas, 21 Enviadas, 2 Cortadas, 1 Material insuficiente), 792 cortes, 47 de 48 COPs, 8.361 de 8.361 SAs. Pendências 874 (9 BLOQUEIA solicitação sem lote, 29 corte sem peso, 10 contêiner discordante, 6 OP mal digitada, 4 consumo em outro material…). Relatórios `cargaelatorios\carga_previa_20261117_1321.xlsx` e `carga_resultado_20261117_1322.xlsx`.
+- **Recarga do zero 10h23** (`fc4b808`, backup `estoqueack_20261117_102113`, saldo do Mega das 10h21, planilhas de 17/11 + `correcoes_carga.json` do R063): 990 lotes (373 esgotados), 1.939 movimentos. (a) Estoque Mega 410 lotes / 212.779,1 kg = saldo Mega, 0 códigos > 5 kg (maior diferença 0,000; RETO 23 lotes / 14.042,2 kg); (b) RJ no Rio 174 lotes / 232.222,5 kg = ESTOQUE 2026, 0 linhas diferentes, abertura 2026 confere; (c) RJ em Itu 33 lotes / 28.820,8 kg = Estoque Geral (sem RETO 25 / 19.881,0; RETO 8 / 8.939,8); lotes RJ com código Mega = 0; saldo = soma dos movimentos em 990 de 990, 0 negativos; (d) **842** de 851 solicitações (808 Concluídas, 10 Canceladas, 21 Enviadas, 2 Cortadas, 1 Material insuficiente), 792 cortes, 47 de 48 COPs, 8.361 de 8.361 SAs. Pendências 874 (9 BLOQUEIA solicitação sem lote, 29 corte sem peso, 10 contêiner discordante, 6 OP mal digitada, 4 consumo em outro material…). Relatórios `carga\relatorios\carga_previa_20261117_1321.xlsx` e `carga_resultado_20261117_1322.xlsx`.
 - **OPs do teste manual** (fora do repo): `carga\ops_teste_manual_2026-11-17.txt` (A 100951, B 100862, B2 100956, C 100924). Não há OP aberta com SA na estrutura livre na base (81 com SA, 80 já na planilha de SA): A/B/B2 usam OP com MP de mesma liga × bitola de lote RJ.
 
 ### Spec v3.13 (R063) e R065 (2026-11-17)

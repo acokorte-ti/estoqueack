@@ -19,7 +19,10 @@ from .base import ErroNegocio, NaoEncontrado, Previa, agora, exigir_sem_pendenci
 from .estoque import bitola
 from .fluxo import recalcular_solicitacao
 
-EMITENTES = ("FIO_CERTO", "MEDIO_VALE", "OUTRO")
+# Emitente da NF de transferência RJ → Itu. Lançamento novo: só Fio Certo (Eduardo, 2026-11-17). MEDIO_VALE e OUTRO
+# continuam válidos só na leitura (NFs já gravadas); a carga grava EMITENTE_CARGA (app/carga/gravar.py).
+EMITENTES_NOVOS = ("FIO_CERTO",)
+EMITENTES_HISTORICO = ("FIO_CERTO", "MEDIO_VALE", "OUTRO")
 
 
 @dataclass
@@ -313,8 +316,8 @@ def obter_nf(db: Session, numero: str, emitente: str, data=None) -> NfTransferen
     numero = numero.strip()
     if not numero:
         raise ErroNegocio("Informe o número da NF.")
-    if emitente not in EMITENTES:
-        raise ErroNegocio("Emitente inválido (FIO_CERTO, MEDIO_VALE ou OUTRO).")
+    if emitente not in EMITENTES_NOVOS:
+        raise ErroNegocio("Emitente inválido: NF nova só da Fio Certo (FIO_CERTO).")
     nf = db.scalar(select(NfTransferencia).where(NfTransferencia.numero == numero,
                                                  NfTransferencia.emitente == emitente))
     if nf is None:

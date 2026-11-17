@@ -101,6 +101,24 @@ def raiz(db: Session, lote: Lote) -> Lote:
     return atual
 
 
+def _termo_liga(texto: str | None) -> str:
+    """Termo do filtro de liga: sem espaços e em maiúsculas ("a8 mod" vira "A8MOD", como o código canônico)."""
+    return "".join((texto or "").split()).upper()
+
+
+def liga_contem(codigo: str, texto: str | None) -> bool:
+    """Filtro de liga por 'contém', sem diferenciar maiúscula (Eduardo, 2026-11-17): A8 traz A8 e A8MOD.
+    Só filtro de consulta: a paridade (MOD é material distinto) e a compatibilidade da T07 não usam isto."""
+    t = _termo_liga(texto)
+    return not t or t in "".join(codigo.split()).upper()
+
+
+def filtro_liga(col: Any, texto: str | None) -> Any:
+    """Mesma regra de `liga_contem` em SQL (UPPER + REPLACE + LIKE: PostgreSQL e SQLite)."""
+    t = _termo_liga(texto).replace("!", "!!").replace("%", "!%").replace("_", "!_")
+    return func.upper(func.replace(col, " ", "")).like(f"%{t}%", escape="!")
+
+
 def consulta_lotes(db: Session, f: dict[str, Any]):
     q = (select(Lote).join(ItemMP, Lote.item_mp_id == ItemMP.id).join(Liga, ItemMP.liga_id == Liga.id)
          .outerjoin(Conteiner, Lote.conteiner_id == Conteiner.id)
@@ -108,8 +126,8 @@ def consulta_lotes(db: Session, f: dict[str, Any]):
     if f.get("estoque"):
         pf, lf = BALDE_INV[f["estoque"]]
         q = q.where(Lote.planta_fiscal == pf, Lote.local_fisico == lf)
-    if f.get("liga"):
-        q = q.where(Liga.codigo == f["liga"].strip().upper())
+    if _termo_liga(f.get("liga")):
+        q = q.where(filtro_liga(Liga.codigo, f["liga"]))
     if f.get("formato"):
         q = q.where(ItemMP.formato == f["formato"])
     for campo in ("espessura", "largura", "diametro"):
@@ -400,7 +418,7 @@ def reto_por_origem(db: Session, f: dict[str, Any]) -> dict[str, Any]:
     lotes = [l for l in consulta_lotes(db, {"estoque": f.get("estoque"), "com_saldo": f.get("com_saldo", True),
                                             "codigo_mega": f.get("codigo_mega")})
              if l.tipo in tipos]
-    ligas = {x.strip().upper() for x in (f.get("ligas") or []) if x.strip()}
+    ligas = [t for t in (_termo_liga(x) for x in (f.get("ligas") or [])) if t]   # cada termo por "contém"
     cont = (f.get("conteiner") or "").strip().upper()
     txt = _norm_medida(f.get("bitola_origem") or "")
     reservado = mov.reservado(db, [l.id for l in lotes])
@@ -411,7 +429,7 @@ def reto_por_origem(db: Session, f: dict[str, Any]) -> dict[str, Any]:
             notas[eid] = f"{notas[eid]} | {texto}" if eid in notas else texto
     linhas: list[dict] = []
     for l in lotes:
-        if ligas and l.item.liga.codigo.upper() not in ligas:
+        if ligas and not any(liga_contem(l.item.liga.codigo, t) for t in ligas):
             continue
         if f.get("criado_de") and l.criado_em.date() < f["criado_de"]:
             continue

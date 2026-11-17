@@ -148,7 +148,7 @@ class Motivo(BaseModel):
 
 
 class Justificativa(BaseModel):
-    justificativa: str = Field(min_length=10, max_length=500)
+    justificativa: str = Field(min_length=1, max_length=500)
 
 
 class TrocaLote(BaseModel):
@@ -158,7 +158,7 @@ class TrocaLote(BaseModel):
 
 class TrocaOp(BaseModel):
     op: int = Field(gt=0)
-    justificativa: str = Field(min_length=10, max_length=500)
+    justificativa: str = Field(min_length=1, max_length=500)
 
 
 @router.post("/solicitacoes/{sol_id}/cancelar")
@@ -225,7 +225,7 @@ def fila(db: Session = Depends(get_db), _: Usuario = Depends(FILA)) -> list[dict
 
 
 class Observacao(BaseModel):
-    observacao: str = Field(min_length=10, max_length=500)
+    observacao: str = Field(min_length=1, max_length=500)
 
 
 @router.post("/solicitacoes/{sol_id}/material-insuficiente")

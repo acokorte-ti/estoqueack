@@ -83,7 +83,7 @@ def test_parcial_e_encerrar_com_saldo_pendente(amb):
     assert r.json()["situacao"] == "CORTADA_PARCIAL"
     assert r.json()["reserva_kg"] == pytest.approx(PREVISTO * 8 / 12, abs=0.01)
     h = entrar(client, u["itu"])
-    assert client.post(f"/api/solicitacoes/{s['id']}/encerrar", json={"justificativa": "curta"},
+    assert client.post(f"/api/solicitacoes/{s['id']}/encerrar", json={"justificativa": ""},
                        headers=h).status_code == 422
     r = client.post(f"/api/solicitacoes/{s['id']}/encerrar", headers=h,
                     json={"justificativa": "Restante vai em outra OP com outro lote"})

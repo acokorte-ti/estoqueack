@@ -86,7 +86,7 @@ def test_encerrar_pendencia_com_justificativa_desbloqueia(amb):
     _envelhecer(10)
     h = entrar(client, u["itu"])
     url = f"/api/pendencias-peso-real/{sol_id}/encerrar"
-    assert client.post(url, json={"justificativa": "curta"}, headers=h).status_code == 422
+    assert client.post(url, json={"justificativa": ""}, headers=h).status_code == 422
     r = client.post(url, json={"justificativa": "OP cancelada pelo cliente"}, headers=h)
     assert r.status_code == 200 and r.json()["justificativa"] == "OP cancelada pelo cliente"
     assert client.post(url, json={"justificativa": "OP cancelada pelo cliente"}, headers=h).status_code == 400

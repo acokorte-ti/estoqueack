@@ -249,8 +249,8 @@ def _exigir_aberta(db: Session, p: PendenciaMega) -> None:
 
 def _justificativa(texto: str | None) -> str:
     t = (texto or "").strip()
-    if len(t) < 10:
-        raise ErroNegocio("Escreva pelo menos 10 caracteres.")
+    if not t:   # sem mínimo de caracteres (spec v3.14 §9, Eduardo, 2026-11-17)
+        raise ErroNegocio("Escreva a justificativa.")
     return t
 
 

@@ -181,7 +181,7 @@ def ajustar(lote_id: int, c: AjusteCorpo, request: Request, db: Session = Depend
 
 
 class Justificativa(BaseModel):
-    justificativa: str = Field(min_length=10, max_length=500)
+    justificativa: str = Field(min_length=1, max_length=500)
 
 
 @router.post("/movimentos/{mov_id}/estorno", status_code=201)
@@ -194,7 +194,7 @@ def estornar(mov_id: int, c: Justificativa, request: Request, db: Session = Depe
 class OrigemCorpo(BaseModel):
     conteiner: str = Field(min_length=2, max_length=30)
     lote_pai_id: int | None = None
-    justificativa: str = Field(min_length=10, max_length=500)
+    justificativa: str = Field(min_length=1, max_length=500)
 
 
 @router.post("/lotes/{lote_id}/atribuir-origem")

@@ -124,8 +124,8 @@ def test_nao_e_entrada_nao_volta_e_reabrir(amb):
     h = entrar(client, us["itu"])
     pid = _pend(client, h, 78290)["id"]
     url = f"/api/entradas-mega/{pid}/nao-e-entrada"
-    r = client.post(url, json={"motivo": "OUTRO", "justificativa": "curta"}, headers=h)
-    assert r.status_code == 400 and "pelo menos 10 caracteres" in r.text
+    r = client.post(url, json={"motivo": "OUTRO", "justificativa": "   "}, headers=h)
+    assert r.status_code == 400 and "Escreva a justificativa" in r.text
     r = client.post(url, json={"motivo": "ACERTO_INVENTARIO_MEGA", "justificativa": "Acerto feito no Mega em 05/11"},
                     headers=h)
     assert r.status_code == 200 and r.json()["situacao"] == "DESCARTADA"

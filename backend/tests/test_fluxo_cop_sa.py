@@ -123,7 +123,7 @@ def test_caminho_b_peca_inteira_gera_lote_rj_em_itu(amb):
     _confirmar_no_mega(fab, 60001)
     client.post("/api/sas/verificar", json={"ids": [sa["id"]]}, headers=h)
     h = entrar(client, u["rj"])
-    client.post(f"/api/cops/{cop['id']}/nf", json={"numero": "900", "emitente": "MEDIO_VALE"}, headers=h)
+    client.post(f"/api/cops/{cop['id']}/nf", json={"numero": "900", "emitente": "FIO_CERTO"}, headers=h)
     assert client.post(f"/api/cops/{cop['id']}/enviar", headers=h).status_code == 200
     h = entrar(client, u["itu"])
     item = client.get(f"/api/cops/{cop['id']}").json()["itens"][0]

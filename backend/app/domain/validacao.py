@@ -12,7 +12,7 @@ from enum import Enum
 from typing import Any
 
 
-JUSTIFICATIVA_MINIMA = 10  # caracteres; evita justificativas vazias como "ok"
+JUSTIFICATIVA_MINIMA = 1  # caracteres: só não pode ficar vazia (spec v3.14 §9, Eduardo, 2026-11-17; antes 10)
 
 
 class Nivel(str, Enum):

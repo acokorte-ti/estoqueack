@@ -25,7 +25,8 @@ RS_KG = deps.exigir_perfil("ESTOQUE", "ANALISE")
 # Análise; o Estoque Itu e o Admin continuam podendo
 INFORMA_SA = deps.exigir_perfil("ESTOQUE", "ANALISE")
 SituacaoCop = Literal["ABERTO", "FECHADO", "ENVIADO", "RECEBIDO_PARCIAL", "RECEBIDO"]
-Emitente = Literal["FIO_CERTO", "MEDIO_VALE", "OUTRO"]
+# Lançamento novo só Fio Certo (Eduardo, 2026-11-17); NFs antigas (MEDIO_VALE, OUTRO, carga) seguem na leitura
+Emitente = Literal["FIO_CERTO"]
 
 
 # ---------------- T11 ----------------
@@ -82,7 +83,7 @@ def fechar(cop_id: int, request: Request, db: Session = Depends(get_db), u: Usua
 
 
 class Justificativa(BaseModel):
-    justificativa: str = Field(min_length=10, max_length=500)
+    justificativa: str = Field(min_length=1, max_length=500)
 
 
 @router.post("/cops/{cop_id}/reabrir")
@@ -93,7 +94,7 @@ def reabrir(cop_id: int, c: Justificativa, request: Request, db: Session = Depen
 
 class NfCorpo(BaseModel):
     numero: str = Field(min_length=1, max_length=20)
-    emitente: Emitente
+    emitente: Emitente = "FIO_CERTO"
     data: date | None = None
     item_ids: list[int] | None = Field(None, description="Vazio: todos os itens. Senão: 'NF diferente para itens "
                                                           "selecionados'")
@@ -270,7 +271,7 @@ def confirmar_teste(sa_id: int, request: Request, c: ConfirmarTeste | None = Non
 class NfB2(BaseModel):
     ids: list[int] = Field(min_length=1, max_length=500)
     numero: str = Field(min_length=1, max_length=20)
-    emitente: Emitente
+    emitente: Emitente = "FIO_CERTO"
     data: date | None = None
 
 

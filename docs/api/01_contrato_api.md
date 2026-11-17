@@ -81,7 +81,7 @@ Resposta do `/validar`, sempre `200`:
 }
 ```
 
-Os níveis de ocorrência são `ERRO` (bloqueia), `CIENCIA` (exige "estou ciente" com justificativa de pelo menos 10 caracteres) e `ALERTA` (só aviso). O `ok` só é `true` quando não há `ERRO` nem `CIENCIA` pendente. O `resultado` aparece mesmo com alertas, para a tela mostrar como vai ficar.
+Os níveis de ocorrência são `ERRO` (bloqueia), `CIENCIA` (exige "estou ciente" com justificativa não vazia; sem mínimo de caracteres desde 2026-11-17, antes 10; vale para toda justificativa da API: ajuste, estorno, encerrar, trocar OP, reabrir COP, atribuir origem, Entradas Mega e a observação de "Material insuficiente") e `ALERTA` (só aviso). O `ok` só é `true` quando não há `ERRO` nem `CIENCIA` pendente. O `resultado` aparece mesmo com alertas, para a tela mostrar como vai ficar.
 
 Para gravar, o corpo do `POST` leva os mesmos dados mais as confirmações:
 
@@ -132,7 +132,7 @@ As rotas de recuperação **não exigem sessão nem CSRF**, porque o usuário n�
 | Parâmetro | Tipo | Observação |
 |---|---|---|
 | `estoque` | `ESTOQUE_MEGA` / `RJ_NO_RIO` / `RJ_EM_ITU` | omitido = todos |
-| `liga` | código, ex.: `H13` | |
+| `liga` | texto, ex.: `A8` | **"contém"**, sem diferenciar maiúscula e ignorando espaço (2026-11-17): `A8` traz A8 e A8MOD; vale também para `/agrupado`, `/reto-por-origem`, `/api/solicitacoes` e os Excel. Não muda a paridade (MOD é material distinto) nem a T07 (`/compativeis` continua exata) |
 | `formato` | `RETANGULAR` / `REDONDO` / `RETO` | |
 | `espessura_de`, `espessura_ate`, `largura_de`, `largura_ate`, `diametro_de`, `diametro_ate` | mm | faixa |
 | `conteiner` | código, ex.: `CH11EA` | |

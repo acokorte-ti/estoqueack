@@ -22,7 +22,7 @@ from app.models import (CadastroSa, Conteiner, CorteItu, ItemMP, LiberacaoCorte,
 from . import auditoria, movimentos, ops, peso_real
 from .base import (ErroNegocio, NaoEncontrado, Previa, agora, exigir_sem_pendencias, hoje, notificar, parametro,
                    so_rj_no_rio)
-from .estoque import BALDE, bitola, mapa_mesma_linha, mesma_liga
+from .estoque import BALDE, bitola, filtro_liga, mapa_mesma_linha, mesma_liga
 from .fluxo import ATIVAS_RJ, material_texto, recalcular_solicitacao
 
 ESTOQUE_ITU = ("ESTOQUE",)
@@ -365,8 +365,8 @@ def entrada_de(sol: SolicitacaoCorte, *, lote_id: int | None = None) -> Solicita
 
 def _justificativa(texto: str | None, campo: str = "justificativa") -> str:
     t = (texto or "").strip()
-    if len(t) < 10:
-        raise ErroNegocio(f"A {campo} precisa ter pelo menos 10 caracteres.")
+    if not t:   # sem mínimo de caracteres (spec v3.14 §9, Eduardo, 2026-11-17)
+        raise ErroNegocio(f"Escreva a {campo}.")
     return t
 
 
@@ -709,8 +709,8 @@ def listar(db: Session, usuario: Usuario, f: dict[str, Any]) -> list[Solicitacao
         q = q.where(SolicitacaoCorte.op == f["op"])
     if f.get("cliente"):
         q = q.where(SolicitacaoCorte.cliente.ilike(f"%{f['cliente'].strip()}%"))
-    if f.get("liga"):
-        q = q.where(Liga.codigo == f["liga"].strip().upper())
+    if (f.get("liga") or "").strip():
+        q = q.where(filtro_liga(Liga.codigo, f["liga"]))   # "contém" (Eduardo, 2026-11-17)
     if f.get("conteiner"):
         q = q.where(Conteiner.codigo == f["conteiner"].strip().upper())
     if f.get("de"):

@@ -51,6 +51,7 @@ Parâmetros: `liga` (obrigatório), `formato` (`RETANGULAR`/`REDONDO`), `espessu
 - `modo`: `CORTAR_RJ` ou `TRAZER_INTEIRA`. Lote em Itu → `MODO_INCOMPATIVEL` (ERRO): a tela usa "Registrar corte em Itu agora" (T13, §5) **[R005]**.
 - `sobremetal_*` em branco usam os parâmetros (5 mm). `sobremetal_largura_mm` em branco = o sistema decide: se a peça usa a largura inteira da bitola, 0; senão, 5.
 - `bruto` (opcional): dimensões brutas editadas pelo usuário. Em branco, o sistema calcula (bitola + sobremetal).
+- `instrucao_processo` (até 300 caracteres): texto livre; várias opções juntas separadas por `"; "` (ex.: `"Retificar espessura; Usar sobras"`). As 4 opções rápidas somam 66 caracteres.
 - `instrucao` em branco = sugerida: `"12 PEÇAS COM 255MM COMPRIMENTO"` ou `"TRAZER 01 PEÇA H13 70X610X3905"`.
 - `op_manual`: `{ item_codigo, item_descricao, cliente }`, só quando o Mega está fora do ar (aparece `OP_NAO_CONFIRMADA`, ALERTA).
 - `liga`: liga pedida. Lote de liga equivalente → `LIGA_EQUIVALENTE` (CIENCIA) **[P18]**.
@@ -84,7 +85,7 @@ Gravou: `201` com `{ "solicitacoes": [ <detalhe> ] }`. O detalhe e o item da lis
 
 ## 2. T08 Solicitações ✅
 
-`GET /api/solicitacoes?situacao=ENVIADA&situacao=CORTADA_PARCIAL&op=&cliente=&liga=&conteiner=&de=&ate=&somente_atrasadas=` (paginado). Situações: `RASCUNHO`, `ENVIADA`, `MATERIAL_INSUFICIENTE`, `CORTADA_PARCIAL`, `CORTADA`, `EM_COP`, `SA_PRONTO`, `EM_TRANSITO`, `AGUARDANDO_CORTE_ITU`, `CONCLUIDA`, `CANCELADA`. Operação RJ não vê rascunhos.
+`GET /api/solicitacoes?situacao=ENVIADA&situacao=CORTADA_PARCIAL&op=&cliente=&liga=&conteiner=&de=&ate=&somente_atrasadas=` (paginado; `liga` por "contém", como em `/api/lotes`). Situações: `RASCUNHO`, `ENVIADA`, `MATERIAL_INSUFICIENTE`, `CORTADA_PARCIAL`, `CORTADA`, `EM_COP`, `SA_PRONTO`, `EM_TRANSITO`, `AGUARDANDO_CORTE_ITU`, `CONCLUIDA`, `CANCELADA`. Operação RJ não vê rascunhos.
 
 Item da lista:
 
@@ -109,7 +110,7 @@ Ações (Estoque Itu):
 |---|---|---|
 | Cancelar | `POST /{id}/cancelar` `{ motivo }` | Rascunho, Enviada, Material insuficiente, sem corte |
 | Trocar lote [R003] | `POST /{id}/trocar-lote/validar` e `POST /{id}/trocar-lote` `{ lote_id, confirmacoes }` | Material insuficiente → volta Enviada com nova reserva |
-| Encerrar com saldo pendente [R004] | `POST /{id}/encerrar` `{ justificativa }` (≥ 10) | Parcial → Cortada, libera a reserva do restante |
+| Encerrar com saldo pendente [R004] | `POST /{id}/encerrar` `{ justificativa }` (não vazia; sem mínimo desde 2026-11-17) | Parcial → Cortada, libera a reserva do restante |
 | Trocar OP [R007] | `POST /{id}/trocar-op` `{ op, justificativa }` | Resposta traz `avisos[]` ("ajustar o SA no Mega") se o SA já estava confirmado |
 | Duplicar | `POST /{id}/duplicar` | Cria um rascunho igual (`201`) |
 
@@ -140,7 +141,7 @@ Várias linhas = "Usar outro lote / dividir". Ocorrências: `SITUACAO_INVALIDA`,
 | Remover item | `DELETE /api/cops/{id}/itens/{item_id}` (só Aberto) |
 | Fechar COP [P13] | `POST /api/cops/{id}/fechar` → gera uma linha de SA por item e avisa Itu |
 | Reabrir | `POST /api/cops/{id}/reabrir` `{ justificativa }` (só sem SA confirmado; apaga as linhas de SA ainda não confirmadas) |
-| NF | `POST /api/cops/{id}/nf` `{ numero, emitente: "FIO_CERTO"\|"MEDIO_VALE"\|"OUTRO", data?, item_ids? }`; sem `item_ids` vale para todos ("NF diferente para itens selecionados" = com `item_ids`) |
+| NF | `POST /api/cops/{id}/nf` `{ numero, emitente?: "FIO_CERTO", data?, item_ids? }` (lançamento novo só Fio Certo desde 2026-11-17; omitido = `FIO_CERTO`; outro valor → 422. NFs já gravadas com `MEDIO_VALE`, `OUTRO` ou o texto da carga continuam aparecendo como vieram); sem `item_ids` vale para todos ("NF diferente para itens selecionados" = com `item_ids`) |
 | Enviar | `POST /api/cops/{id}/enviar/validar` e `POST /api/cops/{id}/enviar` (`SA_PENDENTE`, `NF_PENDENTE`, `COP_NAO_FECHADO`) |
 
 COP: `{ id, numero, situacao, data, fechado_em, enviado_em, qtd_itens, peso_total_kg, nfs[], observacao, itens[] }`. `situacao`: `ABERTO`, `FECHADO`, **`AGUARDANDO_NF`** (derivada: fechado com todos os SAs confirmados), `ENVIADO`, `RECEBIDO_PARCIAL`, `RECEBIDO`. Item: `{ id, liberacao_id, solicitacao_id, op, item_codigo, cliente, material, conteiner, lote, modo, pecas, peso_kg, situacao (EM_COP/EM_TRANSITO/RECEBIDO), sa: {id, situacao, sa_codigo}|null, nf, peso_conferido_kg, lote_itu_id, divergencias[] }`.
@@ -220,7 +221,7 @@ Vale quando `sobra_kg > 0` e `sobra_na_bitola: false` (sobra na bitola continua 
 - `POST /api/sas/preparar` `{ ids }` → Preparado.
 - `POST /api/sas/{id}/codigo/validar` e `POST /api/sas/{id}/codigo` `{ sa_codigo, confirmacoes }`: `SA_CODIGO_TROCADO` (CIENCIA) se diferente do sugerido. Fica *Aguardando Mega* e o sistema já tenta confirmar. **Quem pode (2026-11-17, R063, spec v3.13 T14, [proposta, P36]):** Estoque Itu, **Análise** (a Amanda, que cadastra o SA no Mega, com usuário próprio nesse perfil) e Admin; o resto da T14 não muda.
 - `POST /api/sas/verificar` `{ ids? }` ("Verificar no Mega agora") → `{ verificados, confirmados, erro }`.
-- `POST /api/sas/nf` `{ ids, numero, emitente, data? }`: NF só fiscal do caminho B2 (linhas `CORTE_ITU`).
+- `POST /api/sas/nf` `{ ids, numero, emitente?, data? }` (`emitente` só `FIO_CERTO`, padrão): NF só fiscal do caminho B2 (linhas `CORTE_ITU`).
 - 📋 F1.1: "Exportar pedidos selecionados" e "Exportar SAs novos para o Renato" (Excel, layout da planilha de SA).
 
 ### 7.1 Ferramenta de teste "Confirmar SA (teste)" ✅ (2026-11-17, COORDENAÇÃO; só fora de produção)
@@ -250,8 +251,8 @@ Ocorrências: `NF_DUPLICADA`, `SEM_ITENS`, `LIGA_DESCONHECIDA#n`, `BITOLA_INCOMP
 ## 9. T17, T18 e T05 ✅
 
 - `POST /api/lotes/{id}/destinacoes` `{ tipo: RESERVA|RESTRICAO, descricao, kg?, validade? }` (Estoque Itu, Análise) e `POST /api/destinacoes/{id}/encerrar`.
-- `POST /api/lotes/{id}/ajuste/validar` e `POST /api/lotes/{id}/ajuste` `{ saldo_contado_kg, justificativa }` (Estoque Itu).
-- `POST /api/movimentos/{id}/estorno` `{ justificativa }` (Estoque Itu; Operação RJ só o próprio corte). Corte RJ só antes de entrar em COP; o estorno do corte devolve a solicitação para Enviada/Parcial.
+- `POST /api/lotes/{id}/ajuste/validar` e `POST /api/lotes/{id}/ajuste` `{ saldo_contado_kg, justificativa }` (Estoque Itu; justificativa não vazia, sem mínimo desde 2026-11-17, vazia → 400).
+- `POST /api/movimentos/{id}/estorno` `{ justificativa }` (1 a 500 caracteres desde 2026-11-17; Estoque Itu; Operação RJ só o próprio corte). Corte RJ só antes de entrar em COP; o estorno do corte devolve a solicitação para Enviada/Parcial.
 - `POST /api/lotes/{id}/atribuir-origem` `{ conteiner, lote_pai_id?, justificativa }` (Estoque Itu) **[P07]**.
 
 ## 10. T23 Parâmetros e notificações ✅
@@ -340,7 +341,7 @@ Item da lista: `id, codigo, descricao, situacao, saldo_mega_kg, soma_lotes_kg, d
 
 **criar-lote** (corpo): `peso_kg` (>0), `conteiner` **ou** `sem_conteiner: true`, `pecas?`, `data_entrada?` (padrão: data da NF no Mega; não pode ser futura), `nf?` (padrão: NF do Mega), `observacao?`, `confirmacoes`. Ocorrências: ERRO `PESO_ACIMA_DA_DIFERENCA` ("O lote não pode ter mais kg do que o Mega tem a mais (X kg). Informe um peso menor ou confira a diferença."), `CONTEINER_OBRIGATORIO`, `CONTEINER_FORMATO`, `DATA_FUTURA`, `ITEM_ILEGIVEL` ("Não consegui ler liga e bitola desta descrição. Peça ao Admin para cadastrar o item no Catálogo (T22)."), `PENDENCIA_TRATADA`; CIENCIA `CONTEINER_REPETIDO` (já existe lote ativo com o mesmo contêiner e material; exige justificativa em `confirmacoes`). A prévia traz em `resultado`: `diferenca_kg`, `diferenca_restante_kg`, `peso_sugerido_kg`, `nf`, `data_entrada` e, no código novo, `item_novo {liga, formato, bitola}`. Gravação: lote ITU/ITU, ATIVO, movimento `ENTRADA` (estornável), `origem_identificada = false` sem contêiner, tipo RETO se o item é RETO; código novo cria o item com `criado_pela_t15 = true`. Peso menor que a diferença mantém a pendência ABERTA com o resto; dentro de `DIVERGENCIA_MEGA_KG` vira RESOLVIDA. Resposta 201: `{lote {id, codigo, peso_kg}, pendencia, diferenca_restante_kg, mensagem}` (mensagem: "Lote L-000123 criado com 1.450,0 kg (código 78290). Diferença restante: 0,0 kg.").
 
-**nao-e-entrada**: `motivo` = `ESTORNO_BAIXA_MEGA | ACERTO_INVENTARIO_MEGA | TRANSFERENCIA_CODIGOS | OUTRO`; `justificativa` com 10+ caracteres (400 "Escreva pelo menos 10 caracteres."). A pendência vira DESCARTADA e os kg ficam como diferença explicada (não volta; só o aumento posterior gera nova pendência). Pendência já tratada: 400 "Esta pendência já foi tratada por NOME às HH:MM. Atualize a lista."
+**nao-e-entrada**: `motivo` = `ESTORNO_BAIXA_MEGA | ACERTO_INVENTARIO_MEGA | TRANSFERENCIA_CODIGOS | OUTRO`; `justificativa` não vazia, sem mínimo desde 2026-11-17 (400 "Escreva a justificativa."). A pendência vira DESCARTADA e os kg ficam como diferença explicada (não volta; só o aumento posterior gera nova pendência). Pendência já tratada: 400 "Esta pendência já foi tratada por NOME às HH:MM. Atualize a lista."
 
 Estados: `ABERTA`, `RESOLVIDA`, `DESCARTADA`, `ENCERRADA` (o Mega voltou à tolerância sem ação). Desde a 0008 (R044) o banco garante: estados e motivos só da lista (CHECK) e **uma** ENTRADA ABERTA por código (índice único parcial).
 
@@ -348,7 +349,7 @@ Estados: `ABERTA`, `RESOLVIDA`, `DESCARTADA`, `ENCERRADA` (o Mega voltou à tole
 
 ## 16. Aba "RETO por origem" da T04 ✅ (2026-11-06)
 
-`GET /api/lotes/reto-por-origem` (todos os perfis; Operação RJ com o estoque travado em `RJ_NO_RIO`). Filtros: `estoque`, `liga` (repetível), `bitola_origem` (texto, ex. `45x610`), `bitola_de`/`bitola_ate` (1ª medida da bitola de origem), `conteiner`, `codigo_mega`, `com_saldo` (padrão true), `incluir_sobras` (padrão false: só RETO), `criado_de`/`criado_ate`.
+`GET /api/lotes/reto-por-origem` (todos os perfis; Operação RJ com o estoque travado em `RJ_NO_RIO`). Filtros: `estoque`, `liga` (repetível; cada valor por "contém", sem diferenciar maiúscula), `bitola_origem` (texto, ex. `45x610`), `bitola_de`/`bitola_ate` (1ª medida da bitola de origem), `conteiner`, `codigo_mega`, `com_saldo` (padrão true), `incluir_sobras` (padrão false: só RETO), `criado_de`/`criado_ate`.
 
 Resposta: `{ligas [{liga, bitolas [{bitola_origem, total_kg, conteineres [{conteiner, conteiner_texto ("não informado" se só a bitola), estoque, classe, lotes, saldo_kg, reservado_kg, disponivel_kg, lotes_detalhe [{id, codigo, saldo_kg}]}]}], sem_origem {texto: "Sem origem identificada", lotes, saldo_kg, reservado_kg, disponivel_kg, por_estoque, lotes_detalhe} | null, totais}], totais, lotes [um por lote], vazio, mensagem_vazio, estoque_travado}`. `totais` = `{com_origem_kg, so_bitola_kg, sem_origem_kg, total_kg, lotes, reservado_kg, disponivel_kg}`; o `total_kg` geral é a soma dos saldos dos lotes RETO nos filtros (bate com a T04 filtrada por formato RETO). Classes: `COMPLETA` (bitola e contêiner da raiz da árvore), `SO_BITOLA` (medida anotada na carga, contêiner "não informado"; desde 2026-11-11 a medida vem **normalizada** no formato da bitola do cadastro, R044: "IMP-D2 25X610MM" → `25X610`, "30,5x610" → `30,5X610`, liga diferente da do lote fica na frente, `D2 36X510`; faixa "45x510~610" fica em maiúsculo sem espaço), `SEM_ORIGEM` (linha própria por liga, nunca somada a uma bitola). Para Operação RJ: `mensagem_vazio = "Nenhum RETO no RJ no Rio"`.
 
@@ -376,7 +377,7 @@ A pendência "Informar o peso real" = solicitação **`AGUARDANDO_CORTE_ITU`** (
   `lote_id` = lote RJ em Itu da peça (o que a T13 usa: `/corte-itu?op={op}&lote_id={lote_id}&peso_real=1`).
 - `GET /api/pendencias-peso-real` (todos; Operação RJ recebe lista vazia, P10): `{dias_limite, bloqueado, quantidade, vencidas, bloqueia_a_partir_de, mensagem, aviso, itens: [<item acima>]}`. `mensagem` (com vencida): "Há N peça(s) inteira(s) do RJ sem peso real há mais de 7 dias (ex.: OP 90010, H13 70X610, recebida em 03/11). Informe o peso real em Registrar corte em Itu para voltar a enviar solicitações."; `aviso` (sem vencida): "N peça(s) inteira(s) do RJ aguardando peso real; a partir de DD/MM, novas solicitações ficam bloqueadas.".
 - **T07:** `POST /api/solicitacoes/validar` com `enviar: true`, `POST /api/solicitacoes` com `enviar: true`, `PUT …/{id}` com `enviar: true` e `POST …/{id}/enviar` trazem `PESO_REAL_PENDENTE` (**ERRO**, ninguém libera, nem o Admin; `dados: {quantidade, solicitacao_id, op, lote_itu_id}`) quando há vencida. Com `enviar: false` (rascunho) ou antes do prazo vem `PESO_REAL_AGUARDANDO` (**ALERTA**, não bloqueia) com a mensagem/aviso. Trocar lote, T13 e o resto seguem liberados.
-- `POST /api/pendencias-peso-real/{pendencia_id}/encerrar` `{ "justificativa": "OP cancelada pelo cliente" }` (Estoque Itu e Admin; 10 a 500 caracteres, senão 422) → `200` `{solicitacao_id, encerrada_em, encerrada_por, justificativa}`. A solicitação continua `AGUARDANDO_CORTE_ITU` (a T13 ainda pode ser feita), mas sai da pendência e não bloqueia mais; auditoria `PESO_REAL_PENDENCIA_ENCERRADA`. Já encerrada ou não aguardando o peso real → `400`.
+- `POST /api/pendencias-peso-real/{pendencia_id}/encerrar` `{ "justificativa": "OP cancelada pelo cliente" }` (Estoque Itu e Admin; 1 a 500 caracteres, senão 422; sem mínimo desde 2026-11-17) → `200` `{solicitacao_id, encerrada_em, encerrada_por, justificativa}`. A solicitação continua `AGUARDANDO_CORTE_ITU` (a T13 ainda pode ser feita), mas sai da pendência e não bloqueia mais; auditoria `PESO_REAL_PENDENCIA_ENCERRADA`. Já encerrada ou não aguardando o peso real → `400`.
 - **T13:** o `201` de `POST /api/cortes-itu` ganha `pendencia_peso_real_resolvida` (true quando o corte foi da peça inteira recebida: a solicitação fica Concluída e sai do Painel).
 - **Sino (§14):** tipo novo `PESO_REAL_PENDENTE`, uma vez por peça, quando vence: Estoque Itu e Admin; `link` = o da T13 acima.
 - **T23:** parâmetro novo `PENDENCIA_PESO_REAL_DIAS` (NUMERO, 7), em `GET /api/parametros` como os outros.

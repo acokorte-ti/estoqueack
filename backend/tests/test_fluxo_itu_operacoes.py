@@ -141,7 +141,7 @@ def test_reserva_ajuste_estorno_e_parametro(amb):
     codigos = [o["codigo"] for o in v["ocorrencias"]]
     assert "USA_SALDO_RESERVADO" in codigos and "DESTINACAO_0" in codigos
     # ajuste
-    r = client.post(f"/api/lotes/{ids['l33b']}/ajuste", json={"saldo_contado_kg": 390, "justificativa": "curta"},
+    r = client.post(f"/api/lotes/{ids['l33b']}/ajuste", json={"saldo_contado_kg": 390, "justificativa": "  "},
                     headers=h)
     assert r.status_code == 400
     r = client.post(f"/api/lotes/{ids['l33b']}/ajuste", headers=h,

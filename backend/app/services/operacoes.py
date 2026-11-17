@@ -197,8 +197,8 @@ def validar_ajuste(db: Session, lote_id: int, saldo_contado: float) -> Previa:
 
 def ajustar(db: Session, lote_id: int, saldo_contado: float, justificativa: str, *, usuario: Usuario,
             ip: str | None) -> Movimento:
-    if len((justificativa or "").strip()) < 10:
-        raise ErroNegocio("A justificativa precisa ter pelo menos 10 caracteres.")
+    if not (justificativa or "").strip():   # sem mínimo de caracteres (spec v3.14 §9, Eduardo, 2026-11-17)
+        raise ErroNegocio("Escreva a justificativa.")
     previa = validar_ajuste(db, lote_id, saldo_contado)
     exigir_sem_pendencias(previa, {})
     lote = movimentos.lote_ou_404(db, lote_id, travar=True)
@@ -212,8 +212,8 @@ def ajustar(db: Session, lote_id: int, saldo_contado: float, justificativa: str,
 
 def estornar(db: Session, mov_id: int, justificativa: str, *, usuario: Usuario, ip: str | None) -> Movimento:
     """Cria o movimento inverso ligado ao original. Corte RJ só antes do COP fechado (§8, T18)."""
-    if len((justificativa or "").strip()) < 10:
-        raise ErroNegocio("A justificativa precisa ter pelo menos 10 caracteres.")
+    if not (justificativa or "").strip():   # sem mínimo de caracteres (spec v3.14 §9, Eduardo, 2026-11-17)
+        raise ErroNegocio("Escreva a justificativa.")
     m = db.get(Movimento, mov_id)
     if m is None:
         raise NaoEncontrado("Movimento não encontrado.")
@@ -252,8 +252,8 @@ def estornar(db: Session, mov_id: int, justificativa: str, *, usuario: Usuario, 
 
 def atribuir_origem(db: Session, lote_id: int, conteiner: str, lote_pai_id: int | None, justificativa: str, *,
                     usuario: Usuario, ip: str | None) -> Lote:
-    if len((justificativa or "").strip()) < 10:
-        raise ErroNegocio("A justificativa precisa ter pelo menos 10 caracteres.")
+    if not (justificativa or "").strip():   # sem mínimo de caracteres (spec v3.14 §9, Eduardo, 2026-11-17)
+        raise ErroNegocio("Escreva a justificativa.")
     lote = movimentos.lote_ou_404(db, lote_id, travar=True)
     if lote.origem_identificada:
         raise ErroNegocio("O lote já tem origem identificada.")

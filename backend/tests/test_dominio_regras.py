@@ -38,7 +38,7 @@ class TestTolerancia5(unittest.TestCase):
         self.assertAlmostEqual(r.ocorrencias[0].dados["excedente_kg"], 6)
         self.assertFalse(r.pode_gravar())
         self.assertFalse(r.pode_gravar({"EXCESSO_TOLERANCIA": "  "}), "justificativa vazia não vale")
-        self.assertFalse(r.pode_gravar({"EXCESSO_TOLERANCIA": "ok"}), "justificativa curta não vale")
+        self.assertTrue(r.pode_gravar({"EXCESSO_TOLERANCIA": "ok"}), "sem mínimo de caracteres (2026-11-17)")
         self.assertTrue(r.pode_gravar({"EXCESSO_TOLERANCIA": "Só havia bitola 50x610, OP urgente"}))
 
     def test_abaixo_20_so_alerta(self):

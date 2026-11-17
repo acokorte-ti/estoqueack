@@ -11,7 +11,7 @@ Regras do frontend. Valem junto com o `CLAUDE.md` da raiz.
 ## Padrões de tela
 
 - **Um** botão `.primario` (vermelho #BE0A0F) por tela, com nome do que faz; `.secundario` contorno grafite; `.perigo` contorno vermelho para desfazer. Altura mínima 48 px (56 px no rodapé do celular).
-- Resultado mostrado **antes** de gravar: chamar `/validar`, mostrar as ocorrências no `PainelValidacao` (estou ciente + justificativa ≥ 10 caracteres, sufixo `#n` como veio). 409 na gravação reabre o painel; 400 vira mensagem.
+- Resultado mostrado **antes** de gravar: chamar `/validar`, mostrar as ocorrências no `PainelValidacao` (estou ciente + justificativa não vazia, sem mínimo de caracteres — decisão de 2026-11-17, sufixo `#n` como veio). 409 na gravação reabre o painel; 400 vira mensagem.
 - Bloqueio de validação é caixa clara com ✕, nunca botão vermelho. Campos [MEGA]/[LOTE]/[CALC]/[SISTEMA] só como texto; [SUGERIDO] preenchido e marcado.
 - Tablet/celular primeiro em T09, T10, T12, T13, T20: tabelas viram cartões abaixo de 900 px; rodapé de ação fixo.
 - **Campo novo da API sempre opcional no tipo TS, com reserva para a regra antiga** (ex.: `m.estornavel ?? regraAntiga`). Assim o frontend pode publicar antes do backend sem quebrar.

@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { api, data, kg, num, qs, validacaoDoErro, type Validacao } from "../api/cliente";
 import { useSessao } from "../api/sessao";
 import PainelValidacao, { confirmacoesValidas, podeGravar, type Confirmacoes } from "../components/PainelValidacao";
+import { EMITENTES_LANCAMENTO, nomeEmitente } from "../api/cop";
 
 /* ------------------------------------------------------------------ tipos */
 
@@ -35,12 +36,6 @@ const FILTROS: { chave: string; nome: string; situacao: SituacaoSa[] }[] = [
   { chave: "AGUARDANDO_MEGA", nome: "Aguardando Mega", situacao: ["AGUARDANDO_MEGA"] },
   { chave: "CONFIRMADO", nome: "Confirmados", situacao: ["CONFIRMADO"] },
 ];
-const EMITENTES = [
-  { valor: "FIO_CERTO", nome: "Fio Certo" },
-  { valor: "MEDIO_VALE", nome: "Médio Vale" },
-  { valor: "OUTRO", nome: "Outro" },
-];
-const nomeEmitente = (v: string) => EMITENTES.find((e) => e.valor === v)?.nome ?? v;
 
 /* ------------------------------------------------------------------ tela */
 
@@ -484,15 +479,19 @@ function JanelaNf({ ids, aoFechar, aoGravar }: { ids: number[]; aoFechar: () => 
       <form className="painel-form" onSubmit={(e) => void salvar(e)}>
         <h2 id="titulo-nf">NF de transferência · {ids.length} linha(s) de corte em Itu</h2>
         <label>Nº da NF<input value={f.numero} onChange={(e) => setF({ ...f, numero: e.target.value })} autoFocus required /></label>
-        <fieldset className="formatos">
-          <legend>Emitente</legend>
-          {EMITENTES.map((x) => (
-            <label key={x.valor} className={f.emitente === x.valor ? "opcao marcada" : "opcao"}>
-              <input type="radio" name="emitente" checked={f.emitente === x.valor} onChange={() => setF({ ...f, emitente: x.valor })} />
-              {x.nome}
-            </label>
-          ))}
-        </fieldset>
+        {EMITENTES_LANCAMENTO.length === 1 ? (
+          <p className="desc">Emitente: <strong>{EMITENTES_LANCAMENTO[0].nome}</strong></p>
+        ) : (
+          <fieldset className="formatos">
+            <legend>Emitente</legend>
+            {EMITENTES_LANCAMENTO.map((x) => (
+              <label key={x.valor} className={f.emitente === x.valor ? "opcao marcada" : "opcao"}>
+                <input type="radio" name="emitente" checked={f.emitente === x.valor} onChange={() => setF({ ...f, emitente: x.valor })} />
+                {x.nome}
+              </label>
+            ))}
+          </fieldset>
+        )}
         <label>Data da NF (opcional)<input type="date" value={f.data} onChange={(e) => setF({ ...f, data: e.target.value })} /></label>
         {erro && <p className="erro" role="alert">{erro}</p>}
         <div className="botoes">

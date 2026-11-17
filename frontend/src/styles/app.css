@@ -299,6 +299,14 @@ tr.com-aviso td { border-bottom: none; }
 tr.linha-aviso td { padding-top: 0; height: auto; }
 tr.linha-aviso .validacao { margin: 0 0 var(--esp-2); font-size: var(--t-pequeno); }
 .cartoes-lista { grid-template-columns: 1fr; }
+/* Fila RJ: cartão compacto (uma linha) que abre ao clicar */
+.cartao-compacto { gap: var(--esp-3); padding: var(--esp-2) var(--esp-4); }
+.cartao-linha { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-2) var(--esp-4); min-height: var(--toque); width: 100%; color: var(--aco-grafite); }
+.cartao-linha:focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; border-radius: var(--raio-painel); }
+.cartao-linha .cartao-op { margin-right: 0; font-size: 1.125rem; }
+.cartao-linha-material { font-weight: 700; color: var(--aco-preto); }
+.cartao-linha-etiquetas { display: inline-flex; flex-wrap: wrap; gap: var(--esp-2); margin-left: auto; }
+.cartao-linha-seta { color: var(--aco-medio); font-size: 1.25rem; }
 .secao { margin-top: var(--esp-6); }
 .secao > h2 { margin-bottom: var(--esp-3); }
 .saldos { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: var(--esp-4); margin-bottom: var(--esp-4); }

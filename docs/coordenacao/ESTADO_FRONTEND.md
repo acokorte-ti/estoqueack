@@ -1,6 +1,11 @@
 # Estado — FRONTEND / UX
 
-Atualizado: 2026-11-17 (R070)
+Atualizado: 2026-11-17 (ajustes do teste manual)
+
+## 2026-11-17 Ajustes do teste manual (Eduardo)
+
+- **No ar:** (1) filtro de liga vai para a API, que filtra por "contém" (RETO por origem separa ligas só por vírgula: "A8 MOD" é uma liga); (2) T07 "Instrução de processo" com várias opções marcadas + texto livre, gravados juntos com "; " (Fila RJ e lista impressa já mostram); (3) `JUSTIFICATIVA_MIN` = 1, sem "faltam N caracteres" (painel e janelas de justificativa; cancelar solicitação segue com 3); (4) T09 pesquisa (OP, cliente, liga, bitola, contêiner, lote) e cartões compactos que abrem ao clicar (link do sino já abre); impressão igual; (5) NF de transferência (COP e T14) com emitente fixo "Fio Certo"; histórico mostra o que veio.
+- **Testado:** `tsc` + `build`; sem navegador (o Eduardo testa à mão).
 
 ## 2026-11-17 R070 "Confirmar SA (teste)"
 

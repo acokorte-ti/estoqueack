@@ -224,8 +224,7 @@ function JanelaNaoEntrada({ p, aoFechar, aoGravar }: { p: Pendencia; aoFechar: (
             {motivos.map((m) => <option key={m.codigo} value={m.codigo}>{m.descricao}</option>)}
           </select>
         </label>
-        <label>Justificativa<textarea rows={3} value={j} onChange={(e) => setJ(e.target.value)} />
-          <small className="dica">{falta > 0 ? `Faltam ${falta} caractere(s).` : "Ok."}</small></label>
+        <label>Justificativa<textarea rows={3} value={j} onChange={(e) => setJ(e.target.value)} /></label>
         {erro && <p className="erro" role="alert">{erro}</p>}
         <div className="botoes">
           <button className="primario" disabled={!motivo || falta > 0 || ocupado}>Não é entrada</button>
@@ -252,8 +251,7 @@ function JanelaReabrir({ p, aoFechar, aoGravar }: { p: Pendencia; aoFechar: () =
     <Janela titulo={`Reabrir · código ${p.codigo}`} aoFechar={aoFechar}>
       <form onSubmit={(e) => void ok(e)} className="bloco-passo" style={{ gap: "var(--esp-4)" }}>
         <p className="desc">A pendência volta a Aberta e a diferença deixa de ser explicada.</p>
-        <label>Justificativa<textarea autoFocus rows={3} value={j} onChange={(e) => setJ(e.target.value)} />
-          <small className="dica">{falta > 0 ? `Faltam ${falta} caractere(s).` : "Ok."}</small></label>
+        <label>Justificativa<textarea autoFocus rows={3} value={j} onChange={(e) => setJ(e.target.value)} /></label>
         {erro && <p className="erro" role="alert">{erro}</p>}
         <div className="botoes">
           <button className="primario" disabled={falta > 0 || ocupado}>Reabrir</button>

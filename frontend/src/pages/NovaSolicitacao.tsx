@@ -55,13 +55,18 @@ interface ItemCorte {
   bruto: { espessura: string; largura: string; diametro: string; comprimento: string };
   comprimento_barra: string;
   instrucao: string;
-  instrucao_processo: string;
+  /** opções rápidas marcadas (várias) + texto livre; vão juntos em instrucao_processo, separados por "; " */
+  processos: string[];
+  processo_livre: string;
   /** kg que a pessoa decidiu usar deste lote (passo 2, só para a conta "necessário × escolhido") */
   kg_uso: string;
 }
 
 const PASSOS = ["OP", "Lote", "Corte", "Revisão"];
 const PROCESSOS = ["Retificar espessura", "Retificar largura", "Peça bipartida", "Usar sobras"];
+/** Opções marcadas + texto livre no mesmo campo, separados por "; " (Eduardo, 2026-11-17). */
+const juntarProcessos = (i: { processos: string[]; processo_livre: string }) =>
+  [...i.processos, i.processo_livre.trim()].filter(Boolean).join("; ");
 const emItu = (l: LoteCompativel) => l.estoque !== "RJ_NO_RIO";
 const kg1 = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const n2s = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v).replace(".", ","));
@@ -200,7 +205,7 @@ export default function NovaSolicitacao() {
 
   function novoItem(l: LoteCompativel): ItemCorte {
     return { lote: l, modo: "CORTAR_RJ", quantidade: quantidadeOp, sobremetal_c: "5", sobremetal_l: "",
-      bruto: { espessura: "", largura: "", diametro: "", comprimento: "" }, comprimento_barra: "", instrucao: "", instrucao_processo: "", kg_uso: "" };
+      bruto: { espessura: "", largura: "", diametro: "", comprimento: "" }, comprimento_barra: "", instrucao: "", processos: [], processo_livre: "", kg_uso: "" };
   }
 
   /** Lote do quadro de sugestão com os dados completos da lista (sobremetal, previsto). */
@@ -251,7 +256,7 @@ export default function NovaSolicitacao() {
           sobremetal_comprimento_mm: num(i.sobremetal_c) ?? null, sobremetal_largura_mm: num(i.sobremetal_l) ?? null,
           bruto: temBruto ? { espessura: num(b.espessura) ?? null, largura: num(b.largura) ?? null, diametro: num(b.diametro) ?? null, comprimento: num(b.comprimento) ?? null } : null,
           comprimento_barra_mm: i.modo === "TRAZER_INTEIRA" ? num(i.comprimento_barra) ?? null : null,
-          instrucao: i.instrucao.trim() || null, instrucao_processo: i.instrucao_processo.trim() || null,
+          instrucao: i.instrucao.trim() || null, instrucao_processo: juntarProcessos(i) || null,
         };
       }),
       prazo: prazo || null, observacao: observacao.trim() || null,
@@ -690,11 +695,11 @@ function ItemCorteForm({ item, formato, aoMudar }: { item: ItemCorte; formato: F
         )}
       </div>
       <div>
-        <p className="dica" style={{ marginBottom: 6 }}>Instrução de processo</p>
+        <p className="dica" style={{ marginBottom: 6 }}>Instrução de processo (pode marcar várias)</p>
         <div className="chips">
           {PROCESSOS.map((p) => (
-            <button key={p} type="button" className="chip" aria-pressed={item.instrucao_processo === p}
-              onClick={() => aoMudar({ instrucao_processo: item.instrucao_processo === p ? "" : p })}>{p}</button>
+            <button key={p} type="button" className="chip" aria-pressed={item.processos.includes(p)}
+              onClick={() => aoMudar({ processos: item.processos.includes(p) ? item.processos.filter((x) => x !== p) : PROCESSOS.filter((x) => x === p || item.processos.includes(x)) })}>{p}</button>
           ))}
         </div>
       </div>
@@ -718,7 +723,7 @@ function ItemCorteForm({ item, formato, aoMudar }: { item: ItemCorte; formato: F
         </label>
         <label>
           Outra instrução de processo
-          <input value={PROCESSOS.includes(item.instrucao_processo) ? "" : item.instrucao_processo} onChange={(e) => aoMudar({ instrucao_processo: e.target.value })} />
+          <input value={item.processo_livre} onChange={(e) => aoMudar({ processo_livre: e.target.value })} />
         </label>
       </details>
     </section>

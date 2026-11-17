@@ -4,9 +4,10 @@ import type { Ocorrencia } from "../api/cliente";
 /** Justificativas digitadas, por código de ocorrência (exatamente como veio, inclusive o sufixo "#2"). */
 export type Confirmacoes = Record<string, string>;
 
-export const JUSTIFICATIVA_MIN = 10;
+/** Justificativa só não pode ficar vazia (Eduardo, 2026-11-17). */
+export const JUSTIFICATIVA_MIN = 1;
 
-/** A gravação só libera sem ERRO e com toda CIENCIA justificada (≥ 10 caracteres). */
+/** A gravação só libera sem ERRO e com toda CIENCIA justificada (não vazia). */
 export function podeGravar(ocorrencias: Ocorrencia[], conf: Confirmacoes): boolean {
   return ocorrencias.every(
     (o) => o.nivel === "ALERTA" || (o.nivel === "CIENCIA" && (conf[o.codigo] ?? "").trim().length >= JUSTIFICATIVA_MIN),
@@ -46,7 +47,6 @@ export default function PainelValidacao({
       {lista.map((o) => {
         const id = `${base}-${o.codigo}`;
         const texto = confirmacoes[o.codigo] ?? "";
-        const falta = JUSTIFICATIVA_MIN - texto.trim().length;
         return (
           <li key={o.codigo} className={`validacao ${o.nivel.toLowerCase()}`}>
             <strong>{TITULO[o.nivel]}</strong>
@@ -59,11 +59,8 @@ export default function PainelValidacao({
                   rows={2}
                   value={texto}
                   onChange={(e) => aoMudar({ ...confirmacoes, [o.codigo]: e.target.value })}
-                  placeholder="Explique o motivo (mínimo de 10 caracteres)"
+                  placeholder="Explique o motivo"
                 />
-                <small className="dica" aria-live="polite">
-                  {falta > 0 ? `Faltam ${falta} caractere(s).` : "Justificativa aceita."}
-                </small>
               </label>
             )}
           </li>

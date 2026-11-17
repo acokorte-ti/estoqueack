@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, data, kg } from "../api/cliente";
 import { useSessao } from "../api/sessao";
@@ -6,6 +6,9 @@ import { MODO_NOME, material, type SolicItem } from "../api/solicitacao";
 import { EtiquetaAtraso, EtiquetaSituacao } from "../components/Etiquetas";
 import Janela, { fecharJanela } from "../components/Janela";
 import { JUSTIFICATIVA_MIN } from "../components/PainelValidacao";
+
+/** Pesquisa sem diferenciar maiúsculas nem acentos. */
+const normalizar = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 /** T09 Fila RJ: o que o Marcelo tem para cortar, por prazo. Cartões grandes para tablet/celular. */
 export default function FilaRj() {
@@ -17,6 +20,15 @@ export default function FilaRj() {
   const [erro, setErro] = useState("");
   const [insuf, setInsuf] = useState<SolicItem | null>(null);
   const [aviso, setAviso] = useState("");
+  const [busca, setBusca] = useState("");
+  // cartões compactos: abrem ao clicar; o que veio do link do sino já abre
+  const [abertos, setAbertos] = useState<Set<number>>(() => new Set(destaque ? [destaque] : []));
+  const alternar = (id: number) => setAbertos((a) => { const n = new Set(a); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const visiveis = useMemo(() => {
+    const termo = normalizar(busca.trim());
+    if (!fila || !termo) return fila ?? [];
+    return fila.filter((s) => normalizar([s.op, s.cliente, s.lote.liga, s.lote.bitola, s.lote.conteiner, s.lote.codigo, material(s.lote)].filter(Boolean).join(" ")).includes(termo));
+  }, [fila, busca]);
 
   const carregar = useCallback(async () => {
     try {
@@ -78,32 +90,57 @@ export default function FilaRj() {
         <div className="estado-vazio"><strong>Nenhum corte a fazer</strong>Nenhuma solicitação esperando corte no RJ.</div>
       )}
 
-      <ul className="cartoes nao-imprimir">
-        {fila?.map((s) => {
+      {!!fila?.length && (
+        <div className="barra-filtros nao-imprimir">
+          <label style={{ flexBasis: "24rem" }}>Pesquisar
+            <input type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="OP, cliente, liga, bitola, contêiner ou lote" />
+          </label>
+          {busca.trim() && <span className="desc">{visiveis.length} de {fila.length}</span>}
+        </div>
+      )}
+      {fila && !!fila.length && !visiveis.length && (
+        <div className="estado-vazio nao-imprimir"><strong>Nada encontrado</strong>Nenhum corte com “{busca.trim()}”.</div>
+      )}
+
+      <ul className="cartoes cartoes-lista nao-imprimir">
+        {visiveis.map((s) => {
           const faltam = s.quantidade - s.pecas_cortadas;
+          const pecas = s.pecas_cortadas ? `faltam ${faltam} de ${s.quantidade}` : `${s.quantidade}`;
+          const aberto = abertos.has(s.id);
           return (
-            <li key={s.id} className={["cartao", s.atraso === "ATRASADO" ? "atrasado" : "", destaque === s.id ? "destaque" : ""].join(" ")}>
-              <div className="cartao-topo">
+            <li key={s.id} className={["cartao", "cartao-compacto", s.atraso === "ATRASADO" ? "atrasado" : "", destaque === s.id ? "destaque" : ""].join(" ")}>
+              <button type="button" className="cartao-linha" aria-expanded={aberto} onClick={() => alternar(s.id)}>
                 <span className="cartao-op">OP {s.op}</span>
-                <EtiquetaAtraso a={s.atraso} dias={s.dias_em_aberto} />
-                {s.situacao !== "ENVIADA" && <EtiquetaSituacao s={s.situacao} />}
-              </div>
-              <p className="cartao-instrucao">{s.instrucao ?? `${s.quantidade} peça(s)`}</p>
-              {s.instrucao_processo && <p className="etiqueta info" style={{ alignSelf: "flex-start" }}>{s.instrucao_processo}</p>}
-              <dl className="dados">
-                <div><dt>Material</dt><dd>{material(s.lote)}</dd></div>
-                <div><dt>Contêiner</dt><dd>{s.lote.conteiner ?? "—"}</dd></div>
-                <div><dt>Modo</dt><dd>{MODO_NOME[s.modo]}</dd></div>
-                <div><dt>Peças</dt><dd>{s.pecas_cortadas ? `faltam ${faltam} de ${s.quantidade}` : s.quantidade}</dd></div>
-                <div><dt>Previsto</dt><dd>{s.peso_previsto_kg !== null ? `${kg(s.peso_previsto_kg)} kg` : "—"}</dd></div>
-                <div><dt>Prazo</dt><dd>{data(s.prazo)}</dd></div>
-                <div className="largo"><dt>Item / cliente</dt><dd>{s.item_descricao ?? "—"} · {s.cliente ?? "—"}</dd></div>
-              </dl>
-              {corta && (
-                <div className="cartao-acoes">
-                  <Link className="primario" to={`/fila-rj/${s.id}/corte`}>Registrar corte</Link>
-                  {s.situacao !== "MATERIAL_INSUFICIENTE" && <button className="secundario" onClick={() => setInsuf(s)}>Material insuficiente</button>}
-                </div>
+                <span className="cartao-linha-material">{material(s.lote)}</span>
+                <span>{pecas} peça(s)</span>
+                <span>prazo {data(s.prazo)}</span>
+                <span className="cartao-linha-etiquetas">
+                  <EtiquetaAtraso a={s.atraso} dias={s.dias_em_aberto} />
+                  {s.situacao !== "ENVIADA" && <EtiquetaSituacao s={s.situacao} />}
+                </span>
+                <span className="cartao-linha-seta" aria-hidden="true">{aberto ? "▴" : "▾"}</span>
+              </button>
+              {aberto && (
+                <>
+                  <p className="cartao-instrucao">{s.instrucao ?? `${s.quantidade} peça(s)`}</p>
+                  {s.instrucao_processo && <p className="etiqueta info" style={{ alignSelf: "flex-start" }}>{s.instrucao_processo}</p>}
+                  <dl className="dados">
+                    <div><dt>Material</dt><dd>{material(s.lote)}</dd></div>
+                    <div><dt>Contêiner</dt><dd>{s.lote.conteiner ?? "—"}</dd></div>
+                    <div><dt>Lote</dt><dd>{s.lote.codigo}</dd></div>
+                    <div><dt>Modo</dt><dd>{MODO_NOME[s.modo]}</dd></div>
+                    <div><dt>Peças</dt><dd>{pecas}</dd></div>
+                    <div><dt>Previsto</dt><dd>{s.peso_previsto_kg !== null ? `${kg(s.peso_previsto_kg)} kg` : "—"}</dd></div>
+                    <div><dt>Prazo</dt><dd>{data(s.prazo)}</dd></div>
+                    <div className="largo"><dt>Item / cliente</dt><dd>{s.item_descricao ?? "—"} · {s.cliente ?? "—"}</dd></div>
+                  </dl>
+                  {corta && (
+                    <div className="cartao-acoes">
+                      <Link className="primario" to={`/fila-rj/${s.id}/corte`}>Registrar corte</Link>
+                      {s.situacao !== "MATERIAL_INSUFICIENTE" && <button className="secundario" onClick={() => setInsuf(s)}>Material insuficiente</button>}
+                    </div>
+                  )}
+                </>
               )}
             </li>
           );
@@ -130,8 +167,7 @@ function JanelaInsuficiente({ s, aoFechar, aoGravar }: { s: SolicItem; aoFechar:
   return (
     <Janela titulo={`Material insuficiente · OP ${s.op}`} aoFechar={aoFechar}>
       <p className="desc">Itu é avisado e troca o lote ou cancela a solicitação.</p>
-      <label>O que aconteceu?<textarea autoFocus rows={3} value={t} onChange={(e) => setT(e.target.value)} placeholder="Ex.: barra do CH33K acabou, sobrou só 40 mm" />
-        <small className="dica">{falta > 0 ? `Faltam ${falta} caractere(s).` : "Ok."}</small></label>
+      <label>O que aconteceu?<textarea autoFocus rows={3} value={t} onChange={(e) => setT(e.target.value)} placeholder="Ex.: barra do CH33K acabou, sobrou só 40 mm" /></label>
       {erro && <p className="erro" role="alert">{erro}</p>}
       <div className="botoes">
         <button className="primario" disabled={falta > 0} onClick={() => void ok()}>Avisar Itu</button>

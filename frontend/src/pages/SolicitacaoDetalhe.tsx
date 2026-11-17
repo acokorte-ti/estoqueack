@@ -179,7 +179,7 @@ function JanelaTexto({ titulo, rotulo, minimo, botao, aviso, perigo = false, env
       <form onSubmit={(e) => void ok(e)} className="bloco-passo" style={{ gap: "var(--esp-4)" }}>
         {aviso && <p className="desc">{aviso}</p>}
         <label>{rotulo}<textarea autoFocus value={t} onChange={(e) => setT(e.target.value)} rows={3} />
-          <small className="dica">{falta > 0 ? `Faltam ${falta} caractere(s).` : "Ok."}</small></label>
+          {minimo > 1 && <small className="dica">{falta > 0 ? `Faltam ${falta} caractere(s).` : "Ok."}</small>}</label>
         {erro && <p className="erro" role="alert">{erro}</p>}
         <div className="botoes">
           <button className={perigo ? "perigo" : "primario"} disabled={falta > 0 || ocupado}>{botao}</button>

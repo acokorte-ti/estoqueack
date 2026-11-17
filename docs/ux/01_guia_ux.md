@@ -15,7 +15,7 @@ Operador de chão de fábrica (Marcelo no RJ, Fabiano e Matheus em Itu), muitas 
 4. **Mostrar o resultado antes de gravar.** Toda ação que mexe em saldo mostra a frase do que vai acontecer ("Lote L-000451 passa de 1.288,0 kg para 0 kg…") logo acima do botão principal, como a especificação pede em T13.
 5. **Validação em 3 cores, sempre igual** (componente `Ocorrencias`):
    - vermelho = bloqueia, botão principal desabilitado e a mensagem diz o que fazer;
-   - amarelo (palha) = caixa "Estou ciente" + campo de justificativa (mínimo 10 caracteres, contador visível); botão só libera quando todos os amarelos estão resolvidos;
+   - amarelo (palha) = caixa "Estou ciente" + campo de justificativa (sem mínimo de caracteres, só não pode ficar vazia; Eduardo, 2026-11-17); botão só libera quando todos os amarelos estão resolvidos;
    - cinza = só aviso.
 6. **Linguagem do chão, não do banco.** Nada de `SAIDA_CORTE_RJ` na tela: "Corte no RJ". Lote mostrado com contêiner e bitola junto ("L-000451 · CH25K · H13 70×610"). Números no formato brasileiro.
 7. **Sem surpresa de saída.** Formulário com dado digitado avisa antes de sair da tela. Assistente (T07) guarda o passo em que está.

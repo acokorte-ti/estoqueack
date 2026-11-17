@@ -167,8 +167,7 @@ function JanelaEncerrar({ peca, aoFechar, aoGravar }: { peca: PecaPesoReal; aoFe
     <Janela titulo="Encerrar pendência do peso real" aoFechar={aoFechar}>
       <p><strong>{textoPeca(peca)}</strong>{peca.lote ? ` · lote ${peca.lote}` : ""}</p>
       <p className="desc">Use só para peça que não vai mais ser cortada (ex.: OP cancelada). O estoque não muda; a justificativa fica na auditoria.</p>
-      <label>Justificativa<textarea autoFocus rows={3} value={just} onChange={(e) => setJust(e.target.value)} />
-        <small className="dica">{just.trim().length < JUSTIFICATIVA_MIN ? `Faltam ${JUSTIFICATIVA_MIN - just.trim().length} caractere(s).` : "Ok."}</small></label>
+      <label>Justificativa<textarea autoFocus rows={3} value={just} onChange={(e) => setJust(e.target.value)} /></label>
       {erro && <p className="erro" role="alert">{erro}</p>}
       <div className="botoes">
         <button className="perigo" disabled={just.trim().length < JUSTIFICATIVA_MIN} onClick={() => void ok()}>Encerrar pendência</button>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, data, kg, validacaoDoErro, type Ocorrencia } from "../api/cliente";
 import { useSessao } from "../api/sessao";
-import { EMITENTES, nfTexto, nomeEmitente, SA_ITEM, SITUACAO_COP, type Cop, type CortePronto } from "../api/cop";
+import { EMITENTES_LANCAMENTO, nfTexto, nomeEmitente, SA_ITEM, SITUACAO_COP, type Cop, type CortePronto } from "../api/cop";
 import { MODO_NOME } from "../api/solicitacao";
 import Janela, { fecharJanela } from "../components/Janela";
 import PainelValidacao, { JUSTIFICATIVA_MIN } from "../components/PainelValidacao";
@@ -243,15 +243,19 @@ function JanelaNf({ cop, itemIds, aoFechar, aoGravar }: { cop: Cop; itemIds: num
       <form onSubmit={(e) => void ok(e)} className="bloco-passo" style={{ gap: "var(--esp-4)" }}>
         <p className="desc">{itemIds.length ? "Vale só para os itens marcados; os outros ficam com a NF do COP." : "Vale para todos os itens do COP. Para algum item com NF diferente, marque-o na lista e use \"NF diferente para itens selecionados\"."}</p>
         <label>Nº da NF<input autoFocus value={f.numero} onChange={(e) => setF({ ...f, numero: e.target.value })} required /></label>
-        <fieldset className="formatos">
-          <legend>Emitente</legend>
-          {EMITENTES.map((x) => (
-            <label key={x.valor} className={f.emitente === x.valor ? "opcao marcada" : "opcao"}>
-              <input type="radio" name="emitente-cop" checked={f.emitente === x.valor} onChange={() => setF({ ...f, emitente: x.valor })} />
-              {x.nome}
-            </label>
-          ))}
-        </fieldset>
+        {EMITENTES_LANCAMENTO.length === 1 ? (
+          <p className="desc">Emitente: <strong>{EMITENTES_LANCAMENTO[0].nome}</strong></p>
+        ) : (
+          <fieldset className="formatos">
+            <legend>Emitente</legend>
+            {EMITENTES_LANCAMENTO.map((x) => (
+              <label key={x.valor} className={f.emitente === x.valor ? "opcao marcada" : "opcao"}>
+                <input type="radio" name="emitente-cop" checked={f.emitente === x.valor} onChange={() => setF({ ...f, emitente: x.valor })} />
+                {x.nome}
+              </label>
+            ))}
+          </fieldset>
+        )}
         <label>Data da NF (opcional)<input type="date" value={f.data} onChange={(e) => setF({ ...f, data: e.target.value })} /></label>
         {erro && <p className="erro" role="alert">{erro}</p>}
         <div className="botoes">
@@ -278,8 +282,7 @@ function JanelaReabrir({ cop, aoFechar, aoGravar }: { cop: Cop; aoFechar: () => 
   return (
     <Janela titulo={`Reabrir COP ${cop.numero}`} aoFechar={aoFechar}>
       <p className="desc">Só é possível se nenhum SA deste COP estiver confirmado. As linhas de SA ainda não confirmadas são apagadas e Itu deixa de vê-las.</p>
-      <label>Justificativa<textarea autoFocus rows={3} value={j} onChange={(e) => setJ(e.target.value)} />
-        <small className="dica">{falta > 0 ? `Faltam ${falta} caractere(s).` : "Ok."}</small></label>
+      <label>Justificativa<textarea autoFocus rows={3} value={j} onChange={(e) => setJ(e.target.value)} /></label>
       {erro && <p className="erro" role="alert">{erro}</p>}
       <div className="botoes">
         <button className="perigo" disabled={falta > 0} onClick={() => void ok()}>Reabrir COP</button>

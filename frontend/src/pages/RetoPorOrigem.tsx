@@ -25,7 +25,8 @@ export default function RetoPorOrigem({ soRj, estoqueInicial, aoVoltar }: { soRj
   const [erro, setErro] = useState("");
   const q = useMemo(() => ({
     estoque: soRj ? "RJ_NO_RIO" : f.estoque || undefined,
-    liga: f.liga.split(/[,\s]+/).filter(Boolean).map((x) => x.toUpperCase()),
+    // separa só por vírgula: "A8 MOD" é uma liga; a API filtra por "contém" (A8 traz A8 e A8 MOD)
+    liga: f.liga.split(",").map((x) => x.trim().toUpperCase()).filter(Boolean),
     bitola_origem: f.bitola.trim(), conteiner: f.conteiner.trim(), codigo_mega: f.codigo.trim(),
     com_saldo: f.saldo, incluir_sobras: f.sobras || undefined, criado_de: f.de, criado_ate: f.ate,
   }), [f, soRj]);

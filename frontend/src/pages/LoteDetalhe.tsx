@@ -275,8 +275,7 @@ function JanelaAjuste({ lote, aoFechar, aoGravar }: { lote: TLote; aoFechar: () 
       <p className="desc">Saldo no sistema: <strong>{kg(lote.saldo_kg)} kg</strong>. O ajuste vira um movimento de inventário com a sua justificativa e aparece no relatório de exceções.</p>
       <label>Saldo contado (kg)<input inputMode="decimal" className="campo-grande" autoFocus value={contado} onChange={(e) => { setContado(e.target.value); setV(null); }} /></label>
       {dif !== null && <p className={dif === 0 ? "desc" : "resultado-frase"}>Diferença: {dif > 0 ? "+" : ""}{kg(dif)} kg</p>}
-      <label>Justificativa<textarea rows={3} value={just} onChange={(e) => { setJust(e.target.value); setV(null); }} />
-        <small className="dica">{just.trim().length < JUSTIFICATIVA_MIN ? `Faltam ${JUSTIFICATIVA_MIN - just.trim().length} caractere(s).` : "Ok."}</small></label>
+      <label>Justificativa<textarea rows={3} value={just} onChange={(e) => { setJust(e.target.value); setV(null); }} /></label>
       {v?.resultado?.frase && <p className="frase-resultado">{v.resultado.frase}</p>}
       {v && <PainelValidacao ocorrencias={v.ocorrencias} confirmacoes={conf} aoMudar={setConf} semOcorrencias="Pode ajustar." />}
       {erro && <p className="erro" role="alert">{erro}</p>}
@@ -304,8 +303,7 @@ function JanelaEstorno({ mov, aoFechar, aoGravar }: { mov: Movimento; aoFechar: 
     <Janela titulo="Estornar movimento" aoFechar={aoFechar}>
       <p><strong>{mov.tipo_descricao}</strong> de {data(mov.data)}: {mov.kg > 0 ? "+" : ""}{kg(mov.kg)} kg{mov.op ? ` · OP ${mov.op}` : ""}.</p>
       <p className="desc">Nada é apagado: o sistema cria o movimento inverso, ligado a este. Corte do RJ só pode ser estornado antes de entrar em COP fechado.</p>
-      <label>Justificativa<textarea autoFocus rows={3} value={just} onChange={(e) => setJust(e.target.value)} />
-        <small className="dica">{just.trim().length < JUSTIFICATIVA_MIN ? `Faltam ${JUSTIFICATIVA_MIN - just.trim().length} caractere(s).` : "Ok."}</small></label>
+      <label>Justificativa<textarea autoFocus rows={3} value={just} onChange={(e) => setJust(e.target.value)} /></label>
       {erro && <p className="erro" role="alert">{erro}</p>}
       <div className="botoes">
         <button className="perigo" disabled={just.trim().length < JUSTIFICATIVA_MIN} onClick={() => void ok()}>Estornar</button>

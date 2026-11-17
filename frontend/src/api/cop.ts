@@ -36,6 +36,8 @@ export const EMITENTES = [
   { valor: "OUTRO", nome: "Outro" },
 ] as const;
 export const nomeEmitente = (v: string) => EMITENTES.find((e) => e.valor === v)?.nome ?? v;
+/** Opções ao lançar NF de transferência: só Fio Certo (Eduardo, 2026-11-17). O histórico mostra o emitente como veio. */
+export const EMITENTES_LANCAMENTO = EMITENTES.filter((e) => e.valor === "FIO_CERTO");
 /** "556 (FIO_CERTO)" → "556 · Fio Certo" */
 export const nfTexto = (s: string) => s.replace(/\((\w+)\)/, (_, e: string) => `· ${nomeEmitente(e)}`);
 

@@ -1,9 +1,10 @@
 # Estado — FUNCIONAL
 
-Atualizado: 2026-11-17 (R062 e observações do Eduardo ao fluxo, especificação v3.13)
+Atualizado: 2026-11-17 (T07 + T13 unificadas e ajustes do teste manual, especificação v3.14)
 
 ## No ar
 
+- **Especificação v3.14:** as 2 decisões de 17/11 da DECISOES. (1) T07 é a única porta de entrada; com lote de Itu continua no lançamento do corte (conteúdo da T13); T13 fora do menu, só pelos atalhos do T03 (peso real) e do T05 (botão novo "Registrar corte em Itu" no lote RJ em Itu) (§2, §4, §4.1, §4.2, T07, T13, §9). (2) Filtro de liga por "contém" (T04, RETO por origem, T08, T19), instrução de processo múltipla (T07), justificativa sem mínimo, não vazia (§9, T15), T09 com pesquisa e cartões que expandem, emitente só Fio Certo (§2.1, T11, T14). Nova **P38** (detalhes que são proposta). Sem pedido novo (a COORDENAÇÃO já acionou as frentes).
 - **Especificação v3.13:** observações do Eduardo de 17/11 (SA cadastrado no Mega pela **Amanda**, Fabiano só pede: §2, T14; peso real da peça inteira = consumo da OP, resto = estoque em Itu: §2.2, T13; **regra do RETO** por E × L com "Conferi a regra" e 3 parâmetros na T23: T13, T10, §9) e R062 respondido (§10.3, §10.9 A.1/A.7/B/E: 41 contêineres corrigidos dentro do aprovado, 1 com material diferente; CH35SH = H13 nas três planilhas; Planilha1 com SA). Novas **P35** (RETO), **P36** (quem informa o código do SA), **P37** (carga 17/11); P34(d) com evidência. Pedidos **R063** (TÉCNICO) e **R064** (FRONTEND).
 - **Especificação v3.12:** nomes novos do menu (aprovados pelo Eduardo em 17/11) no §4, matriz §4.1, títulos T03–T16 e fluxos do §2; códigos das telas mantidos. T17, T18 e T24 ficaram fora do menu aprovado.
 - **Especificação v3.11:** respostas de 17/11 (DECISOES 2026-11-17). SA da peça inteira **não é corrigido** (saem "Corrigir no Mega"/"Corrigido no Mega"); pendência do peso real com mais de 7 dias **bloqueia** "Enviar ao RJ" na T07 (`PESO_REAL_PENDENTE`, T23 `PENDENCIA_PESO_REAL_DIAS`); faixa da seção = maior valor (§1.4 item 7, R057 respondido); paridade manual (§1.4 item 8); novo §10.9 (correções antes da recarga + arquivo de correções). P32 respondida; **P33** (detalhes do bloqueio) e **P34** (escolhas da carga) abertas, devolvidas à COORDENAÇÃO para o arquivo único. Pedidos **R058** (TÉCNICO) e **R059** (FRONTEND).
@@ -22,13 +23,14 @@ Atualizado: 2026-11-17 (R062 e observações do Eduardo ao fluxo, especificaçã
 
 ## Próximo
 
-- Aplicar P33, P34, P35, P36 e P37 quando o Eduardo (e o Fabiano, P34 a/c) responder; aplicar a resposta do 1.2767 × 1.2746 RETO (PENDENCIAS 17/11) no §10.9 D.
+- Responder o R068 (leituras do TÉCNICO no R063/R065).
+- Aplicar P33, P34, P35, P36, P37 e P38 quando o Eduardo (e o Fabiano, P34 a/c) responder; aplicar a resposta do 1.2767 × 1.2746 RETO (PENDENCIAS 17/11) no §10.9 D.
 - Aplicar a P27 quando o Eduardo responder.
 - Depois da implantação: lista do BLOCO 2 (OPs mal digitadas, SEM OP, cortes sem peso, solicitações sem lote), contêiner digitado errado, comentário com várias OPs, corte dividido entre contêineres, "PESO INICIAL" (B05 a B08).
 
 ## Aguardando
 
-- **Eduardo:** P33, P34, P35, P36. **Marcelo:** P37(a). **Fabiano:** P37(b), P34(d) (10 discordantes), aviso da paridade do contêiner H13. **Fabiano:** 1.2767 × 1.2746 RETO (`carga/PENDENCIAS_USUARIOS_2026-11-17.txt`). (55322: resolvido, A8 MOD do RJ fica separado.) Avisar o Fabiano sobre o IPI do NCM 82089000 (se ainda não foi).
+- **Eduardo:** P33, P34, P35, P36, P38. **Marcelo:** P37(a). **Fabiano:** P37(b), P34(d) (10 discordantes), aviso da paridade do contêiner H13. **Fabiano:** 1.2767 × 1.2746 RETO (`carga/PENDENCIAS_USUARIOS_2026-11-17.txt`). (55322: resolvido, A8 MOD do RJ fica separado.) Avisar o Fabiano sobre o IPI do NCM 82089000 (se ainda não foi).
 - **TÉCNICO / FRONTEND:** R045, R046, R047, R049, R050, R051, R052, R054, R058, R059, R063, R064.
 
 ## Instruções permanentes desta frente

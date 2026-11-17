@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api, data, ErroApi, ESTOQUE_NOME, kg, num, qs, validacaoDoErro, type Validacao } from "../api/cliente";
 import PainelValidacao, { confirmacoesValidas, podeGravar, type Confirmacoes } from "../components/PainelValidacao";
 import { bloqueiaEm, linkPeca, textoPeca, usePesoReal, type ResumoPesoReal } from "../api/pesoReal";
+import LancamentoCorteItu, { CartaoLote } from "../components/LancamentoCorteItu";
 
 /* ------------------------------------------------------------------ tipos da API */
 
@@ -22,7 +23,7 @@ interface LoteCompativel {
   id: number; codigo: string; conteiner: string | null; liga: string; formato: string; bitola: string; descricao: string;
   estoque: string; tipo: string; saldo_kg: number; reservado_kg: number; disponivel_kg: number;
   peso_previsto_kg: number | null; peso_peca_kg: number | null; sobremetal_pct: number | null;
-  liga_equivalente?: boolean; substituido_por_id?: number | null;
+  liga_equivalente?: boolean; substituido_por_id?: number | null; codigo_mega?: number | null;
   indicadores?: { destinacao?: boolean; nota?: boolean; origem_nao_identificada?: boolean };
 }
 /** Sugestão por liga × bitola (contrato F1 §1, spec v3.5–v3.9 T07, §1.4). Tudo opcional: a API antiga não manda `grupos`. */
@@ -138,8 +139,8 @@ export default function NovaSolicitacao() {
     const q = num(itemItu.quantidade);
     return k && q ? Math.round(k * q * 10) / 10 : num(itemItu.kg_uso) ?? itemItu.lote.peso_previsto_kg;
   })();
-  const linkItu = itemItu ? `/corte-itu${qs({ op: op?.numero, lote_id: itemItu.lote.id, previsto: previstoItu ?? undefined,
-    pecas: num(itemItu.quantidade) ?? undefined, consumo_misto: misto ? 1 : undefined })}` : "";
+  // peça inteira do RJ aguardando peso real no lote de Itu escolhido: o corte resolve a pendência (spec v3.11 §2.2)
+  const pecaPendenteItu = itemItu ? pesoReal?.pecas.find((p) => (p.lote_id ? p.lote_id === itemItu.lote.id : !!op && p.op === op.numero)) ?? null : null;
 
   /* ---------- passo 1: OP ---------- */
   async function buscarOp(e: FormEvent) {
@@ -214,7 +215,7 @@ export default function NovaSolicitacao() {
     if (da) return da;
     return { id: gl.id, codigo: gl.codigo, conteiner: gl.conteiner, liga: gl.liga ?? g.liga, formato: g.formato, bitola: g.bitola,
       descricao: gl.descricao ?? "", estoque: gl.estoque, tipo: gl.tipo, saldo_kg: gl.saldo_kg, reservado_kg: gl.reservado_kg,
-      disponivel_kg: gl.disponivel_kg, peso_previsto_kg: g.peso_previsto_kg ?? null, peso_peca_kg: null, sobremetal_pct: g.sobremetal_pct ?? null,
+      disponivel_kg: gl.disponivel_kg, codigo_mega: gl.codigo_mega ?? null, peso_previsto_kg: g.peso_previsto_kg ?? null, peso_peca_kg: null, sobremetal_pct: g.sobremetal_pct ?? null,
       liga_equivalente: gl.liga_equivalente, indicadores: gl.indicadores };
   }
 
@@ -319,20 +320,19 @@ export default function NovaSolicitacao() {
               <li key={s.id}><Link to={`/solicitacoes/${s.id}`}><strong>{s.numero}</strong></Link>{s.lote ? `, lote ${s.lote.codigo}` : ""}</li>
             ))}
           </ul>
-          {misto && itemItu && (
-            <p className="validacao alerta">
-              OP com consumo misto: falta lançar a parte de Itu ({itemItu.lote.codigo}, {itemItu.quantidade} peça(s){previstoItu ? `, ${kg(previstoItu)} kg previstos` : ""}) em "Registrar corte em Itu".
-            </p>
-          )}
-          <div className="botoes">
-            {misto && itemItu ? (
-              <>
-                <Link className="primario" to={linkItu}>Registrar corte em Itu agora</Link>
-                <button className="secundario" onClick={recomecar}>Pedir outro corte</button>
-              </>
-            ) : <button className="primario" onClick={recomecar}>Pedir outro corte</button>}
-          </div>
+          {!(misto && itemItu && gravado.enviada) && <div className="botoes"><button className="primario" onClick={recomecar}>Pedir outro corte</button></div>}
         </div>
+        {misto && itemItu && gravado.enviada && (
+          <>
+            <h2 style={{ marginTop: "var(--esp-5)" }}>Agora o corte da parte de Itu</h2>
+            <CartaoLote lote={itemItu.lote} />
+            <LancamentoCorteItu op={op} megaFora={megaFora} lote={itemItu.lote} previsto={previstoItu} misto pecasInicial={itemItu.quantidade}
+              pecaPendente={pecaPendenteItu} aoRecomecar={recomecar} textoRecomecar="Pedir outro corte" />
+          </>
+        )}
+        {misto && itemItu && !gravado.enviada && (
+          <p className="validacao alerta">OP com consumo misto: a parte de Itu ({itemItu.lote.codigo}) é lançada depois de enviar a parte do RJ.</p>
+        )}
       </>
     );
   }
@@ -341,7 +341,7 @@ export default function NovaSolicitacao() {
     <>
       <header className="cabecalho">
         <h1>Pedir corte de material</h1>
-        <p>Digite a OP, escolha o lote e confira o corte antes de enviar ao RJ.</p>
+        <p>Digite a OP e escolha o lote. Lote do RJ vira pedido de corte ao RJ; lote que já está em Itu (Estoque Mega ou RJ em Itu) tem o corte lançado aqui mesmo.</p>
       </header>
 
       <ol className="passos" aria-label="Passos">
@@ -431,7 +431,7 @@ export default function NovaSolicitacao() {
               <p className="dica">
                 Material de {liga} que comporta {medida.formato === "RETANGULAR" ? `${medida.espessura} × ${medida.largura}` : `Ø ${medida.diametro}`} × {medida.comprimento} mm,
                 agrupado por liga × bitola exatas, com Itu e RJ lado a lado. Marque um ou mais lotes e diga quantos kg de cada.
-                Lotes do RJ formam a solicitação; o lote de Itu (um por vez) é lançado em "Registrar corte em Itu".
+                Lotes do RJ formam o pedido ao RJ; o lote de Itu (um por vez) tem o corte lançado no passo seguinte.
               </p>
               {grupos.map((g) => (
                 <QuadroGrupo key={g.chave ?? `${g.liga}-${g.formato}-${g.bitola}-${g.multiplo ?? ""}`} g={g}
@@ -498,23 +498,21 @@ export default function NovaSolicitacao() {
       {passo === 3 && (
         <div className="bloco-passo">
           {itu ? (
-            <div className="ficha">
-              <h2>Corte em Itu</h2>
-              <p>
-                O lote <strong>{itens[0].lote.codigo}</strong> ({itens[0].lote.liga} {itens[0].lote.bitola}) já está em Itu. Não se cria solicitação
-                nem reserva: o corte é lançado direto em "Registrar corte em Itu", com a OP, o lote e o peso previsto preenchidos.
-              </p>
-              <div className="botoes">
-                <Link className="primario" to={linkItu}>Registrar corte em Itu agora</Link>
-                <button className="secundario" onClick={() => setPasso(2)}>Voltar</button>
-              </div>
-            </div>
+            <>
+              <section className="painel-form" aria-label="Lote em Itu">
+                <h2>Corte em Itu</h2>
+                <p className="dica">O lote já está em Itu: não se cria pedido ao RJ nem reserva. Lance o corte com o peso da balança.</p>
+                <CartaoLote lote={itemItu!.lote} />
+              </section>
+              <LancamentoCorteItu op={op} megaFora={megaFora} lote={itemItu!.lote} previsto={previstoItu} pecasInicial={itemItu!.quantidade}
+                pecaPendente={pecaPendenteItu} voltar={() => setPasso(2)} aoRecomecar={recomecar} textoRecomecar="Pedir outro corte" />
+            </>
           ) : (
             <>
               {misto && itemItu && (
                 <section className="painel-form" aria-label="Parte de Itu">
                   <h2>Parte de Itu · {itemItu.lote.liga} {itemItu.lote.bitola} <span className="desc">({itemItu.lote.codigo}, {ESTOQUE_NOME[itemItu.lote.estoque] ?? itemItu.lote.estoque})</span></h2>
-                  <p className="dica">OP com consumo misto. Esta parte não entra na solicitação: depois de enviar a parte do RJ, o botão "Registrar corte em Itu agora" abre a tela de corte em Itu com a OP, o lote e o previsto.</p>
+                  <p className="dica">OP com consumo misto. Esta parte não entra no pedido ao RJ: depois de enviar a parte do RJ, o corte desta parte é lançado aqui mesmo.</p>
                   <div className="grade-form">
                     <label>
                       <span className="rotulo">Peças desta parte <span className="sugerido">sugerido</span></span>
@@ -557,7 +555,7 @@ export default function NovaSolicitacao() {
           {!!validacao.resultado?.efeitos?.length && <TabelaEfeitos efeitos={validacao.resultado.efeitos} />}
           {misto && itemItu && (
             <p className="validacao alerta">
-              OP com consumo misto: esta solicitação é a parte do RJ. A parte de Itu ({itemItu.lote.codigo}, {itemItu.quantidade} peça(s){previstoItu ? `, ${kg(previstoItu)} kg` : ""}) é lançada em "Registrar corte em Itu" depois de enviar.
+              OP com consumo misto: esta solicitação é a parte do RJ. A parte de Itu ({itemItu.lote.codigo}, {itemItu.quantidade} peça(s){previstoItu ? `, ${kg(previstoItu)} kg` : ""}) é lançada nesta mesma tela depois de enviar.
             </p>
           )}
           <PainelValidacao ocorrencias={validacao.ocorrencias} confirmacoes={conf} aoMudar={setConf} semOcorrencias="Tudo certo. Pode enviar ao RJ." />
@@ -584,7 +582,7 @@ function FaixaPesoReal({ r, bloqueioApi }: { r: ResumoPesoReal; bloqueioApi: str
   if (r.vencidas > 0 || bloqueioApi) {
     const ex = antiga ? ` (ex.: ${textoPeca(antiga)})` : "";
     const texto = r.vencidas > 0
-      ? `Há ${r.vencidas} peça(s) inteira(s) do RJ sem peso real há mais de ${r.limite} dias${ex}. Informe o peso real em Registrar corte em Itu para voltar a enviar solicitações.`
+      ? `Há ${r.vencidas} peça(s) inteira(s) do RJ sem peso real há mais de ${r.limite} dias${ex}. Informe o peso real para voltar a enviar solicitações.`
       : bloqueioApi!;
     return (
       <div className="faixa-bloqueio" role="alert">

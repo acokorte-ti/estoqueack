@@ -2,6 +2,10 @@
 
 Atualizado: 2026-11-17 (ajustes do teste manual)
 
+## 2026-11-17 "Pedir corte" como porta única (Eduardo)
+
+- **No ar:** T07 com lote de Itu (Estoque Mega ou RJ em Itu) continua no passo 3 com o lançamento do corte na mesma tela (componente `LancamentoCorteItu`, o mesmo da T13: consumo, sobra, regra do RETO + "Conferi a regra", perda, "Fazer no Mega"); consumo misto: depois de enviar a parte do RJ, a parte de Itu é lançada na mesma tela. "Registrar corte em Itu" saiu do menu; `/corte-itu` continua pelos atalhos (Painel/peso real, recebimento, "Usar em corte em Itu" no detalhe do lote RJ em Itu). Nenhuma mudança de API.
+
 ## 2026-11-17 Ajustes do teste manual (Eduardo)
 
 - **No ar:** (1) filtro de liga vai para a API, que filtra por "contém" (RETO por origem separa ligas só por vírgula: "A8 MOD" é uma liga); (2) T07 "Instrução de processo" com várias opções marcadas + texto livre, gravados juntos com "; " (Fila RJ e lista impressa já mostram); (3) `JUSTIFICATIVA_MIN` = 1, sem "faltam N caracteres" (painel e janelas de justificativa; cancelar solicitação segue com 3); (4) T09 pesquisa (OP, cliente, liga, bitola, contêiner, lote) e cartões compactos que abrem ao clicar (link do sino já abre); impressão igual; (5) NF de transferência (COP e T14) com emitente fixo "Fio Certo"; histórico mostra o que veio.

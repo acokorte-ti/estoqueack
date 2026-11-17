@@ -90,7 +90,10 @@ export default function LoteDetalhe() {
             {l.indicadores.origem_nao_identificada && <span className="etiqueta atencao">origem não identificada</span>}
           </p>
         </div>
-        {pode.solicitar && l.disponivel_kg > 0 && <Link className="primario" to="/solicitacoes/nova">Pedir corte de material</Link>}
+        <div className="botoes">
+          {pode.solicitar && l.estoque === "RJ_EM_ITU" && l.saldo_kg > 0 && <Link className="secundario" to={`/corte-itu?lote_id=${l.id}`}>Usar em corte em Itu</Link>}
+          {pode.solicitar && l.disponivel_kg > 0 && <Link className="primario" to="/solicitacoes/nova">Pedir corte de material</Link>}
+        </div>
       </header>
 
       {erro && <p className="erro" role="alert">{erro}</p>}

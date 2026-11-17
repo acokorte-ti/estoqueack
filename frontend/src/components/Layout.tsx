@@ -42,7 +42,7 @@ const GRUPOS: { titulo: string; itens: Item[] }[] = [
     titulo: "Itu",
     itens: [
       { para: "/recebimentos", rotulo: "Receber material do RJ", pronto: true, perfis: ACESSO.receberCop },
-      { para: "/corte-itu", rotulo: "Registrar corte em Itu", pronto: true, perfis: ACESSO.corteItu },
+      // "Registrar corte em Itu" saiu do menu (2026-11-17): o corte começa em "Pedir corte de material"; /corte-itu abre pelos atalhos
       { para: "/sa", rotulo: "Cadastro de SA (semiacabado)", pronto: true, perfis: ACESSO.sa },
     ],
   },

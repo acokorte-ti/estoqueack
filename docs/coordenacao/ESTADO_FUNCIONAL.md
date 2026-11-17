@@ -1,9 +1,10 @@
 # Estado — FUNCIONAL
 
-Atualizado: 2026-11-17 (respostas de 17/11, especificação v3.11)
+Atualizado: 2026-11-17 (respostas de 17/11 e nomes do menu, especificação v3.12)
 
 ## No ar
 
+- **Especificação v3.12:** nomes novos do menu (aprovados pelo Eduardo em 17/11) no §4, matriz §4.1, títulos T03–T16 e fluxos do §2; códigos das telas mantidos. T17, T18 e T24 ficaram fora do menu aprovado.
 - **Especificação v3.11:** respostas de 17/11 (DECISOES 2026-11-17). SA da peça inteira **não é corrigido** (saem "Corrigir no Mega"/"Corrigido no Mega"); pendência do peso real com mais de 7 dias **bloqueia** "Enviar ao RJ" na T07 (`PESO_REAL_PENDENTE`, T23 `PENDENCIA_PESO_REAL_DIAS`); faixa da seção = maior valor (§1.4 item 7, R057 respondido); paridade manual (§1.4 item 8); novo §10.9 (correções antes da recarga + arquivo de correções). P32 respondida; **P33** (detalhes do bloqueio) e **P34** (escolhas da carga) abertas, devolvidas à COORDENAÇÃO para o arquivo único. Pedidos **R058** (TÉCNICO) e **R059** (FRONTEND).
 - **Especificação v3.10:** P30 (pendência do Fabiano para o peso real; SA corrigido para o peso real com "Fazer no Mega" e situação "Corrigir no Mega"; previsto só na NF; sem SA complementar; sobra sem OP = nada na F1) e P31 (comprimento do HISTORICO só conta se Itu também tem comprimento). **P32** aberta (pendência não resolvida; quando o SA conta como corrigido), em `carga/perguntas_eduardo_2026-11-12c.txt`. Pedido **R054**. Exemplos com OPs e contêineres fictícios (6c7c043).
 - **Especificação v3.9:** P27 (peso pesado substitui o previsto na peça inteira do RJ, também acima de 8 %; B2 gera SA normal com dados do Fabiano) e P29 (comprimento do HISTORICO vale; faixa igual = mesma linha; CH39SH = 95199). **P30** aberta (SA complementar dos kg a mais; sobra RJ em Itu sem OP), em `carga/perguntas_eduardo_2026-11-12.txt`. Pedido **R052**. OP 100092 trocada por fictícia.

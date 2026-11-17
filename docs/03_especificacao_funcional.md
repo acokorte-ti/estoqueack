@@ -1,6 +1,6 @@
 # EstoqueACK — Especificação Funcional Completa
 
-Versão 3.11, 17/11/2026. A 3.11 registra as respostas de 2026-11-17 (Eduardo, PENDENCIAS 1–5; Fabiano e Marcelo, PENDENCIAS 6–19): na peça inteira do RJ o **SA não é corrigido no Mega** (o código de SA é sempre o mesmo e o SA fica com o previsto; saem a situação "Corrigir no Mega", a instrução de correção e o "Corrigido no Mega"); fica só a **pendência do Fabiano "Informar o peso real"**, que ajusta o peso baixado do estoque, e pendência com **mais de 7 dias bloqueia novas solicitações** (§2.2, T03, T07, T13, T14, §6, §9, T23; detalhes de quem e como: [proposta, P33]); **faixa de medida da seção = maior valor**, com a faixa anotada no lote (§1.4 item 7, fecha o R057 item 1); **correções antes da recarga** (novo §10.9: contêiner do Controle de Corte pelo da ESTOQUE 2026/SA, corte dividido, peso inicial = entrada do packing list, "não usar para guilhotinas" no item, OPs inexistentes como consumo sem OP, Planilha1 fora); **arquivo de correções** com o tipo novo **"paridade manual"** e as 3 exceções conferidas pelo Fabiano; A8 MOD vale como na ESTOQUE 2026; ligas pelo HISTORICO; "45 C" = 1.2767, "1271 STEEL" = 1.2721 (§1.4, §10.9); P32 respondida, novas perguntas **P33** e **P34**. A 3.10 registra as respostas do Eduardo à **P30** e à **P31** (2026-11-12): na peça inteira vinda do RJ, depois do corte em Itu fica uma **pendência do Fabiano para informar o peso real**; o estoque usa o peso real e o **SA é corrigido** para esse peso ("Fazer no Mega" de correção, conferido na sincronização); o **previsto fica só na NF**, sem NF complementar; sai a proposta de "SA complementar" (§2.2, T03, T13, T14); sobra RJ em Itu **sem OP: nada na F1** (sai o botão "Transferir para o Estoque Mega", §2.2b); comprimento vindo só do HISTORICO **só conta se a linha de Itu também tem comprimento**, e vários comprimentos no HISTORICO são ignorados (§1.4, §10.1); nova pergunta **P32** (pendência não resolvida e conferência do SA corrigido). A 3.9 registra as respostas do Eduardo à **P27** e à **P29** (2026-11-11): na peça inteira vinda do RJ, o **peso pesado em Itu substitui o previsto** (também acima de 8 %, com justificativa) e o lote RJ em Itu fica com o que sobra de fato (muda a P26(2b); §2.2, T13, T14); os kg a mais vão ao Mega por **SA complementar** [proposta, P30(1)]; sobra/RETO RJ em Itu cortado para outra OP ou novo corte para a mesma OP gera SA normal (B2, com os dados do Fabiano); transferência fiscal de sobra RJ em Itu **antes de existir OP** [proposta, P30(2)]; comprimento do HISTORICO vale quando a ESTOQUE 2026 não traz, e faixa igual = mesma linha (P29): **CH95XE = 95199**, mesma linha (§1.4, §10.8); exemplo de OP real do §2.2 trocado por fictício; nova pergunta **P30**. A 3.8 registra as respostas do Eduardo à **P28** (2026-11-11), que fecham a identidade do material no §1.4: ligas **MOD são diferentes** (A8 MOD ≠ A8, CR8MOD ≠ CR8), mas **1.2344 = H13 e 1.2379 = D2** contam como a mesma liga e ficam na mesma linha (P18 atualizada); **comprimento informado e múltiplo diferenciam o material** (D2 Ø90 ≠ D2 Ø90X2425); escrita da medida normalizada; recarga do zero com o relatório de paridade conferido antes (T04, T07, §10.1, §10.2, §10.7, §10.8, §11, §12); o D2 Ø90 do CH95XE, sem comprimento na ESTOQUE 2026, **não** fica na linha do 95199 RED 90X2425; nova pergunta **P29** (comprimento que só aparece no HISTORICO e faixa de comprimento). A 3.7 registra a mudança de regra do Eduardo e do Fabiano (B04, 2026-11-11): a paridade RJ × Itu passa a ser por **liga + bitola exatamente iguais** (novo §1.4); o material do RJ (no Rio e em Itu) **não recebe código do Mega na carga** e só ganha código pelo cadastro de SA; Itu e RJ ficam na **mesma linha liga × bitola** na T04 e na sugestão da T07; os 7 pares do B04 não se juntam; a P19, a ligação material RJ → código Mega (§10.2, §10.7 itens 1, 5 e 6) e o "CH95XE = 95199" (§10.8) ficam **substituídos**; T13, T14, T15, T16, §2.2b, §10.1, §11 e T22 dizem o que muda; propostas da **P28** (ligas equivalentes, comprimento, escrita da medida, recarga do zero com relatório de paridade) marcadas "[proposta, P28]"; exemplo de OP real do §2.2 trocado por fictício. A 3.6 registra as respostas do Eduardo à P26 (2026-11-11): consumo misto Itu + RJ na mesma OP pela **opção A, na F1** (T07); peça inteira do RJ **sem SA complementar** do excesso, SA e NF ficam com o peso previsto (§2.2, T13); justificativa de sobremetal acima de 20 % mantida na peça inteira; redondo inteiro do RJ com a mesma lógica (Ø da barra, comprimento + 5 mm, até 8 %); aviso `BARRA_MAIS_LEVE_QUE_PECA` confirmado, só aviso (P26(2a)); nova pergunta P27 (se a regra vale também para o B2). A 3.5 registra as respostas do Eduardo, do Matheus e do Fabiano à auditoria (arquivo `carga/respostas.docx`): P19 a P25 confirmadas (o §9.1 deixa de ser "a confirmar"; CR8MOD é liga distinta); **P22(a) reescrita** (peso previsto do material que vem inteiro do RJ, oscilação de até 8 %, §2.2, T13, §9); P22(b) (um código de SA por item, vale o mais recente); a sugestão de lote da T07 passa a ser **liga × bitola em kg, mostrando Itu e RJ lado a lado** (consumo nos dois na mesma OP, P26 em aberto); carga: redondo exige RED ou Ø, D6 97X2660 e 101X2260 são chapas, D2 36X510 do DC53 RETO foi corrigido na planilha, RETO do RJ em Itu não se liga a lote de origem por candidato único (§10.7, §10.8). A 3.4 registra a correção da auditoria de 06/11: T15 mínima e consulta "RETO por origem" entram na F1 (§4.2, T04, T15), a carga passa a quebrar o RETO do RJ em Itu por bitola de origem e a ler redondo com comprimento como redondo (§10.8), a T25 é linha de comando (não é tela), regras que só estavam no código ficam registradas como "a confirmar" (§9.1) e perguntas P19 a P25 (§12). A 3.3 registra as respostas do Fabiano ao BLOCO 1 da carga (§10.7: paridade sem múltiplo, material só do RJ sem código, kardex de 2 anos para códigos fora do catálogo). A 3.2 registra as decisões do Eduardo de 04/11 (T16 mínima e impressão da Fila RJ na F1; depois da implantação, planilhas só para conferência semanal, §10.6; sem data de implantação), as colunas da lista de corte impressa (R037), as interpretações da carga (R032, §10.7) e o R024 completo (perda de corte normal: até 6 % do material usado). A 3.1 registra as leituras do Mega confirmadas no R026 (situação da OP, SA pela estrutura da OP, confirmação do SA, NCM/IPI). A v3 incorpora as **respostas do Eduardo às perguntas P01–P18** (arquivo "Questões IA.xlsx", 2026-11-03) e as respostas do FUNCIONAL aos pedidos R003–R009, R014 e R017. A v2 tinha incorporado a conferência com as planilhas (`04_conferencia_planilhas_x_fluxo.md`) e as regras do Matheus. **Sem data fixa de implantação [P08]:** o sistema entra quando os critérios de go/no-go forem atendidos e o Eduardo liberar. Este documento descreve o sistema **como se ele já estivesse funcionando**: o que cada tela faz, quais botões existem, de onde vem cada informação e o que acontece no banco de dados a cada ação. Ele complementa `02_proposta_arquitetura.md`, que trata da parte técnica.
+Versão 3.12, 17/11/2026. A 3.12 troca os **nomes do menu** pelos aprovados pelo Eduardo em 2026-11-17 (§4, matriz §4.1, títulos das telas e fluxos do §2), mantendo o código de cada tela (T07 etc.). A 3.11 registra as respostas de 2026-11-17 (Eduardo, PENDENCIAS 1–5; Fabiano e Marcelo, PENDENCIAS 6–19): na peça inteira do RJ o **SA não é corrigido no Mega** (o código de SA é sempre o mesmo e o SA fica com o previsto; saem a situação "Corrigir no Mega", a instrução de correção e o "Corrigido no Mega"); fica só a **pendência do Fabiano "Informar o peso real"**, que ajusta o peso baixado do estoque, e pendência com **mais de 7 dias bloqueia novas solicitações** (§2.2, T03, T07, T13, T14, §6, §9, T23; detalhes de quem e como: [proposta, P33]); **faixa de medida da seção = maior valor**, com a faixa anotada no lote (§1.4 item 7, fecha o R057 item 1); **correções antes da recarga** (novo §10.9: contêiner do Controle de Corte pelo da ESTOQUE 2026/SA, corte dividido, peso inicial = entrada do packing list, "não usar para guilhotinas" no item, OPs inexistentes como consumo sem OP, Planilha1 fora); **arquivo de correções** com o tipo novo **"paridade manual"** e as 3 exceções conferidas pelo Fabiano; A8 MOD vale como na ESTOQUE 2026; ligas pelo HISTORICO; "45 C" = 1.2767, "1271 STEEL" = 1.2721 (§1.4, §10.9); P32 respondida, novas perguntas **P33** e **P34**. A 3.10 registra as respostas do Eduardo à **P30** e à **P31** (2026-11-12): na peça inteira vinda do RJ, depois do corte em Itu fica uma **pendência do Fabiano para informar o peso real**; o estoque usa o peso real e o **SA é corrigido** para esse peso ("Fazer no Mega" de correção, conferido na sincronização); o **previsto fica só na NF**, sem NF complementar; sai a proposta de "SA complementar" (§2.2, T03, T13, T14); sobra RJ em Itu **sem OP: nada na F1** (sai o botão "Transferir para o Estoque Mega", §2.2b); comprimento vindo só do HISTORICO **só conta se a linha de Itu também tem comprimento**, e vários comprimentos no HISTORICO são ignorados (§1.4, §10.1); nova pergunta **P32** (pendência não resolvida e conferência do SA corrigido). A 3.9 registra as respostas do Eduardo à **P27** e à **P29** (2026-11-11): na peça inteira vinda do RJ, o **peso pesado em Itu substitui o previsto** (também acima de 8 %, com justificativa) e o lote RJ em Itu fica com o que sobra de fato (muda a P26(2b); §2.2, T13, T14); os kg a mais vão ao Mega por **SA complementar** [proposta, P30(1)]; sobra/RETO RJ em Itu cortado para outra OP ou novo corte para a mesma OP gera SA normal (B2, com os dados do Fabiano); transferência fiscal de sobra RJ em Itu **antes de existir OP** [proposta, P30(2)]; comprimento do HISTORICO vale quando a ESTOQUE 2026 não traz, e faixa igual = mesma linha (P29): **CH95XE = 95199**, mesma linha (§1.4, §10.8); exemplo de OP real do §2.2 trocado por fictício; nova pergunta **P30**. A 3.8 registra as respostas do Eduardo à **P28** (2026-11-11), que fecham a identidade do material no §1.4: ligas **MOD são diferentes** (A8 MOD ≠ A8, CR8MOD ≠ CR8), mas **1.2344 = H13 e 1.2379 = D2** contam como a mesma liga e ficam na mesma linha (P18 atualizada); **comprimento informado e múltiplo diferenciam o material** (D2 Ø90 ≠ D2 Ø90X2425); escrita da medida normalizada; recarga do zero com o relatório de paridade conferido antes (T04, T07, §10.1, §10.2, §10.7, §10.8, §11, §12); o D2 Ø90 do CH95XE, sem comprimento na ESTOQUE 2026, **não** fica na linha do 95199 RED 90X2425; nova pergunta **P29** (comprimento que só aparece no HISTORICO e faixa de comprimento). A 3.7 registra a mudança de regra do Eduardo e do Fabiano (B04, 2026-11-11): a paridade RJ × Itu passa a ser por **liga + bitola exatamente iguais** (novo §1.4); o material do RJ (no Rio e em Itu) **não recebe código do Mega na carga** e só ganha código pelo cadastro de SA; Itu e RJ ficam na **mesma linha liga × bitola** na T04 e na sugestão da T07; os 7 pares do B04 não se juntam; a P19, a ligação material RJ → código Mega (§10.2, §10.7 itens 1, 5 e 6) e o "CH95XE = 95199" (§10.8) ficam **substituídos**; T13, T14, T15, T16, §2.2b, §10.1, §11 e T22 dizem o que muda; propostas da **P28** (ligas equivalentes, comprimento, escrita da medida, recarga do zero com relatório de paridade) marcadas "[proposta, P28]"; exemplo de OP real do §2.2 trocado por fictício. A 3.6 registra as respostas do Eduardo à P26 (2026-11-11): consumo misto Itu + RJ na mesma OP pela **opção A, na F1** (T07); peça inteira do RJ **sem SA complementar** do excesso, SA e NF ficam com o peso previsto (§2.2, T13); justificativa de sobremetal acima de 20 % mantida na peça inteira; redondo inteiro do RJ com a mesma lógica (Ø da barra, comprimento + 5 mm, até 8 %); aviso `BARRA_MAIS_LEVE_QUE_PECA` confirmado, só aviso (P26(2a)); nova pergunta P27 (se a regra vale também para o B2). A 3.5 registra as respostas do Eduardo, do Matheus e do Fabiano à auditoria (arquivo `carga/respostas.docx`): P19 a P25 confirmadas (o §9.1 deixa de ser "a confirmar"; CR8MOD é liga distinta); **P22(a) reescrita** (peso previsto do material que vem inteiro do RJ, oscilação de até 8 %, §2.2, T13, §9); P22(b) (um código de SA por item, vale o mais recente); a sugestão de lote da T07 passa a ser **liga × bitola em kg, mostrando Itu e RJ lado a lado** (consumo nos dois na mesma OP, P26 em aberto); carga: redondo exige RED ou Ø, D6 97X2660 e 101X2260 são chapas, D2 36X510 do DC53 RETO foi corrigido na planilha, RETO do RJ em Itu não se liga a lote de origem por candidato único (§10.7, §10.8). A 3.4 registra a correção da auditoria de 06/11: T15 mínima e consulta "RETO por origem" entram na F1 (§4.2, T04, T15), a carga passa a quebrar o RETO do RJ em Itu por bitola de origem e a ler redondo com comprimento como redondo (§10.8), a T25 é linha de comando (não é tela), regras que só estavam no código ficam registradas como "a confirmar" (§9.1) e perguntas P19 a P25 (§12). A 3.3 registra as respostas do Fabiano ao BLOCO 1 da carga (§10.7: paridade sem múltiplo, material só do RJ sem código, kardex de 2 anos para códigos fora do catálogo). A 3.2 registra as decisões do Eduardo de 04/11 (T16 mínima e impressão da Fila RJ na F1; depois da implantação, planilhas só para conferência semanal, §10.6; sem data de implantação), as colunas da lista de corte impressa (R037), as interpretações da carga (R032, §10.7) e o R024 completo (perda de corte normal: até 6 % do material usado). A 3.1 registra as leituras do Mega confirmadas no R026 (situação da OP, SA pela estrutura da OP, confirmação do SA, NCM/IPI). A v3 incorpora as **respostas do Eduardo às perguntas P01–P18** (arquivo "Questões IA.xlsx", 2026-11-03) e as respostas do FUNCIONAL aos pedidos R003–R009, R014 e R017. A v2 tinha incorporado a conferência com as planilhas (`04_conferencia_planilhas_x_fluxo.md`) e as regras do Matheus. **Sem data fixa de implantação [P08]:** o sistema entra quando os critérios de go/no-go forem atendidos e o Eduardo liberar. Este documento descreve o sistema **como se ele já estivesse funcionando**: o que cada tela faz, quais botões existem, de onde vem cada informação e o que acontece no banco de dados a cada ação. Ele complementa `02_proposta_arquitetura.md`, que trata da parte técnica.
 
 As decisões estão marcadas como **[P01]**, **[P02]** etc. e reunidas no fim (§12), já com a resposta.
 
@@ -77,17 +77,17 @@ O sistema tem cinco caminhos principais. Todos terminam com o material baixado n
 ```mermaid
 flowchart TD
     subgraph RJ["Barra Mansa (Marcelo)"]
-        E1[T06 Entrada por NF<br/>cria lote RJ/RJ] 
-        F1[T09 Fila RJ]
+        E1[T06 Registrar entrada<br/>de material no RJ (NF)<br/>cria lote RJ/RJ] 
+        F1[T09 Cortes a fazer no RJ]
         C1[T10 Registrar corte<br/>peso real]
         C2[T10 Separar peça inteira<br/>peso da barra]
         NF[NF de transferência<br/>emitida com o código do SA]
-        P1[T11 Montar e fechar COP<br/>lista do que vai]
+        P1[T11 Montar envio para Itu (COP)<br/>lista do que vai]
     end
     subgraph ITU["Itu (Fabiano / Matheus)"]
-        S1[T07 Nova solicitação<br/>OP + lote + modo]
-        R1[T12 Receber COP]
-        K1[T13 Corte em Itu<br/>consumo + sobra / RETO]
+        S1[T07 Pedir corte de material<br/>OP + lote + modo]
+        R1[T12 Receber material do RJ]
+        K1[T13 Registrar corte em Itu<br/>consumo + sobra / RETO]
         SA[T14 Preparar SA]
         MG[(Mega: cadastro/<br/>carga de saldo SA<br/>e baixa na OP)]
         CF[T14 SA confirmado<br/>leitura no Mega]
@@ -109,12 +109,12 @@ flowchart TD
 
 Exemplo real: OP 90014, H13 33×105, CH94XD.
 
-1. **Fabiano** abre *Nova solicitação* (T07) e digita a OP. O sistema busca no Mega o item, o cliente e a medida acabada. Fabiano escolhe o lote H13 33×105 / CH94XD e o modo **Cortar no RJ**. Ele informa quantidade, comprimento de corte e prazo. O sistema calcula o peso previsto e valida o sobremetal (§9). A solicitação fica **Enviada ao RJ**.
-2. **Marcelo** vê a solicitação na *Fila RJ* (T09), corta e abre *Registrar corte* (T10). Ali informa peças cortadas e **peso real de balança**. Se precisou usar **outro lote ou dividir entre dois lotes**, ele informa isso ali (T10, "Usar outro lote / dividir"). O sistema valida a regra dos 5 % e **baixa o peso real do lote** (movimento `SAIDA_CORTE_RJ`). A solicitação fica **Cortada**.
+1. **Fabiano** abre *Pedir corte de material* (T07) e digita a OP. O sistema busca no Mega o item, o cliente e a medida acabada. Fabiano escolhe o lote H13 33×105 / CH94XD e o modo **Cortar no RJ**. Ele informa quantidade, comprimento de corte e prazo. O sistema calcula o peso previsto e valida o sobremetal (§9). A solicitação fica **Enviada ao RJ**.
+2. **Marcelo** vê a solicitação em *Cortes a fazer no RJ* (T09), corta e abre *Registrar corte* (T10). Ali informa peças cortadas e **peso real de balança**. Se precisou usar **outro lote ou dividir entre dois lotes**, ele informa isso ali (T10, "Usar outro lote / dividir"). O sistema valida a regra dos 5 % e **baixa o peso real do lote** (movimento `SAIDA_CORTE_RJ`). A solicitação fica **Cortada**.
 3. **Marcelo** abre *COP* (T11), inclui os cortes prontos e **fecha o COP** nº 600 (a lista do que vai no caminhão, com peças e pesos). Os itens entram na **fila de SA** do Fabiano. A solicitação fica **Em COP**.
 4. **Fabiano** abre *SA* (T14). O sistema já montou o pedido de SA de cada item do COP fechado, com material, dimensão, origem, quantidade e peso real. Se a peça acabada (item da OP) já teve SA, o sistema usa o mesmo código, seja qual for a bitola ou a MP. Só uma peça acabada que nunca teve SA exige cadastro novo (ver T14). Fabiano faz o cadastro ou a carga de saldo no Mega, como hoje, e informa o código do SA. O sistema confirma lendo o Mega. A solicitação fica **SA pronto**. Hoje isso acontece, em mediana, 1 dia antes do envio.
 5. **RJ (Fio Certo / Médio Vale)** emite a **NF de transferência** com os SAs. Quando todos os itens do COP têm SA, **Marcelo** informa a NF (normalmente uma por COP; pode variar por item) e clica **"Enviar"**. Todas as solicitações do COP ficam **Em trânsito**.
-6. **Fabiano** abre *Receber COP* (T12), confere item a item e confirma. A solicitação fica **Concluída**.
+6. **Fabiano** abre *Receber material do RJ* (T12), confere item a item e confirma. A solicitação fica **Concluída**.
 
 ### 2.2 Caminho B: material RJ, peça inteira trazida para Itu
 
@@ -125,7 +125,7 @@ Exemplo fictício: OP 90010, H13 70×610, contêiner CH92XB. A peça prevista pe
 3. **Marcelo** inclui a barra no COP (T11) e fecha o COP. A linha entra na fila de SA com o **peso previsto** (837 kg), porque a peça ainda não foi pesada.
 4. **Fabiano** faz o SA (T14) com o peso previsto. O RJ emite a NF de transferência (que leva o peso do SA, 837 kg) e o Marcelo envia o COP.
 5. **Fabiano** recebe o COP (T12). O sistema cria automaticamente um **lote RJ em Itu** de 1.288 kg, filho do lote original (mesmo contêiner, liga e bitola). Fiscalmente, 837 kg já foram para Itu pelo SA; o resto (451 kg) fica, por enquanto, **fiscal RJ, físico Itu**.
-6. **Fabiano** corta em Itu e lança em *Corte em Itu* (T13): consumo da OP (peças pesadas), sobra pesada e se a sobra **ainda está na bitola** 70×610. Exemplo: consumo **880 kg**, sobra 403 kg e perda de corte de 5 kg.
+6. **Fabiano** corta em Itu e lança em *Registrar corte em Itu* (T13): consumo da OP (peças pesadas), sobra pesada e se a sobra **ainda está na bitola** 70×610. Exemplo: consumo **880 kg**, sobra 403 kg e perda de corte de 5 kg.
    - **O peso pesado substitui o previsto (Eduardo, 2026-11-11, P27; muda a P26(2b)):** o consumo da OP passa a ser **880 kg** (não 837). Vale também **acima de 8 %**: nesse caso o sistema aponta `EXCESSO_TOLERANCIA` e **pede justificativa** (ex.: "Peso maior por desvio de serra, aumentou o sobremetal no comprimento"), mas o peso pesado continua sendo o que vale.
    - **O lote RJ em Itu fica com o que sobra de fato:** 1.288 − 880 = 408 kg, que no exemplo são 403 kg de sobra pesada e 5 kg de perda de corte. O estoque usa o peso real: 880 kg consumidos na OP e 408 kg no lote RJ em Itu.
    - **Se a sobra ainda está na bitola**, ela fica no lote RJ em Itu. **Se não está**, o sistema cria um **lote RETO** (RJ em Itu), filho do lote 70×610 / CH92XB.
@@ -150,7 +150,7 @@ Exemplo fictício: OP 90010, H13 70×610, contêiner CH92XB. A peça prevista pe
 
 Nas planilhas, é **45 % de todos os SAs** desde maio/2025 (649 de 1.438), e esse caminho não passa pelo Controle de Corte. Exemplo: em 2025-05-08, dezenas de OPs com H13 28×610 / CH93XC, de 7 a 300 kg cada, NFs 556–558.
 
-1. **Fabiano** lança em *Corte em Itu* (T13): OP, lote RJ em Itu (ou RETO RJ em Itu), consumo, sobra e se a sobra mantém a bitola.
+1. **Fabiano** lança em *Registrar corte em Itu* (T13): OP, lote RJ em Itu (ou RETO RJ em Itu), consumo, sobra e se a sobra mantém a bitola.
 2. Como o lote é **fiscal RJ**, o sistema cria automaticamente a linha na **fila de SA** (T14), com o consumo pesado, o material, a bitola (ou "RETO") e o contêiner de origem.
 3. **Fabiano** faz o SA no Mega e informa o código. O **RJ emite a NF de transferência só fiscal** (o material não viaja), e o Fabiano informa o nº da NF no SA (várias linhas de SA podem usar a mesma NF).
 4. A baixa na OP é feita no Mega com o código do SA, como hoje. O lote RJ em Itu **não tem código do Mega** (§1.4): a única ligação desse material com o Mega é o código do SA (v3.7).
@@ -161,8 +161,8 @@ Nas planilhas, é **45 % de todos os SAs** desde maio/2025 (649 de 1.438), e ess
 
 ### 2.3 Caminho C: material Mega (fiscal e físico em Itu)
 
-1. **Entrada:** a NF é lançada no Mega, como hoje. Na sincronização, o sistema detecta saldo novo no código Mega e cria uma pendência em *Entradas Mega a classificar* (T15, **versão mínima na F1**, decisão de 06/11). Fabiano informa o contêiner e escolhe **"Criar lote"** (o sistema cria o lote ITU/ITU **[P01]**) ou **"Não é entrada"** (com justificativa). Sem isso, a primeira NF de MP lançada no Mega depois da implantação deixaria o sistema diferente do Mega, e a única saída seria ajuste manual. A diferença que sobra aparece na T16 mínima.
-2. **Uso:** Fabiano lança em *Corte em Itu* (T13): OP, lote, consumo e sobra, dentro ou fora da bitola. O sistema baixa o lote e, se for o caso, cria o lote RETO com a origem.
+1. **Entrada:** a NF é lançada no Mega, como hoje. Na sincronização, o sistema detecta saldo novo no código Mega e cria uma pendência em *Entradas do Mega sem lote* (T15, **versão mínima na F1**, decisão de 06/11). Fabiano informa o contêiner e escolhe **"Criar lote"** (o sistema cria o lote ITU/ITU **[P01]**) ou **"Não é entrada"** (com justificativa). Sem isso, a primeira NF de MP lançada no Mega depois da implantação deixaria o sistema diferente do Mega, e a única saída seria ajuste manual. A diferença que sobra aparece na T16 mínima.
+2. **Uso:** Fabiano lança em *Registrar corte em Itu* (T13): OP, lote, consumo e sobra, dentro ou fora da bitola. O sistema baixa o lote e, se for o caso, cria o lote RETO com a origem.
 3. **ERP:** a baixa na OP e a transferência de saldo do código original para o código RETO continuam sendo feitas **no Mega**. O sistema mostra a instrução pronta, por exemplo: "Baixar 104,5 kg do código 78290 na OP 90012. Transferir 12,0 kg do código 78290 para o código 1698 (H13 RETO)". Depois, a *Conciliação* (T16) confere se o Mega bate.
 
 ### 2.4 Caminho D: entrada de material novo no RJ
@@ -230,34 +230,35 @@ Nasce em dois momentos: **COP fechado** pelo RJ (uma linha por item do COP, incl
 
 ## 4. Navegação
 
+**Nomes do menu aprovados pelo Eduardo em 2026-11-17** (pedido da COORDENAÇÃO; aplicados pelo FRONTEND). O código da tela (T07 etc.) não muda; nomes antigos que ainda aparecem no texto ("Fila RJ", "Receber COP", "Corte em Itu", "Conciliação") são a mesma tela.
+
 ```
 Menu lateral (aparece conforme o perfil)
-├── Painel                                (todos)
+├── Painel de pendências (T03)                          (todos)
 ├── Estoque
-│   ├── Consulta de estoque               (todos; abas: por lote, agrupado por liga × bitola, RETO por origem)
-│   └── Detalhe do lote                   (todos, abre a partir da consulta)
-├── Barra Mansa
-│   ├── Entrada por NF                    (Operação RJ)
-│   ├── Fila RJ / Registrar corte         (Operação RJ; Estoque Itu só consulta)
-│   └── COP                               (Operação RJ; Estoque Itu consulta e recebe)
+│   ├── Consultar estoque (T04)                         (todos; abas: por lote, agrupado por liga × bitola, RETO por origem)
+│   ├── Registrar entrada de material no RJ (NF) (T06)  (Operação RJ)
+│   ├── Entradas do Mega sem lote (T15)                 (Estoque Itu)
+│   └── Conferir estoque com o Mega (T16)               (Estoque Itu, Análise)
+├── Pedidos de corte
+│   ├── Pedir corte de material (T07)                   (Estoque Itu)
+│   └── Acompanhar pedidos de corte (T08)               (Estoque Itu; Operação RJ e Análise consultam)
+├── Rio de Janeiro
+│   ├── Cortes a fazer no RJ (T09)                      (Operação RJ; Estoque Itu só consulta)
+│   └── Montar envio para Itu (COP) (T11)               (Operação RJ; Estoque Itu consulta e recebe)
 ├── Itu
-│   ├── Solicitações de corte             (Estoque Itu)
-│   ├── Receber COP                       (Estoque Itu)
-│   ├── Corte em Itu (consumo/sobra/RETO) (Estoque Itu)
-│   ├── SA                                (Estoque Itu)
-│   └── Entradas Mega a classificar       (Estoque Itu)
-├── Controle
-│   ├── Conciliação com o Mega            (Estoque Itu, Análise)
-│   ├── Reservas e restrições             (Estoque Itu, Análise)
-│   ├── Ajuste de inventário / estorno    (Estoque Itu, com justificativa)
-│   └── Relatórios                        (todos)
-├── Calculadora de peso                   (todos)
-└── Administração                         (Admin)
-    ├── Usuários
-    ├── Catálogo: ligas, densidades, itens de MP
-    ├── Parâmetros (tolerâncias, prazos)
-    └── Auditoria
+│   ├── Receber material do RJ (T12)                    (Estoque Itu)
+│   ├── Registrar corte em Itu (T13)                    (Estoque Itu)
+│   └── Cadastro de SA (semiacabado) (T14)              (Estoque Itu)
+├── Ferramentas
+│   └── Calculadora de peso (T20)                       (todos)
+└── Administração                                       (Admin)
+    ├── Usuários (T21)
+    ├── Ligas e densidades (T22)
+    └── Parâmetros do sistema (T23)
 ```
+
+**Telas sem item próprio no menu:** T05 Detalhe do lote (abre a partir da consulta T04); T10 Registrar corte (abre a partir de "Cortes a fazer no RJ"); T17 Reservas e restrições, T18 Ajuste / estorno e T24 Auditoria não estão no menu aprovado em 2026-11-17 (o acesso é definido pelo FRONTEND em `docs/ux/`); T19 Relatórios e T26 Material a chegar ficam para a F1.1 (§4.2).
 
 A **carga inicial (T25) não é tela**: é linha de comando rodada pelo TÉCNICO no servidor (`python -m app.carga`), com prévia em Excel, uma vez na virada (§10).
 
@@ -268,26 +269,26 @@ Legenda: **A** = usa e altera; **V** = só consulta; **—** = não aparece no m
 | Tela | Estoque Itu (Fabiano, Matheus) | Operação RJ (Marcelo) | Análise (Renato) | Admin |
 |---|---|---|---|---|
 | T01, T01b, T02 Entrar / senha | A | A | A | A |
-| T03 Painel | A (pendências de Itu) | A (pendências do RJ) | A (pendências de análise) | A |
-| T04 Consulta de estoque (inclui a aba "RETO por origem") | V | V (só RJ no Rio) | V | V |
+| T03 Painel de pendências | A (pendências de Itu) | A (pendências do RJ) | A (pendências de análise) | A |
+| T04 Consultar estoque (inclui a aba "RETO por origem") | V | V (só RJ no Rio) | V | V |
 | T05 Detalhe do lote | A (notas, ajuste, atribuir origem) | V (só RJ no Rio) + notas | V + notas | A |
-| T06 Entrada por NF (RJ) | V | A | V | A |
-| T07 Nova solicitação | A | — | — | A |
-| T08 Solicitações (lista) | A | V (as do RJ) | V | A |
-| T09 Fila RJ | V | A | — | A |
+| T06 Registrar entrada de material no RJ (NF) | V | A | V | A |
+| T07 Pedir corte de material | A | — | — | A |
+| T08 Acompanhar pedidos de corte | A | V (as do RJ) | V | A |
+| T09 Cortes a fazer no RJ | V | A | — | A |
 | T10 Registrar corte | — | A | — | A |
-| T11 COP | V | A | V | A |
-| T12 Receber COP | A | V | — | A |
-| T13 Corte em Itu | A | — | — | A |
-| T14 SA | A | V (situação do SA dos itens do COP) | V + exportar + R$/kg | A |
-| T15 Entradas Mega a classificar (mínima, F1) | A | — | V | A |
-| T16 Conciliação Mega | A | — | V | A |
+| T11 Montar envio para Itu (COP) | V | A | V | A |
+| T12 Receber material do RJ | A | V | — | A |
+| T13 Registrar corte em Itu | A | — | — | A |
+| T14 Cadastro de SA (semiacabado) | A | V (situação do SA dos itens do COP) | V + exportar + R$/kg | A |
+| T15 Entradas do Mega sem lote (mínima, F1) | A | — | V | A |
+| T16 Conferir estoque com o Mega | A | — | V | A |
 | T17 Reservas e restrições | A | V (lotes RJ no Rio) | A | A |
 | T18 Ajuste / estorno | A | A (só estorno dos próprios lançamentos, antes do COP fechado) | — | A |
 | T19 Relatórios | V | V (só RJ no Rio) | V | V |
-| T20 Calculadora | A | A | A | A |
-| T21 Usuários, T23 Parâmetros, T24 Auditoria | — | — | — | A |
-| T22 Catálogo | V | — | V | A |
+| T20 Calculadora de peso | A | A | A | A |
+| T21 Usuários, T23 Parâmetros do sistema, T24 Auditoria | — | — | — | A |
+| T22 Ligas e densidades (catálogo) | V | — | V | A |
 | T26 Material a chegar | V | — | A | A |
 
 **Operação RJ não vê o que é de Itu em nenhum lugar [P10, detalhado em 06/11 após a auditoria].** Vale para o Painel (só pendências e totais do RJ no Rio), para a árvore de origem do T05 (filhos que estão em Itu não aparecem, nem seus saldos), para o T14 (só os SAs dos itens dos COPs do RJ; os SAs de corte em Itu, Caminho B2, não aparecem), para as exportações e para a aba "RETO por origem".
@@ -298,8 +299,8 @@ Em todas as telas há uma busca global no topo. Ela aceita um número de OP, de 
 
 | Tela | F1 | F1.1 |
 |---|---|---|
-| T15 Entradas Mega a classificar | **Mínima (entra na F1 desde 06/11)**: lista, "Criar lote", "Não é entrada" | Nada previsto além disso |
-| T16 Conciliação com o Mega | Mínima, só leitura (decisão de 04/11); mostra a diferença **explicada** pela T15 | "Ver movimentos", "Ajustar lote", "Marcar como explicada" |
+| T15 Entradas do Mega sem lote | **Mínima (entra na F1 desde 06/11)**: lista, "Criar lote", "Não é entrada" | Nada previsto além disso |
+| T16 Conferir estoque com o Mega | Mínima, só leitura (decisão de 04/11); mostra a diferença **explicada** pela T15 | "Ver movimentos", "Ajustar lote", "Marcar como explicada" |
 | Consulta "RETO por origem" (aba do T04) | **Entra na F1 (06/11)** | T19 completo (rastreio por OP, por contêiner, histórico) |
 | T19 Relatórios (os 9) | — | Todos |
 | T26 Material a chegar | — | Sim |
@@ -341,7 +342,7 @@ Toda gravação gera um registro na auditoria com usuário, data/hora e IP.
 
 Campos: senha atual, nova senha e repetição da nova [DIGITADO]. **Botão "Salvar nova senha".** A senha precisa ter **pelo menos 6 caracteres**, sem outra exigência (pode ser só números) **[R017]**.
 
-### T03. Painel
+### T03. Painel de pendências
 
 O que aparece depende do perfil.
 
@@ -356,7 +357,7 @@ O que aparece depende do perfil.
 
 **Pendência da peça inteira do RJ (v3.10, P30(1); v3.11, Eduardo, 2026-11-17; Estoque Itu e Admin):** card "Peças inteiras do RJ aguardando peso real (N)", com os dias desde o recebimento do COP em cada peça (abre a T13 com a peça sugerida). Pendência com mais de 7 dias (T23) fica em **vermelho**, com o texto "bloqueando novas solicitações" (T07, [proposta, P33]). Não existe mais o card "SAs a corrigir no Mega": o SA não é corrigido (§2.2 passo 7).
 
-### T04. Consulta de estoque
+### T04. Consultar estoque
 
 Filtros (todos [DIGITADO]):
 
@@ -440,7 +441,7 @@ Botões:
 - **"Ajustar saldo"**: Estoque Itu; abre T18.
 - **"Imprimir ficha do lote"**: PDF com o resumo.
 
-### T06. Entrada por NF (Barra Mansa)
+### T06. Registrar entrada de material no RJ (NF)
 
 Quem usa: Marcelo. Objetivo: registrar o material que chega ao RJ e criar os lotes RJ/RJ.
 
@@ -466,7 +467,7 @@ Botões:
 
 Depois de salvar, a entrada só pode ser corrigida por estorno (T18).
 
-### T07. Nova solicitação de corte
+### T07. Pedir corte de material
 
 Quem usa: Fabiano e Matheus. É um assistente em quatro passos.
 
@@ -518,7 +519,7 @@ Botões:
 **Bloqueio por peso real pendente (Eduardo, 2026-11-17, P32(1): bloqueia; quem, desde quando e a mensagem: [proposta, P33]).** Quando existe pelo menos uma peça inteira do RJ com a pendência "Informar o peso real" (§2.2 passo 7) aberta há **mais de 7 dias** (`PENDENCIA_PESO_REAL_DIAS`, T23), contados do **recebimento do COP** (T12):
 
 - **"Enviar ao RJ" fica bloqueado para todos que criam solicitação** (Estoque Itu, Fabiano e Matheus, e Admin), porque a pendência é do estoque de Itu e não de uma pessoa. O Admin não libera (`PESO_REAL_PENDENTE`, §9). Vale também para a parte RJ do consumo misto.
-- **Mensagem** (faixa vermelha no topo da T07, desde o passo 1, e de novo ao clicar "Enviar ao RJ"): "Há N peça(s) inteira(s) do RJ sem peso real há mais de 7 dias (ex.: OP 90010, H13 70×610, recebida em 03/11). Informe o peso real no Corte em Itu para voltar a enviar solicitações." e o botão **"Informar peso real"**, que abre a T13 com a peça mais antiga sugerida.
+- **Mensagem** (faixa vermelha no topo da T07, desde o passo 1, e de novo ao clicar "Enviar ao RJ"): "Há N peça(s) inteira(s) do RJ sem peso real há mais de 7 dias (ex.: OP 90010, H13 70×610, recebida em 03/11). Informe o peso real em Registrar corte em Itu para voltar a enviar solicitações." e o botão **"Informar peso real"**, que abre a T13 com a peça mais antiga sugerida.
 - **Continua liberado:** "Salvar rascunho", o modo "Cortar em Itu" ("Registrar corte em Itu agora") e a T13, que é por onde a pendência se resolve, e todas as outras telas.
 - **Antes do prazo:** com pendência de até 7 dias, a T07 mostra só aviso cinza: "N peça(s) inteira(s) do RJ aguardando peso real; a partir de DD/MM, novas solicitações ficam bloqueadas."
 - **Peça que não vai mais ser cortada** (ex.: OP cancelada): o Estoque Itu ou o Admin usa **"Encerrar pendência"** no card do Painel, com justificativa (fica na auditoria).
@@ -532,7 +533,7 @@ Botões:
 
 **Opção B (não adotada):** uma única solicitação com uma linha por lote e o modo por linha, concluída só quando todas as linhas terminam. Mudaria o estado da solicitação e o COP; o Eduardo escolheu a opção A (P26(1)).
 
-### T08. Solicitações de corte (lista)
+### T08. Acompanhar pedidos de corte
 
 Filtros: situação, OP, cliente, liga, contêiner, período, "somente atrasadas".
 
@@ -547,7 +548,7 @@ Botões:
 - **"Encerrar com saldo pendente"** para solicitação *Parcial*: só Estoque Itu, com justificativa; libera a reserva do restante **[R004]**.
 - **"Trocar OP"** **[R007]**: só Estoque Itu, com justificativa. Pode ser usado até o SA ser confirmado no Mega. Troca OP, item e cliente da solicitação e da linha de SA pendente; o COP e os movimentos de lote não mudam (a OP nova passa a aparecer neles). Depois do SA confirmado, a troca continua possível, mas gera o aviso "ajustar o SA no Mega" e fica no relatório de exceções. Casos reais: "90016 deveria ter pedido material A8 comum… anexamos essas outras 20 peças na OP 90017".
 
-### T09. Fila RJ
+### T09. Cortes a fazer no RJ
 
 Quem usa: Marcelo. É a lista das solicitações *Enviadas* e *Parciais*, ordenada por prazo, com a cor de atraso. Ela funciona bem no tablet ou no celular.
 
@@ -577,7 +578,7 @@ Botões:
 - **"Confirmar corte"**: movimento `SAIDA_CORTE_RJ` em cada lote usado, com o peso real negativo e a reserva liberada. A solicitação fica *Cortada* e aparece em "Adicionar cortes prontos" no COP.
 - **"Voltar".**
 
-### T11. COP
+### T11. Montar envio para Itu (COP)
 
 **Lista de COPs:** número, data, situação, quantidade de itens, peso total e NF.
 
@@ -602,7 +603,7 @@ Botões:
 - **"Imprimir romaneio":** PDF com OP, item, MP, contêiner, peças e peso.
 - **"Reabrir COP":** só enquanto nenhum item tiver SA confirmado; exige justificativa.
 
-### T12. Receber COP
+### T12. Receber material do RJ
 
 Quem usa: Fabiano e Matheus. A tela mostra os COPs *Em trânsito*. Ao abrir um, aparece a lista de itens com uma caixa de conferência por linha.
 
@@ -624,7 +625,7 @@ Efeitos:
 - **Peça cortada:** fica *Concluída* (o SA já foi feito antes do envio).
 - **Peça inteira:** o sistema cria o **lote RJ em Itu**, filho do lote de origem, com o peso recebido (movimento `RECEBIMENTO_ITU`). A solicitação fica *Aguardando corte em Itu*.
 
-### T13. Corte em Itu (consumo, sobra e RETO)
+### T13. Registrar corte em Itu (consumo, sobra e RETO)
 
 Quem usa: Fabiano e Matheus. Vale para lotes **RJ em Itu** (peças inteiras e sobras) e **Estoque Mega**.
 
@@ -654,7 +655,7 @@ Lote **RJ em Itu** (inclusive RETO) **não tem código do Mega** (§1.4): não a
 
 Para lote Mega, depois de confirmar, aparece um quadro **"Fazer no Mega"** com a baixa na OP (**consumo + perda de corte**, para o saldo do Mega bater com o lote **[R024]**) e a transferência para RETO já descritas, e o botão **"Copiar instrução"**.
 
-### T14. SA
+### T14. Cadastro de SA (semiacabado)
 
 **Fila:** uma linha por OP + lote, com situação (Pendente / Preparado / Aguardando Mega / Confirmado; a situação "Corrigir no Mega" da v3.10 **saiu**: o SA da peça inteira não é corrigido, Eduardo, 2026-11-17). As linhas nascem de: **COP fechado** pelo RJ (T11; os dados do SA vêm do COP **[P13]**), **corte em Itu de lote fiscal RJ** (T13, dados do Fabiano, P27(a)). O SA de peça inteira **não gera linha nova nem muda** quando a peça é pesada em Itu: o peso real só ajusta o estoque (§2.2 passo 7). A fila mostra no topo os COPs que estão **aguardando SA** para serem enviados.
 
@@ -699,7 +700,7 @@ Botões:
 
 Uma OP com dois lotes gera duas linhas com o mesmo código de SA, como já acontece hoje.
 
-### T15. Entradas Mega a classificar (versão mínima, entra na F1 desde 06/11)
+### T15. Entradas do Mega sem lote (versão mínima, entra na F1 desde 06/11)
 
 **Para que serve (Caminho C, passo 1):** quando uma NF de MP entra no Mega em Itu, o saldo do código sobe, mas o sistema ainda não tem o lote. A T15 deixa o operador transformar essa diferença em lote ou dizer que ela não é entrada, para que o sistema continue igual ao Mega. Na T16 mínima a diferença que o operador explicar aparece como explicada.
 
@@ -757,7 +758,7 @@ Depois de gravar: o lote nasce **ITU/ITU**, estado `Ativo`, aparece na T04 e na 
 
 **Auditoria (T24):** toda criação de lote e todo "Não é entrada" ficam registrados com usuário, código, kg e justificativa. **Dia da carga:** logo depois da carga as pendências devem ser **zero** (cada código do Mega com saldo ganhou o seu lote).
 
-### T16. Conciliação com o Mega
+### T16. Conferir estoque com o Mega
 
 **Na F1 entra a versão mínima (decisão de 04/11):** só leitura, com código Mega × soma dos lotes Estoque Mega e destaque quando a diferença passa de `DIVERGENCIA_MEGA_KG` (T23, 5 kg). Os botões "Ver movimentos", "Ajustar lote" e "Marcar como explicada" ficam para a F1.1; na F1, a correção é feita pelo T18 a partir do T05.
 
@@ -1184,5 +1185,5 @@ Todo registro importado guarda **arquivo, aba e linha** de origem. Assim, qualqu
 | **P30** | (1) Peça inteira do RJ pesada em Itu acima do previsto (ex. fictício: SA e NF com 837 kg, pesado 880 kg): como os 43 kg chegam ao Mega? (2) Sobra RJ em Itu **sem OP**: como o Fabiano a deixa disponível no estoque de Itu antes de existir OP? | **Respondida (Eduardo, 2026-11-12):** (1) **nenhuma das opções propostas:** depois do corte em Itu fica uma **pendência do Fabiano para informar o peso real**; o estoque usa o peso real; ~~o **SA é corrigido** para o peso real; o previsto fica **só na NF**~~ **substituído (Eduardo, 2026-11-17, P32):** o SA não é corrigido no Mega, SA e NF ficam com o previsto, sem NF complementar (§2.2 passo 7, T13, T14); (2) **opção B:** nada na F1; a sobra aguarda a OP e então segue o B2 |
 | **P31** | O comprimento que vem só do HISTORICO (P29(a)) conta na paridade em qualquer caso? | **Respondida (Eduardo, 2026-11-12):** só conta quando a **linha de Itu também tem comprimento** na descrição; senão é ignorado (fica como informação do lote); com vários comprimentos no HISTORICO, ignora (§1.4 item 6) |
 | **P32** | Pendência da peça inteira do RJ (P30(1)): (1) o que acontece se o Fabiano não informar o peso real ou não corrigir o SA no Mega? (2) quando o sistema considera o SA corrigido? | **Respondida (Eduardo, 2026-11-17, PENDENCIAS itens 1 e 2):** (1) **bloqueia** novas solicitações enquanto houver pendência com mais de 7 dias (parâmetro), diferente da proposta "só aviso"; detalhes em P33; (2) **não se aplica: o SA não é corrigido no Mega** (o código de SA é sempre o mesmo); o peso real só ajusta o peso baixado do estoque. Saem "Corrigir no Mega", a instrução de correção e "Corrigido no Mega" (§2.2 passo 7, T03, T13, T14) |
-| **P33** | Bloqueio pela pendência do peso real (P32(1)): (a) quem fica bloqueado? (b) de quando contam os 7 dias? (c) o que bloqueia? (d) quem é avisado? (e) e a peça que não vai mais ser cortada? | **Aberta, Eduardo.** Proposta padrão (já escrita na T07): (a) **todos que criam solicitação** (Estoque Itu, Fabiano e Matheus, e Admin), sem liberação pelo Admin, porque a pendência é do estoque de Itu; (b) do **recebimento do COP** (T12), a única data que o sistema conhece antes da T13; (c) só **"Enviar ao RJ"** na T07 (inclusive a parte RJ do consumo misto); rascunho, "Cortar em Itu", T13 e as outras telas seguem; mensagem "Há N peça(s) inteira(s) do RJ sem peso real há mais de 7 dias (…). Informe o peso real no Corte em Itu para voltar a enviar solicitações."; (d) aviso cinza na T07 antes de vencer e, ao vencer, sino para Fabiano, Matheus e Admin; (e) "Encerrar pendência" no Painel, com justificativa, pelo Estoque Itu ou Admin |
+| **P33** | Bloqueio pela pendência do peso real (P32(1)): (a) quem fica bloqueado? (b) de quando contam os 7 dias? (c) o que bloqueia? (d) quem é avisado? (e) e a peça que não vai mais ser cortada? | **Aberta, Eduardo.** Proposta padrão (já escrita na T07): (a) **todos que criam solicitação** (Estoque Itu, Fabiano e Matheus, e Admin), sem liberação pelo Admin, porque a pendência é do estoque de Itu; (b) do **recebimento do COP** (T12), a única data que o sistema conhece antes da T13; (c) só **"Enviar ao RJ"** na T07 (inclusive a parte RJ do consumo misto); rascunho, "Cortar em Itu", T13 e as outras telas seguem; mensagem "Há N peça(s) inteira(s) do RJ sem peso real há mais de 7 dias (…). Informe o peso real em Registrar corte em Itu para voltar a enviar solicitações."; (d) aviso cinza na T07 antes de vencer e, ao vencer, sino para Fabiano, Matheus e Admin; (e) "Encerrar pendência" no Painel, com justificativa, pelo Estoque Itu ou Admin |
 | **P34** | Escolhas minhas na carga de 2026-11-17 (§10.9): (a) na **paridade manual**, o lote do RJ mantém a própria medida (ex.: H13 45X610) para o peso previsto e o corte, e só a linha do agrupamento (T04, T07, relatório) é a do código de Itu? (b) lote sem ENTRADA no HISTORICO: peso inicial = "PESO INICIAL" da ESTOQUE 2026 e linha na lista de pendências? (c) "Cr8 13x510/560/610" junto = **um lote 13x510** (o padrão do arquivo de pendências), com as três larguras na nota, e não 13x610 pela regra do maior valor? (d) contêiner do Controle de Corte quando a ESTOQUE 2026 e o SA discordam entre si: fica o do Controle de Corte, na lista de pendências? (e) a regra do maior valor vale só para a seção (espessura, largura, Ø); a faixa de comprimento segue a P29(b)? | **Aberta, Eduardo** (a e c com o Fabiano). Proposta padrão: **sim** nos cinco itens |

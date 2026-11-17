@@ -88,13 +88,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         est, hist = planilhas.ler_estoque_2026(a.pasta)
         geral = planilhas.ler_geral(a.pasta)
-        corte = planilhas.ler_corte(a.pasta)
-        sas = planilhas.ler_sa(a.pasta)
     except planilhas.EstruturaMudou as e:
         log.error("PAROU: a estrutura de uma planilha mudou: %s", e)
         return 2
-    log.info("planilhas lidas em %.1f s", time.time() - t0)
-    carimbo = datetime.now().strftime("%Y%m%d_%H%M")
     correcoes = {}
     if a.correcoes:
         import json
@@ -103,6 +99,15 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, ValueError) as e:
             log.error("PAROU: arquivo de correções ilegível (%s): %s", a.correcoes, e)
             return 2
+    try:
+        from .correcoes import linhas_planilha1
+        corte = planilhas.ler_corte(a.pasta, linhas_planilha1(correcoes))
+        sas = planilhas.ler_sa(a.pasta)
+    except planilhas.EstruturaMudou as e:
+        log.error("PAROU: a estrutura de uma planilha mudou: %s", e)
+        return 2
+    log.info("planilhas lidas em %.1f s", time.time() - t0)
+    carimbo = datetime.now().strftime("%Y%m%d_%H%M")
     with SessionLocal() as db:
         pl = plano.montar(contexto(db, not a.sem_conferir_ops, correcoes), est, hist, geral, corte, sas)
         log.info("plano: %s", pl.contagens)

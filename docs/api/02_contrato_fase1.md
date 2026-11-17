@@ -170,6 +170,36 @@ COP: `{ id, numero, situacao, data, fechado_em, enviado_em, qtd_itens, peso_tota
 - Ocorrências: `OP_INEXISTENTE`, `OP_ENCERRADA`, `OP_NAO_CONFIRMADA`, `LOTE_FORA_DE_ITU`, `PESO_INVALIDO`, `SALDO_INSUFICIENTE`, `EXCESSO_TOLERANCIA`, `ABAIXO_PREVISTO`, `SOMA_MAIOR_QUE_LOTE`, `PERDA_CORTE_ALTA` (CIENCIA quando a perda passa de `PERDA_CORTE_MAX_PCT` % do material usado; `dados`: `perda_kg`, `perda_pct`, `limite_kg`, `limite_pct`), `USA_SALDO_RESERVADO`, `DESTINACAO_n`, `DATA_CORTE_INVALIDA`.
 - Gravou: `201` com `{ id, op, lote, consumo_kg, sobra_kg, perda_kg, lote_reto: {id, codigo}|null, sa_id, instrucao_mega, ... }`.
 
+### 6.1 Regra do RETO na sobra ✅ (2026-11-17, R063, spec v3.13 T13 e §9; propostas padrão da P35; migração 0010)
+
+Vale quando `sobra_kg > 0` e `sobra_na_bitola: false` (sobra na bitola continua no lote, nada muda). Campos novos no corpo:
+
+```json
+{ "sobra_na_bitola": false, "sobra_espessura_mm": 40, "sobra_largura_mm": 200,
+  "sobra_diametro_mm": null, "sobra_vai_para_reto": null, "conferi_regra_reto": true }
+```
+
+- **Placa/blooming** (lote `RETANGULAR` ou `RETO`): `sobra_espessura_mm` (E) e `sobra_largura_mm` (L) obrigatórios. E ≤ `RETO_ESP_LIMITE` (50) e L < `RETO_LARG_MAX_ATE_LIMITE` (200), ou E > 50 e L < `RETO_LARG_MAX_ACIMA` (250) → **RETO** (como antes: lote RETO filho, `GERA_RETO`, transferência no "Fazer no Mega"); senão → **lote novo** com a medida E × L (tipo `SOBRA`, mesma liga e contêiner, filho do lote de origem, movimento `GERA_SOBRA`, no mesmo estoque). E e L valem como digitados (E > L só avisa).
+- **Redondo:** a regra não se aplica [P35(d)]. `sobra_vai_para_reto` obrigatório (true = RETO; false = lote novo com `sobra_diametro_mm`, obrigatório nesse caso).
+- **`conferi_regra_reto: true`** obrigatório (caixa "Conferi a regra do RETO") nos dois casos.
+- Ocorrências novas: `MEDIDA_SOBRA_OBRIGATORIA` (ERRO), `SOBRA_DESTINO_OBRIGATORIO` (ERRO, redondo sem escolha), `REGRA_RETO_NAO_CONFERIDA` (ERRO, caixa desmarcada), `REGRA_RETO` (ALERTA, placa: texto da regra + resultado; `dados.destino`), `MEDIDA_SOBRA_INVERTIDA` (ALERTA, E > L).
+- `resultado.regra_reto` (null sem sobra fora da bitola), para a tela mostrar a regra e o resultado **antes de gravar**:
+
+```json
+{ "aplicavel": true, "formato": "PLACA", "limites": { "esp_limite_mm": 50, "larg_max_ate_limite_mm": 200,
+  "larg_max_acima_mm": 250 }, "espessura_mm": 40, "largura_mm": 200, "diametro_mm": null,
+  "destino": "LOTE_NOVO", "vai_para_reto": false,
+  "texto_regra": "Regra do RETO: espessura até 50 mm → largura abaixo de 200 mm; espessura acima de 50 mm → largura abaixo de 250 mm.",
+  "texto_resultado": "Sobra 40 × 200 mm: largura de 200 mm ou mais (espessura até 50 mm) → não vai para RETO; vira lote novo com a medida da sobra.",
+  "conferida": true }
+```
+
+  `formato`: `PLACA` | `REDONDO` (`aplicavel: false`). `destino`: `RETO` | `LOTE_NOVO` | null (faltam dados).
+- `resultado.frase` diz o lote novo ("Novo lote H13 40X200 com 12,0 kg (sobra fora da regra do RETO), origem …"); `efeitos` ganha `(novo lote H13 40X200)`.
+- **Estoque Mega, lote novo:** `instrucao_mega` só tem a baixa na OP (sem transferência). O lote novo não tem código próprio: `codigo_mega` dele (em `/api/lotes`) é o do lote de origem, e o saldo conta nesse código na T16 e na T15 (o kg continua nesse código no Mega). O próximo corte desse lote baixa do mesmo código.
+- `201` ganha: `lote_sobra: {id, codigo, bitola}|null`, `sobra_destino` (`RETO` | `LOTE_NOVO` | null), `sobra_espessura_mm`, `sobra_largura_mm`, `sobra_diametro_mm`.
+- Parâmetros novos da T23 (§10): `RETO_ESP_LIMITE` = 50, `RETO_LARG_MAX_ATE_LIMITE` = 200, `RETO_LARG_MAX_ACIMA` = 250 (mm; `PATCH /api/parametros/{chave}`, só Admin).
+
 ## 7. T14 SA ✅ (Estoque Itu altera; Operação RJ e Análise consultam; Análise edita R$/kg)
 
 - `GET /api/sas?situacao=&origem=&op=&cop=&nao_exportados=`: sem filtro, traz os não confirmados. A resposta tem `cops_aguardando_sa[]` (para o topo da tela) e `itens[]`:
@@ -188,7 +218,7 @@ COP: `{ id, numero, situacao, data, fechado_em, enviado_em, qtd_itens, peso_tota
 - `avisos[]` (R026, v3.1; aviso cinza, não bloqueia): `{ codigo, nivel: "ALERTA", mensagem, … }`. `NF_DIFERENTE_MEGA` (NF informada ≠ NF da entrada do SA no Mega; traz `nf`, `nf_mega`) e `IPI_DIFERENTE_MEGA` (IPI do histórico ≠ IPI do NCM no Mega; traz `ipi`, `ipi_mega` em %). `IPI_DIFERENTE_MEGA` também aparece como ALERTA no `/codigo/validar`; `NF_DIFERENTE_MEGA` também no `/cops/{id}/enviar/validar` (com `dados.itens`).
 - `PATCH /api/sas/{id}` `{ rs_kg, sa_descricao, ncm, icms, ipi, pedido, quantidade, peso_kg }` (Análise: só `rs_kg`; confirmado: só `rs_kg`).
 - `POST /api/sas/preparar` `{ ids }` → Preparado.
-- `POST /api/sas/{id}/codigo/validar` e `POST /api/sas/{id}/codigo` `{ sa_codigo, confirmacoes }`: `SA_CODIGO_TROCADO` (CIENCIA) se diferente do sugerido. Fica *Aguardando Mega* e o sistema já tenta confirmar.
+- `POST /api/sas/{id}/codigo/validar` e `POST /api/sas/{id}/codigo` `{ sa_codigo, confirmacoes }`: `SA_CODIGO_TROCADO` (CIENCIA) se diferente do sugerido. Fica *Aguardando Mega* e o sistema já tenta confirmar. **Quem pode (2026-11-17, R063, spec v3.13 T14, [proposta, P36]):** Estoque Itu, **Análise** (a Amanda, que cadastra o SA no Mega, com usuário próprio nesse perfil) e Admin; o resto da T14 não muda.
 - `POST /api/sas/verificar` `{ ids? }` ("Verificar no Mega agora") → `{ verificados, confirmados, erro }`.
 - `POST /api/sas/nf` `{ ids, numero, emitente, data? }`: NF só fiscal do caminho B2 (linhas `CORTE_ITU`).
 - 📋 F1.1: "Exportar pedidos selecionados" e "Exportar SAs novos para o Renato" (Excel, layout da planilha de SA).
@@ -260,6 +290,8 @@ Ocorrências: `NF_DUPLICADA`, `SEM_ITENS`, `LIGA_DESCONHECIDA#n`, `BITOLA_INCOMP
                "diferenca_kg": 12.0, "status": "MEGA_MAIOR", "lotes": 1 } ] }
 ```
 
+- **`totais` são sempre de todos os códigos** (2026-11-17, R065(2)); `somente_divergentes=true` só filtra `itens`.
+- Lote `SOBRA` de medida nova da T13 (§6.1) conta no código do lote de origem.
 - Só códigos do catálogo (`item_mp` com código Mega) e só lotes do **Estoque Mega** (ITU/ITU). `diferenca_kg` = Mega − lotes. `status`: `OK` (|diferença| ≤ `DIVERGENCIA_MEGA_KG`), `MEGA_MAIOR`, `MEGA_MENOR`. Ordem: divergentes primeiro, maior diferença primeiro.
 - O saldo do Mega é o da última sincronização (06h, 13h ou "Sincronizar agora"); mostrar `ultima_sincronizacao` no topo.
 - 📋 F1.1: "Ver movimentos", "Ajustar lote" e "Marcar como explicada".
@@ -344,7 +376,7 @@ A pendência "Informar o peso real" = solicitação **`AGUARDANDO_CORTE_ITU`** (
 ## 16.3 Restrição gravada no item e paridade manual ✅ (2026-11-17, §10.9, migração 0009)
 
 - `item_mp.restricao_uso` (carga, B09): todo **lote novo** do item (T06, T13 sobra/recebimento, T15) já nasce com a destinação `RESTRICAO` com esse texto (pede "estou ciente" na baixa, como as outras). Nada muda na API: a destinação aparece em `GET /api/lotes/{id}` como as criadas na T17.
-- `item_mp.paridade_item_id` (carga, paridade manual, §1.4 item 8): o lote RJ mantém a própria descrição e medida, mas `chave_material` (T04 agrupado e sugestão da T07) é a do item de Itu indicado. Os itens de `GET /api/lotes` ganham `paridade_manual` (bool) e a linha de `GET /api/lotes/agrupado` também (true quando algum lote da linha está nela por exceção: "mesma linha por exceção", R060).
+- `item_mp.paridade_item_id` (carga, paridade manual, §1.4 item 8): o lote RJ mantém a própria descrição e medida, mas `chave_material` (T04 agrupado e sugestão da T07) é a do item de Itu indicado. Os itens de `GET /api/lotes` ganham `paridade_manual` (bool) e a linha de `GET /api/lotes/agrupado` também (true quando algum lote da linha está nela por exceção: "mesma linha por exceção", R060). Os itens de `/api/lotes` ganham `codigo_paridade` (código de Itu indicado) e `codigos_itu` da linha agrupada passa a incluí-lo, também quando o código não tem lote com saldo no Estoque Mega (2026-11-17, R065(4)).
 
 ## 17. Ainda não implementado
 

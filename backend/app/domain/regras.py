@@ -181,3 +181,30 @@ def validar_op(op_existe: bool, op_aberta: bool, ja_tem_solicitacao: bool) -> Re
         r.adicionar("OP_DUPLICADA", Nivel.CIENCIA,
                     "Já existe solicitação/baixa para esta OP. Confirme que é uma nova necessidade.")
     return r
+
+
+def _mm(v: float) -> str:
+    return f"{v:g}".replace(".", ",")
+
+
+def regra_reto(espessura_mm: float, largura_mm: float, esp_limite_mm: float, larg_max_ate_limite_mm: float,
+               larg_max_acima_mm: float) -> tuple[bool, str, str]:
+    """Regra do RETO para sobra de placa/blooming (spec v3.13 T13, Eduardo, 2026-11-17).
+
+    E ≤ `esp_limite` e L < `larg_max_ate_limite` → RETO; E > `esp_limite` e L < `larg_max_acima` → RETO; largura no
+    limite ou acima → não vai para RETO. E e L são usados como o operador informou (leitura literal; E > L só gera
+    aviso em quem chama). Devolve (vai_para_reto, texto da regra, texto do resultado), prontos para a tela."""
+    texto_regra = (f"Regra do RETO: espessura até {_mm(esp_limite_mm)} mm → largura abaixo de "
+                   f"{_mm(larg_max_ate_limite_mm)} mm; espessura acima de {_mm(esp_limite_mm)} mm → largura abaixo "
+                   f"de {_mm(larg_max_acima_mm)} mm.")
+    ate_limite = espessura_mm <= esp_limite_mm + EPS
+    limite = larg_max_ate_limite_mm if ate_limite else larg_max_acima_mm
+    vai = largura_mm < limite - EPS
+    faixa = f"até {_mm(esp_limite_mm)}" if ate_limite else f"acima de {_mm(esp_limite_mm)}"
+    medida = f"Sobra {_mm(espessura_mm)} × {_mm(largura_mm)} mm"
+    if vai:
+        resultado = f"{medida}: largura abaixo de {_mm(limite)} mm (espessura {faixa} mm) → vai para RETO."
+    else:
+        resultado = (f"{medida}: largura de {_mm(limite)} mm ou mais (espessura {faixa} mm) → não vai para RETO; "
+                     "vira lote novo com a medida da sobra.")
+    return vai, texto_regra, resultado

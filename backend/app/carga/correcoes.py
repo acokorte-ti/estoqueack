@@ -12,6 +12,10 @@ Vêm do arquivo `--correcoes` (JSON FORA do repositório: tem dados reais). Form
   escrita diferente (spec §1.4 item 8, P34(a)): o item do RJ mantém a própria medida e fica na mesma linha do código
   de Itu na T04/T07 (item_mp.paridade_item_id), sem receber o código.
 - `avisos`: marca no relatório (e na nota do lote) uma linha com pergunta em aberto, sem mudar nada.
+- `corte_planilha1` (spec v3.13 §10.9 A.7, [proposta, P37(a)]): linha que só existe na aba "Planilha1" do Controle
+  de Corte e tem cadastro de SA → entra como solicitação CONCLUÍDA (corte no RJ, recebido), ligada ao SA da mesma OP
+  e contêiner. Não mexe em saldo (a liberação não tem movimento; o kg já está nas saídas anteriores a 2026).
+  `[{linha, op, conteiner?, fonte}]`; `__main__` lê só essas linhas da Planilha1 (`linhas_planilha1`).
 
 Correção que não casa com a planilha → pendência `CORRECAO_NAO_APLICADA` (BLOQUEIA: a gravação é recusada, R053(4)).
 Aviso que não casa → `AVISO_NAO_APLICADO` (REVISAR). A planilha nunca é alterada: o valor original vai para a nota.
@@ -238,6 +242,38 @@ def preparar_paridade_manual(pl, correcoes: dict, est: list[P.LinhaEstoque2026],
             pl.notas_origem[("ESTOQUE 2026", e.linha)].append(
                 f"Paridade manual ({fonte}): mesmo material que {g.codigo} {g.descricao.strip()}; fica na mesma linha "
                 f"de Itu ({k_itu.texto}) por exceção, com a própria medida.")
+
+
+# ---------------- corte da Planilha1 ----------------
+
+def linhas_planilha1(correcoes: dict) -> set[int]:
+    return {int(c["linha"]) for c in correcoes.get("corte_planilha1") or [] if c.get("linha")}
+
+
+def aplicar_corte_planilha1(pl, correcoes: dict, corte: list[P.LinhaCorte]) -> list[P.LinhaCorte]:
+    regras = correcoes.get("corte_planilha1") or []
+    da_p1 = [x for x in corte if x.origem.get("aba") == P.ABA_PLANILHA1]
+    if not regras:
+        return [x for x in corte if x.origem.get("aba") != P.ABA_PLANILHA1]
+    usadas: set[int] = set()
+    out = [x for x in corte if x.origem.get("aba") != P.ABA_PLANILHA1]
+    for n, c in enumerate(regras):
+        fonte = c.get("fonte") or "arquivo de correções"
+        x = next((y for y in da_p1 if y.linha == c.get("linha")), None)
+        if x is None or x.op != c.get("op") or (c.get("conteiner") and norm(x.conteiner) != norm(c["conteiner"])):
+            _nao_aplicada(pl, "corte_planilha1", n, c, f"Planilha1 linha {c.get('linha')}: "
+                          + ("linha vazia ou fora da aba" if x is None else f"OP {x.op} / {x.conteiner}, esperado "
+                             f"OP {c.get('op')}" + (f" / {c['conteiner']}" if c.get("conteiner") else "")))
+            continue
+        usadas.add(x.linha)
+        # P37(a): o corte aconteceu (tem cadastro de SA) → concluída, como as outras linhas de 2025 do contêiner
+        y = dataclasses.replace(x, liberacao_feita=True, recebido=True,
+                                pecas_cortadas=x.pecas_cortadas or x.qtd, status=None)
+        out.append(y)
+        _registrar(pl, "corte_planilha1", n, f"Planilha1 linha {x.linha} (OP {x.op})", x.peso2 or x.peso,
+                   f"{x.conteiner} {x.mp}: só na Planilha1 (não importada)",
+                   "solicitação concluída, corte no RJ, ligada ao SA da mesma OP", fonte)
+    return out
 
 
 # ---------------- avisos ----------------

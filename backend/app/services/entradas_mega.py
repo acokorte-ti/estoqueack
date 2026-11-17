@@ -61,10 +61,8 @@ def _explicadas(db: Session) -> dict[int, float]:
 
 
 def _soma_lotes(db: Session) -> dict[int, float]:
-    q = (select(ItemMP.codigo_mega, func.coalesce(func.sum(Lote.saldo_kg), 0)).join(Lote, Lote.item_mp_id == ItemMP.id)
-         .where(Lote.planta_fiscal == "ITU", Lote.local_fisico == "ITU", ItemMP.codigo_mega.is_not(None))
-         .group_by(ItemMP.codigo_mega))
-    return {c: round(float(k), 3) for c, k in db.execute(q)}
+    from .estoque import soma_lotes_por_codigo          # lote SOBRA de medida nova conta no código de origem
+    return soma_lotes_por_codigo(db)[0]
 
 
 def _com_entrada_recente(db: Session) -> set[int]:

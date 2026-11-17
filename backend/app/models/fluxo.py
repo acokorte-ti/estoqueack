@@ -220,6 +220,14 @@ class CorteItu(Base):
     previsto_kg: Mapped[float | None] = mapped_column(Kg)
     consumo_misto: Mapped[bool] = mapped_column(Boolean, default=False)   # 0008: parte de Itu de OP Itu + RJ (P26)
     lote_reto_id: Mapped[int | None] = mapped_column(ForeignKey("lote.id"))
+    # 0010 (spec v3.13 T13, regra do RETO): medida da sobra fora da bitola, destino (RETO | LOTE_NOVO), regra
+    # mostrada e conferida pelo operador, e o lote novo com a medida da sobra (fora da regra) [P35(b)(c)]
+    sobra_espessura_mm: Mapped[float | None] = mapped_column(Mm)
+    sobra_largura_mm: Mapped[float | None] = mapped_column(Mm)
+    sobra_diametro_mm: Mapped[float | None] = mapped_column(Mm)
+    sobra_destino: Mapped[str | None] = mapped_column(String(10))
+    regra_reto: Mapped[dict[str, Any] | None] = mapped_column(JsonDoc)
+    lote_sobra_id: Mapped[int | None] = mapped_column(ForeignKey("lote.id"))
     instrucao_mega: Mapped[str | None] = mapped_column(String(500))
     observacao: Mapped[str | None] = mapped_column(String(1000))
     confirmacoes: Mapped[dict[str, Any] | None] = mapped_column(JsonDoc)

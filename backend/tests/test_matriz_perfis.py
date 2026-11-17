@@ -27,7 +27,7 @@ MATRIZ = [
     ("POST", "/api/cops/999/receber/validar", {ITU}, "T12 receber"),
     ("POST", "/api/cortes-itu/validar", {ITU}, "T13 corte em Itu"),
     ("GET", "/api/sas", {ITU, RJ, ANALISE}, "T14 SA (consulta)"),
-    ("POST", "/api/sas/999/codigo/validar", {ITU}, "T14 informar código"),
+    ("POST", "/api/sas/999/codigo/validar", {ITU, ANALISE}, "T14 informar código (P36: Amanda, perfil Análise)"),
     ("PATCH", "/api/sas/999", {ITU, ANALISE}, "T14 editar (Análise: R$/kg)"),
     ("POST", "/api/entradas-nf/validar", {RJ}, "T06 entrada por NF"),
     ("POST", "/api/lotes/999/destinacoes", {ITU, ANALISE}, "T17 reservas e restrições"),

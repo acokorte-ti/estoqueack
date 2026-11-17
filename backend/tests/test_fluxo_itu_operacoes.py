@@ -21,7 +21,8 @@ def test_corte_itu_lote_mega_com_reto_e_instrucao(amb):
     client, u, ids, _ = amb
     h = entrar(client, u["itu"])
     corpo = {"op": 100508, "lote_id": ids["lmega"], "consumo_kg": 104.5, "sobra_kg": 12, "sobra_na_bitola": False,
-             "pecas": 128, "peso_usado_kg": 117}
+             "pecas": 128, "peso_usado_kg": 117,
+             "sobra_espessura_mm": 40, "sobra_largura_mm": 180, "conferi_regra_reto": True}   # v3.13: dentro da regra
     v = client.post("/api/cortes-itu/validar", json=corpo, headers=h).json()
     res = v["resultado"]
     assert res["gera_sa"] is False and res["perda_kg"] == 0.5

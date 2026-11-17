@@ -72,6 +72,8 @@ PADROES: dict[str, float] = {
     "TOLERANCIA_EXCESSO_RJ_INTEIRO_PCT": 8, "SA_JANELA_ANTES_DIAS": 7,
     # 0009 (R058, spec v3.11 T07/T23): peça inteira do RJ sem peso real bloqueia "Enviar ao RJ" depois de N dias
     "PENDENCIA_PESO_REAL_DIAS": 7,
+    # 0010 (spec v3.13 T13, Eduardo, 2026-11-17): regra do RETO da sobra de placa/blooming (E × L, em mm)
+    "RETO_ESP_LIMITE": 50, "RETO_LARG_MAX_ATE_LIMITE": 200, "RETO_LARG_MAX_ACIMA": 250,
 }
 
 

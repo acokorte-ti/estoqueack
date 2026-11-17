@@ -9,13 +9,14 @@ from collections import Counter
 from datetime import timedelta
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models import CadastroSa, Cop, Destinacao, ItemMP, Lote, MegaSaldo, Movimento, SolicitacaoCorte, Usuario
 
 from . import cops as svc_cops
 from . import entradas_mega, peso_real
+from . import estoque as svc_estoque
 from . import sas as svc_sas
 from . import solicitacoes as svc_sol
 from . import sync_mega
@@ -28,14 +29,7 @@ ITENS_POR_PENDENCIA = 10
 
 def conciliacao(db: Session, *, somente_divergentes: bool = False) -> dict[str, Any]:
     limite = parametro(db, "DIVERGENCIA_MEGA_KG")
-    lotes = dict(db.execute(
-        select(ItemMP.codigo_mega, func.coalesce(func.sum(Lote.saldo_kg), 0)).join(Lote, Lote.item_mp_id == ItemMP.id)
-        .where(Lote.planta_fiscal == "ITU", Lote.local_fisico == "ITU", ItemMP.codigo_mega.is_not(None))
-        .group_by(ItemMP.codigo_mega)).all())
-    n_lotes = dict(db.execute(
-        select(ItemMP.codigo_mega, func.count(Lote.id)).join(Lote, Lote.item_mp_id == ItemMP.id)
-        .where(Lote.planta_fiscal == "ITU", Lote.local_fisico == "ITU", Lote.saldo_kg > 0,
-               ItemMP.codigo_mega.is_not(None)).group_by(ItemMP.codigo_mega)).all())
+    lotes, n_lotes = svc_estoque.soma_lotes_por_codigo(db)
     catalogo = {c: d for c, d in db.execute(select(ItemMP.codigo_mega, ItemMP.descricao)
                                             .where(ItemMP.codigo_mega.is_not(None)))}
     mega = {m.codigo: m for m in db.scalars(select(MegaSaldo).where(MegaSaldo.codigo.in_(list(catalogo))))} \
@@ -52,8 +46,6 @@ def conciliacao(db: Session, *, somente_divergentes: bool = False) -> dict[str, 
         explicada = round(sum(e["kg"] for e in ex), 3)
         nao_expl = round(dif - explicada, 3)          # vermelho só para a diferença NÃO explicada na T15
         status = "OK" if abs(nao_expl) <= limite else ("MEGA_MAIOR" if nao_expl > 0 else "MEGA_MENOR")
-        if somente_divergentes and status == "OK":
-            continue
         itens.append({"codigo": cod, "descricao": (mega[cod].descricao if cod in mega else None) or catalogo[cod],
                       "saldo_mega_kg": round(sm, 3), "soma_lotes_kg": round(sl, 3), "diferenca_kg": dif,
                       "status": status, "lotes": int(n_lotes.get(cod) or 0),
@@ -62,13 +54,16 @@ def conciliacao(db: Session, *, somente_divergentes: bool = False) -> dict[str, 
     itens.sort(key=lambda x: (x["status"] == "OK", -abs(x["diferenca_kg"]), x["codigo"]))
     u = sync_mega.ultima(db, "ESTOQUE")
     cont = Counter(x["status"] for x in itens)
+    # R065(2): os totais são sempre de TODOS os códigos; `somente_divergentes` filtra só a lista
+    totais = {"codigos": len(itens), "ok": cont["OK"], "mega_maior": cont["MEGA_MAIOR"],
+              "mega_menor": cont["MEGA_MENOR"],
+              "saldo_mega_kg": round(sum(x["saldo_mega_kg"] for x in itens), 3),
+              "soma_lotes_kg": round(sum(x["soma_lotes_kg"] for x in itens), 3)}
+    if somente_divergentes:
+        itens = [x for x in itens if x["status"] != "OK"]
     return {"limite_kg": limite,
             "ultima_sincronizacao": u.terminado_em.isoformat() if u and u.terminado_em else None,
-            "totais": {"codigos": len(itens), "ok": cont["OK"], "mega_maior": cont["MEGA_MAIOR"],
-                       "mega_menor": cont["MEGA_MENOR"],
-                       "saldo_mega_kg": round(sum(x["saldo_mega_kg"] for x in itens), 3),
-                       "soma_lotes_kg": round(sum(x["soma_lotes_kg"] for x in itens), 3)},
-            "itens": itens}
+            "totais": totais, "itens": itens}
 
 
 def divergencias_mega(db: Session) -> int:

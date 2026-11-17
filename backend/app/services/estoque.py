@@ -28,6 +28,46 @@ TIPO_MOV_DESCRICAO = {
 }
 
 
+def codigo_mega_do_lote(lote: Lote) -> int | None:
+    """Código do Mega em que o kg do lote está no ERP. Só o Estoque Mega (ITU/ITU) tem código. Lote SOBRA com a
+    medida nova (T13 fora da regra do RETO, spec v3.13 [P35(c)]) não tem código próprio: o kg continua no código do
+    lote de origem, porque o "Fazer no Mega" não manda transferir (o mesmo vale para a conciliação, T16)."""
+    if (lote.planta_fiscal, lote.local_fisico) != ("ITU", "ITU"):
+        return None
+    atual: Lote | None = lote
+    for _ in range(50):                       # proteção contra ciclo
+        if atual is None:
+            return None
+        if atual.item.codigo_mega:
+            return atual.item.codigo_mega
+        if atual.tipo != "SOBRA" or atual.lote_pai_id is None:
+            return None
+        atual = atual.pai
+    return None
+
+
+def soma_lotes_por_codigo(db: Session) -> tuple[dict[int, float], dict[int, int]]:
+    """Saldo e nº de lotes com saldo do Estoque Mega por código do Mega (T15/T16), contando o lote SOBRA de medida
+    nova no código do lote de origem (`codigo_mega_do_lote`)."""
+    kg = {c: float(k) for c, k in db.execute(
+        select(ItemMP.codigo_mega, func.coalesce(func.sum(Lote.saldo_kg), 0)).join(Lote, Lote.item_mp_id == ItemMP.id)
+        .where(Lote.planta_fiscal == "ITU", Lote.local_fisico == "ITU", ItemMP.codigo_mega.is_not(None))
+        .group_by(ItemMP.codigo_mega))}
+    n = {c: int(k) for c, k in db.execute(
+        select(ItemMP.codigo_mega, func.count(Lote.id)).join(Lote, Lote.item_mp_id == ItemMP.id)
+        .where(Lote.planta_fiscal == "ITU", Lote.local_fisico == "ITU", Lote.saldo_kg > 0,
+               ItemMP.codigo_mega.is_not(None)).group_by(ItemMP.codigo_mega))}
+    sobras = db.scalars(select(Lote).join(ItemMP, Lote.item_mp_id == ItemMP.id).where(
+        Lote.planta_fiscal == "ITU", Lote.local_fisico == "ITU", Lote.tipo == "SOBRA", Lote.saldo_kg > 0,
+        ItemMP.codigo_mega.is_(None)))
+    for l in sobras:
+        cod = codigo_mega_do_lote(l)
+        if cod:
+            kg[cod] = kg.get(cod, 0.0) + float(l.saldo_kg)
+            n[cod] = n.get(cod, 0) + 1
+    return {c: round(v, 3) for c, v in kg.items()}, n
+
+
 def bitola(item: ItemMP) -> str:
     if item.formato == "RETO":
         return "RETO"
@@ -169,7 +209,10 @@ def lote_resumo(db: Session, lotes: list[Lote]) -> list[dict]:
             "id": l.id, "codigo": l.codigo, "conteiner": l.conteiner.codigo if l.conteiner else None,
             "liga": l.item.liga.codigo, "formato": l.item.formato, "bitola": bitola(l.item),
             "descricao": l.item.descricao,
-            "codigo_mega": l.item.codigo_mega if (l.planta_fiscal, l.local_fisico) == ("ITU", "ITU") else None,
+            "codigo_mega": codigo_mega_do_lote(l),
+            # R065(4): código de Itu da paridade manual (§1.4 item 8), para a linha mostrar o código mesmo sem lote
+            # do Estoque Mega com saldo
+            "codigo_paridade": l.item.paridade_item.codigo_mega if l.item.paridade_item_id is not None else None,
             "chave_material": chave_lote(l.item, mapa).texto,
             "paridade_manual": l.item.paridade_item_id is not None,      # §1.4 item 8 (R060)
             "estoque": BALDE.get((l.planta_fiscal, l.local_fisico)), "tipo": l.tipo,
@@ -197,8 +240,9 @@ def agrupado(itens: list[dict]) -> list[dict]:
             a[c] = round(a[c] + i[c], 3)
         a["por_estoque"][i["estoque"]] = round(a["por_estoque"][i["estoque"]] + i["saldo_kg"], 3)
         a["ligas"].add(i["liga"])
-        if i["codigo_mega"]:
-            a["codigos_itu"].add(i["codigo_mega"])
+        for cod in (i["codigo_mega"], i.get("codigo_paridade")):
+            if cod:
+                a["codigos_itu"].add(cod)
     for a in g.values():
         a["por_estoque"] = {b: a["por_estoque"].get(b, 0.0) for b in BALDE.values()}
         a["codigos_itu"] = sorted(a["codigos_itu"])

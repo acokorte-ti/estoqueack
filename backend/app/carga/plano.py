@@ -17,6 +17,7 @@ O plano é o que vai para a prévia (relatório) e, depois de aprovado, para `gr
 """
 from __future__ import annotations
 
+import dataclasses
 import re
 from collections import Counter, defaultdict
 from collections.abc import Callable
@@ -186,6 +187,7 @@ class Plano:
     conteiner_corrigido: list[dict[str, Any]] = field(default_factory=list)
     cortes_divididos: list[dict[str, Any]] = field(default_factory=list)
     peso_inicial_packing: list[dict[str, Any]] = field(default_factory=list)
+    prazos_corrigidos: list[dict[str, Any]] = field(default_factory=list)      # R065(1)
     solicitacoes: list[SolP] = field(default_factory=list)
     cops: dict[int, dict[str, Any]] = field(default_factory=dict)
     sas: list[SaP] = field(default_factory=list)
@@ -323,6 +325,8 @@ def montar(ctx: Contexto, estoque: list[P.LinhaEstoque2026], historico: list[dic
     _MESMA_LINHA = ctx.mesma_linha
     pl = Plano(data_mega=ctx.data_mega)
     # v3.11 §10.9: correções respondidas (arquivo --correcoes) antes de tudo; a planilha não muda (vai para a nota)
+    corte = C.aplicar_corte_planilha1(pl, ctx.correcoes, corte)
+    corte = _prazos(pl, corte)
     estoque, historico, corte, sas = C.aplicar_leitura(pl, ctx.correcoes, estoque, historico, corte, sas)
     estoque = C.aplicar_consumo_sem_op(pl, ctx.correcoes, estoque)
     C.preparar_paridade_manual(pl, ctx.correcoes, estoque, geral, chave_mat)
@@ -953,6 +957,30 @@ def _conteiner_pela_op(pl: Plano, c: P.LinhaCorte, idx: dict[tuple, list[LoteP]]
     return idx[(ct, fam)]
 
 
+PRAZO_ANO_ERRADO_DIAS = 180
+
+
+def _prazos(pl: Plano, corte: list[P.LinhaCorte]) -> list[P.LinhaCorte]:
+    """R065(1): PRAZO digitado sem o ano ("10/01") vira 10/01 do ano em que foi digitado: a solicitação de nov/2026
+    fica com prazo em jan/2026 e sobe no topo da Fila RJ como atrasada. Prazo mais de 180 dias ANTES da data
+    solicitada → mesmo dia e mês do ano seguinte (pendência INFO `PRAZO_ANO_CORRIGIDO`; a planilha não muda).
+    Prazo até 180 dias antes fica como está (pode ser pedido atrasado de fato). Leitura do TÉCNICO, pedido ao
+    FUNCIONAL para registrar no §10."""
+    out = []
+    for c in corte:
+        if c.prazo and c.data and (c.data - c.prazo).days > PRAZO_ANO_ERRADO_DIAS:
+            try:
+                novo = c.prazo.replace(year=c.prazo.year + 1)
+            except ValueError:                     # 29/02
+                novo = c.prazo.replace(year=c.prazo.year + 1, day=28)
+            pl.pend("PRAZO_ANO_CORRIGIDO", "INFO", f"OP {c.op}: prazo {c.prazo:%d/%m/%Y} é anterior à data solicitada "
+                    f"({c.data:%d/%m/%Y}); vale {novo:%d/%m/%Y} (ano não digitado).", c.origem)
+            pl.prazos_corrigidos.append({"op": c.op, "linha": c.linha, "antes": c.prazo, "depois": novo})
+            c = dataclasses.replace(c, prazo=novo)
+        out.append(c)
+    return out
+
+
 def _pecas_divididas(pecas: int, kgs: list[float]) -> list[int]:
     """Divide as peças pelos kg de cada parte (maiores restos), somando o total."""
     tot = sum(kgs) or 1.0
@@ -1072,6 +1100,17 @@ def _solicitacoes(pl: Plano, ctx: Contexto, corte: list[P.LinhaCorte], idx: dict
                     for m in ms:
                         if m.liberacao is None:
                             m.liberacao = lib
+                            outro = lote_do_mov.get(id(m))
+                            if outro is not None and outro is not lp:
+                                # R063/P37(b): o consumo da OP na ESTOQUE 2026 está em outro material do mesmo
+                                # contêiner (a medida do Corte difere da ESTOQUE 2026); a carga liga o corte ao lote
+                                # do Corte, mas a baixa é a do outro lote → conferir (ou corrigir no arquivo)
+                                pl.pend("CONSUMO_EM_OUTRO_MATERIAL", "REVISAR",
+                                        f"OP {c.op}: o Controle de Corte diz {lp.conteiner} "
+                                        f"{pl.itens[lp.item].descricao}, mas a ESTOQUE 2026 baixa {-m.kg:g} kg "
+                                        f"de {outro.conteiner} "
+                                        f"{pl.itens[outro.item].descricao}.", c.origem,
+                                        "Conferir o material com o Fabiano (correção de leitura no arquivo)")
                     if ncop:
                         cp = pl.cops.setdefault(ncop, {"numero": ncop, "datas": [], "itens": 0, "recebidos": 0})
                         cp["datas"].append(lib.data)

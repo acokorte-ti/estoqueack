@@ -20,6 +20,9 @@ ITU = deps.exigir_perfil("ESTOQUE")
 VER_COP = deps.exigir_perfil("OPERACAO_RJ", "ESTOQUE", "ANALISE")
 VER_SA = deps.exigir_perfil("ESTOQUE", "OPERACAO_RJ", "ANALISE")
 RS_KG = deps.exigir_perfil("ESTOQUE", "ANALISE")
+# P36 [proposta] (spec v3.13 T14): a Amanda cadastra o SA no Mega e informa o código com usuário próprio, perfil
+# Análise; o Estoque Itu e o Admin continuam podendo
+INFORMA_SA = deps.exigir_perfil("ESTOQUE", "ANALISE")
 SituacaoCop = Literal["ABERTO", "FECHADO", "ENVIADO", "RECEBIDO_PARCIAL", "RECEBIDO"]
 Emitente = Literal["FIO_CERTO", "MEDIO_VALE", "OUTRO"]
 
@@ -222,13 +225,13 @@ class CodigoSa(BaseModel):
 
 
 @router.post("/sas/{sa_id}/codigo/validar")
-def validar_codigo(sa_id: int, c: CodigoSa, db: Session = Depends(get_db), _: Usuario = Depends(ITU)) -> dict:
+def validar_codigo(sa_id: int, c: CodigoSa, db: Session = Depends(get_db), _: Usuario = Depends(INFORMA_SA)) -> dict:
     return sas.validar_codigo(db, sas.obter(db, sa_id), c.sa_codigo).como_dict()
 
 
 @router.post("/sas/{sa_id}/codigo")
 def informar_codigo(sa_id: int, c: CodigoSa, request: Request, db: Session = Depends(get_db),
-                    u: Usuario = Depends(ITU)) -> dict:
+                    u: Usuario = Depends(INFORMA_SA)) -> dict:
     return sas.para_dict(db, sas.informar_codigo(db, sa_id, c.sa_codigo, c.confirmacoes, usuario=u,
                                                  ip=deps.ip_cliente(request)))
 

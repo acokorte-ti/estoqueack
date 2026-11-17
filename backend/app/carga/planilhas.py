@@ -316,17 +316,32 @@ class LinhaCorte:
     origem: dict[str, Any] = field(default_factory=dict)
 
 
-def ler_corte(pasta: Path) -> list[LinhaCorte]:
+ABA_PLANILHA1 = "Planilha1"
+
+
+def ler_corte(pasta: Path, planilha1_linhas: set[int] | None = None) -> list[LinhaCorte]:
+    """Aba principal do Controle de Corte. `planilha1_linhas`: linhas da aba "Planilha1" que o arquivo de correções
+    manda importar (spec v3.13 §10.9 A.7, [proposta, P37(a)]); as outras linhas dessa aba nunca são lidas."""
     wb = _abrir(pasta, ARQ_CORTE)
-    ws = _aba(wb, "CONTROLE - CORTE RJ", ARQ_CORTE)
     nomes = {"data": "DATA SOLICITADA", "op": "OP", "item": "Item", "medida": "MEDIDA ACABADA", "qtd": "QTD",
              "mp": "MP", "ct": "CT", "peso": "PESO", "cliente": "CLIENTE", "info": "INFORMAÇÕES DO CORTE",
              "prazo": "PRAZO", "cortadas": "QTDE PEÇAS CORTADAS", "lib": "DATA DE LIBERAÇÃO", "obs": "OBSERVAÇÃO",
              "peso2": "PESO2", "feita": "LIBERAÇÃO FEITA", "receb": "RECEBIDO ACK?", "status": "STATUS"}
+    out = _linhas_corte(_aba(wb, "CONTROLE - CORTE RJ", ARQ_CORTE), nomes, None)
+    if planilha1_linhas:
+        sem_status = {k: v for k, v in nomes.items() if k != "status"}     # a Planilha1 não tem STATUS
+        out += _linhas_corte(_aba(wb, ABA_PLANILHA1, ARQ_CORTE), sem_status, planilha1_linhas)
+    return out
+
+
+def _linhas_corte(ws, nomes: dict[str, str], so_linhas: set[int] | None) -> list[LinhaCorte]:
     r0, col = _cabecalho(ws, nomes, ARQ_CORTE, range(1, 8))
     out = []
     for r in range(r0 + 1, ws.max_row + 1):
+        if so_linhas is not None and r not in so_linhas:
+            continue
         v = {k: ws.cell(r, c).value for k, c in col.items()}
+        v.setdefault("status", None)
         if v["op"] is None and v["mp"] is None:
             continue
         info_cel = ws.cell(r, col["info"])

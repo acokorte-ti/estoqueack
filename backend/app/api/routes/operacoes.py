@@ -46,6 +46,12 @@ class CorteItuCorpo(BaseModel):
     observacao: str | None = Field(None, max_length=1000)
     op_manual: OpManual | None = None
     consumo_misto: bool = Field(False, description="Parte de Itu de uma OP com consumo Itu + RJ [P26]")
+    # spec v3.13, regra do RETO (P35): sobra fora da bitola
+    sobra_espessura_mm: float | None = Field(None, gt=0, description="E da sobra (placa/blooming)")
+    sobra_largura_mm: float | None = Field(None, gt=0, description="L da sobra (placa/blooming)")
+    sobra_diametro_mm: float | None = Field(None, gt=0, description="Ø da sobra de redondo que vira lote novo")
+    sobra_vai_para_reto: bool | None = Field(None, description="Redondo: escolha do operador")
+    conferi_regra_reto: bool = Field(False, description="Caixa \"Conferi a regra do RETO\"")
     confirmacoes: dict[str, str] = Field(default_factory=dict)
 
 

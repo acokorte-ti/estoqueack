@@ -62,7 +62,7 @@ export default function Estoque() {
   return (
     <>
       <header className="cabecalho">
-        <h1>Consulta de estoque</h1>
+        <h1>Consultar estoque</h1>
         <p>{soRj ? "Lotes do RJ no Rio." : "Lotes dos três estoques. Clique num lote para ver movimentos, origem, reservas e notas."}</p>
       </header>
 

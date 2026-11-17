@@ -79,7 +79,7 @@ export default function LoteDetalhe() {
 
   return (
     <>
-      <p><Link to="/estoque">← Consulta de estoque</Link></p>
+      <p><Link to="/estoque">← Consultar estoque</Link></p>
       <header className="cabecalho cabecalho-acao">
         <div>
           <h1>{l.codigo} · {l.liga} {l.bitola}</h1>

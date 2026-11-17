@@ -1,6 +1,10 @@
 ﻿# Estado — FRONTEND / UX
 
-Atualizado: 2026-11-12 (rodada de 12/11)
+Atualizado: 2026-11-17 (menu da apresentação)
+
+## 2026-11-17 Menu por etapa (só texto)
+
+- Menu agrupado (Estoque, Pedidos de corte, Rio de Janeiro, Itu, Ferramentas, Administração; grupo vazio some) e itens/títulos `<h1>` com nomes novos ("Consultar estoque", "Cortes a fazer no RJ", "Receber material do RJ"...). Rotas e ACESSO iguais.
 
 ## Rodada 2026-11-12 (commit 2f7bb9e)
 

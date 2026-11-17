@@ -69,7 +69,7 @@ export default function Pendencias() {
           <span className={`etiqueta ${r.atrasos.ATENCAO ? "atencao" : ""}`}>{r.atrasos.ATENCAO} atenção</span>
           <span className={`etiqueta ${r.atrasos.ATRASADO ? "ruim" : ""}`}>{r.atrasos.ATRASADO} atrasada(s)</span>
           {entradas !== null && entradas !== undefined && (
-            <Link to="/entradas-mega" className={`etiqueta ${entradas ? "atencao" : "ok"}`}>Entradas Mega a classificar: {entradas}</Link>
+            <Link to="/entradas-mega" className={`etiqueta ${entradas ? "atencao" : "ok"}`}>Entradas do Mega sem lote: {entradas}</Link>
           )}
           {r.divergencias_mega.quantidade !== null && r.divergencias_mega.quantidade !== undefined && (
             <Link to="/conciliacao" className={`etiqueta ${r.divergencias_mega.quantidade ? "ruim" : "ok"}`}>

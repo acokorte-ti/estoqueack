@@ -42,7 +42,7 @@ export default function RetoPorOrigem({ soRj, estoqueInicial, aoVoltar }: { soRj
   return (
     <>
       <header className="cabecalho">
-        <h1>Consulta de estoque</h1>
+        <h1>Consultar estoque</h1>
         <p>RETO por origem: quantos kg de RETO vieram de cada bitola e contêiner.</p>
       </header>
       <div className="barra-acoes">

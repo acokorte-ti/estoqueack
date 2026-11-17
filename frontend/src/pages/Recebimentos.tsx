@@ -18,7 +18,7 @@ export function Recebimentos() {
   return (
     <>
       <header className="cabecalho">
-        <h1>Receber COP</h1>
+        <h1>Receber material do RJ</h1>
         <p>COPs que saíram do RJ. Confira item a item quando o material chegar a Itu.</p>
       </header>
       {erro && <p className="erro" role="alert">{erro}</p>}
@@ -117,9 +117,9 @@ export function ReceberCop() {
 
   return (
     <>
-      <p><Link to="/recebimentos">← Receber COP</Link></p>
+      <p><Link to="/recebimentos">← Receber material do RJ</Link></p>
       <header className="cabecalho">
-        <h1>Receber COP {c.numero}</h1>
+        <h1>Receber material do RJ · COP nº {c.numero}</h1>
         <p><span className={`etiqueta ${SITUACAO_COP[c.situacao]?.classe ?? ""}`}>{SITUACAO_COP[c.situacao]?.nome ?? c.situacao}</span> · enviado em {data(c.enviado_em)} · NF {c.nfs.length ? c.nfs.map(nfTexto).join(", ") : "—"}</p>
       </header>
 

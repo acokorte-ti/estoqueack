@@ -31,7 +31,7 @@ export default function EntradasNf() {
     <>
       <header className="cabecalho cabecalho-acao">
         <div>
-          <h1>Entrada por NF</h1>
+          <h1>Registrar entrada de material no RJ (NF)</h1>
           <p>Material que chega ao RJ. Cada item da NF vira um lote no RJ no Rio, com o peso informado.</p>
         </div>
         {lanca && <button className="primario" onClick={() => { setGravada(null); setNova(true); }}>Nova entrada</button>}

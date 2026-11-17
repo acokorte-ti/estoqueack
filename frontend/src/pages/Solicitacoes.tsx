@@ -54,7 +54,7 @@ export default function Solicitacoes() {
     <>
       <header className="cabecalho cabecalho-acao">
         <div>
-          <h1>Solicitações de corte</h1>
+          <h1>Acompanhar pedidos de corte</h1>
           <p>Todas as solicitações, do rascunho até a conclusão. Clique numa linha para ver o detalhe e as ações.</p>
         </div>
         <div className="botoes">

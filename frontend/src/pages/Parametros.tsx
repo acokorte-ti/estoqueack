@@ -32,7 +32,7 @@ export default function Parametros() {
   return (
     <>
       <header className="cabecalho">
-        <h1>Parâmetros</h1>
+        <h1>Parâmetros do sistema</h1>
         <p>Tolerâncias, prazos e horários usados pelas validações e avisos. A mudança vale a partir da próxima operação e fica na auditoria.</p>
       </header>
       {msg && <p className="validacao ok" role="status">{msg}</p>}

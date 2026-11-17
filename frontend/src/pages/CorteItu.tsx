@@ -157,7 +157,7 @@ export default function CorteItu() {
   return (
     <>
       <header className="cabecalho">
-        <h1>Corte em Itu</h1>
+        <h1>Registrar corte em Itu</h1>
         <p>Consumo da OP, sobra e RETO para material que já está em Itu (RJ em Itu ou Estoque Mega).</p>
       </header>
       {erro && <p className="erro" role="alert">{erro}</p>}

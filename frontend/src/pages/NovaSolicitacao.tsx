@@ -293,7 +293,7 @@ export default function NovaSolicitacao() {
   if (gravado) {
     return (
       <>
-        <header className="cabecalho"><h1>Nova solicitação de corte</h1></header>
+        <header className="cabecalho"><h1>Pedir corte de material</h1></header>
         <div className="ficha">
           <p className="validacao ok" role="status">
             {gravado.enviada ? "Enviada ao RJ. O peso previsto ficou reservado no lote e o Marcelo foi avisado." : "Rascunho salvo. Nada foi reservado ainda."}
@@ -305,7 +305,7 @@ export default function NovaSolicitacao() {
           </ul>
           {misto && itemItu && (
             <p className="validacao alerta">
-              OP com consumo misto: falta lançar a parte de Itu ({itemItu.lote.codigo}, {itemItu.quantidade} peça(s){previstoItu ? `, ${kg(previstoItu)} kg previstos` : ""}) no Corte em Itu.
+              OP com consumo misto: falta lançar a parte de Itu ({itemItu.lote.codigo}, {itemItu.quantidade} peça(s){previstoItu ? `, ${kg(previstoItu)} kg previstos` : ""}) em "Registrar corte em Itu".
             </p>
           )}
           <div className="botoes">
@@ -324,7 +324,7 @@ export default function NovaSolicitacao() {
   return (
     <>
       <header className="cabecalho">
-        <h1>Nova solicitação de corte</h1>
+        <h1>Pedir corte de material</h1>
         <p>Digite a OP, escolha o lote e confira o corte antes de enviar ao RJ.</p>
       </header>
 
@@ -414,7 +414,7 @@ export default function NovaSolicitacao() {
               <p className="dica">
                 Material de {liga} que comporta {medida.formato === "RETANGULAR" ? `${medida.espessura} × ${medida.largura}` : `Ø ${medida.diametro}`} × {medida.comprimento} mm,
                 agrupado por liga × bitola exatas, com Itu e RJ lado a lado. Marque um ou mais lotes e diga quantos kg de cada.
-                Lotes do RJ formam a solicitação; o lote de Itu (um por vez) é lançado no Corte em Itu.
+                Lotes do RJ formam a solicitação; o lote de Itu (um por vez) é lançado em "Registrar corte em Itu".
               </p>
               {grupos.map((g) => (
                 <QuadroGrupo key={g.chave ?? `${g.liga}-${g.formato}-${g.bitola}-${g.multiplo ?? ""}`} g={g}
@@ -485,7 +485,7 @@ export default function NovaSolicitacao() {
               <h2>Corte em Itu</h2>
               <p>
                 O lote <strong>{itens[0].lote.codigo}</strong> ({itens[0].lote.liga} {itens[0].lote.bitola}) já está em Itu. Não se cria solicitação
-                nem reserva: o corte é lançado direto no "Corte em Itu", com a OP, o lote e o peso previsto preenchidos.
+                nem reserva: o corte é lançado direto em "Registrar corte em Itu", com a OP, o lote e o peso previsto preenchidos.
               </p>
               <div className="botoes">
                 <Link className="primario" to={linkItu}>Registrar corte em Itu agora</Link>
@@ -497,7 +497,7 @@ export default function NovaSolicitacao() {
               {misto && itemItu && (
                 <section className="painel-form" aria-label="Parte de Itu">
                   <h2>Parte de Itu · {itemItu.lote.liga} {itemItu.lote.bitola} <span className="desc">({itemItu.lote.codigo}, {ESTOQUE_NOME[itemItu.lote.estoque] ?? itemItu.lote.estoque})</span></h2>
-                  <p className="dica">OP com consumo misto. Esta parte não entra na solicitação: depois de enviar a parte do RJ, o botão "Registrar corte em Itu agora" abre o Corte em Itu com a OP, o lote e o previsto.</p>
+                  <p className="dica">OP com consumo misto. Esta parte não entra na solicitação: depois de enviar a parte do RJ, o botão "Registrar corte em Itu agora" abre a tela de corte em Itu com a OP, o lote e o previsto.</p>
                   <div className="grade-form">
                     <label>
                       <span className="rotulo">Peças desta parte <span className="sugerido">sugerido</span></span>
@@ -540,7 +540,7 @@ export default function NovaSolicitacao() {
           {!!validacao.resultado?.efeitos?.length && <TabelaEfeitos efeitos={validacao.resultado.efeitos} />}
           {misto && itemItu && (
             <p className="validacao alerta">
-              OP com consumo misto: esta solicitação é a parte do RJ. A parte de Itu ({itemItu.lote.codigo}, {itemItu.quantidade} peça(s){previstoItu ? `, ${kg(previstoItu)} kg` : ""}) é lançada no Corte em Itu depois de enviar.
+              OP com consumo misto: esta solicitação é a parte do RJ. A parte de Itu ({itemItu.lote.codigo}, {itemItu.quantidade} peça(s){previstoItu ? `, ${kg(previstoItu)} kg` : ""}) é lançada em "Registrar corte em Itu" depois de enviar.
             </p>
           )}
           <PainelValidacao ocorrencias={validacao.ocorrencias} confirmacoes={conf} aoMudar={setConf} semOcorrencias="Tudo certo. Pode enviar ao RJ." />

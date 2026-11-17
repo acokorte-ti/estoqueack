@@ -12,27 +12,53 @@ interface Item {
   perfis?: Perfil[];
 }
 
-const OPERACAO: Item[] = [
-  { para: "/", rotulo: "Painel", pronto: true },
-  { para: "/estoque", rotulo: "Consulta de estoque", pronto: true, perfis: ACESSO.estoque },
-  { para: "/entradas-nf", rotulo: "Entrada por NF", pronto: true, perfis: ACESSO.entradaNf },
-  { para: "/solicitacoes/nova", rotulo: "Nova solicitação de corte", pronto: true, perfis: ACESSO.novaSolicitacao },
-  { para: "/solicitacoes", rotulo: "Solicitações de corte", pronto: true, perfis: ACESSO.solicitacoes },
-  { para: "/fila-rj", rotulo: "Fila RJ", pronto: true, perfis: ACESSO.filaRj },
-  { para: "/cops", rotulo: "COP", pronto: true, perfis: ACESSO.cop },
-  { para: "/recebimentos", rotulo: "Receber COP", pronto: true, perfis: ACESSO.receberCop },
-  { para: "/corte-itu", rotulo: "Corte em Itu", pronto: true, perfis: ACESSO.corteItu },
-  { para: "/sa", rotulo: "SA", pronto: true, perfis: ACESSO.sa },
-  { para: "/entradas-mega", rotulo: "Entradas Mega a classificar", pronto: true, perfis: ACESSO.entradasMega },
-  { para: "/conciliacao", rotulo: "Conciliação com o Mega", pronto: true, perfis: ACESSO.conciliacao },
-  { para: "/relatorios", rotulo: "Relatórios" },
-  { para: "/calculadora", rotulo: "Calculadora de peso", pronto: true },
+const PAINEL: Item[] = [{ para: "/", rotulo: "Painel de pendências", pronto: true }];
+
+const GRUPOS: { titulo: string; itens: Item[] }[] = [
+  {
+    titulo: "Estoque",
+    itens: [
+      { para: "/estoque", rotulo: "Consultar estoque", pronto: true, perfis: ACESSO.estoque },
+      { para: "/entradas-nf", rotulo: "Registrar entrada de material no RJ (NF)", pronto: true, perfis: ACESSO.entradaNf },
+      { para: "/entradas-mega", rotulo: "Entradas do Mega sem lote", pronto: true, perfis: ACESSO.entradasMega },
+      { para: "/conciliacao", rotulo: "Conferir estoque com o Mega", pronto: true, perfis: ACESSO.conciliacao },
+    ],
+  },
+  {
+    titulo: "Pedidos de corte",
+    itens: [
+      { para: "/solicitacoes/nova", rotulo: "Pedir corte de material", pronto: true, perfis: ACESSO.novaSolicitacao },
+      { para: "/solicitacoes", rotulo: "Acompanhar pedidos de corte", pronto: true, perfis: ACESSO.solicitacoes },
+    ],
+  },
+  {
+    titulo: "Rio de Janeiro",
+    itens: [
+      { para: "/fila-rj", rotulo: "Cortes a fazer no RJ", pronto: true, perfis: ACESSO.filaRj },
+      { para: "/cops", rotulo: "Montar envio para Itu (COP)", pronto: true, perfis: ACESSO.cop },
+    ],
+  },
+  {
+    titulo: "Itu",
+    itens: [
+      { para: "/recebimentos", rotulo: "Receber material do RJ", pronto: true, perfis: ACESSO.receberCop },
+      { para: "/corte-itu", rotulo: "Registrar corte em Itu", pronto: true, perfis: ACESSO.corteItu },
+      { para: "/sa", rotulo: "Cadastro de SA (semiacabado)", pronto: true, perfis: ACESSO.sa },
+    ],
+  },
+  {
+    titulo: "Ferramentas",
+    itens: [
+      { para: "/calculadora", rotulo: "Calculadora de peso", pronto: true },
+      { para: "/relatorios", rotulo: "Relatórios" },
+    ],
+  },
 ];
 
 const ADMIN: Item[] = [
   { para: "/admin/usuarios", rotulo: "Usuários", pronto: true },
   { para: "/admin/ligas", rotulo: "Ligas e densidades", pronto: true },
-  { para: "/admin/parametros", rotulo: "Parâmetros", pronto: true },
+  { para: "/admin/parametros", rotulo: "Parâmetros do sistema", pronto: true },
 ];
 
 function Lista({ itens }: { itens: Item[] }) {
@@ -110,7 +136,17 @@ export default function Layout() {
           </button>
         </div>
         <nav aria-label="Navegação principal">
-          <Lista itens={OPERACAO.filter((i) => !i.perfis || (usuario && i.perfis.includes(usuario.perfil)))} />
+          <Lista itens={PAINEL} />
+          {GRUPOS.map((g) => {
+            const visiveis = g.itens.filter((i) => !i.perfis || (usuario && i.perfis.includes(usuario.perfil)));
+            if (visiveis.length === 0) return null;
+            return (
+              <div key={g.titulo}>
+                <p className="grupo">{g.titulo}</p>
+                <Lista itens={visiveis} />
+              </div>
+            );
+          })}
           {usuario?.perfil === "ADMIN" && (
             <>
               <p className="grupo">Administração</p>

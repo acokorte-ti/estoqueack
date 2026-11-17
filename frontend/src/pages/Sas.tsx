@@ -121,7 +121,7 @@ export default function Sas() {
   return (
     <>
       <header className="cabecalho">
-        <h1>SA</h1>
+        <h1>Cadastro de SA (semiacabado)</h1>
         <p>Pedidos de SA que nascem do COP fechado e do corte em Itu de material RJ. Informe o código e confirme no Mega.</p>
       </header>
 

@@ -40,7 +40,7 @@ export default function Cops() {
     <>
       <header className="cabecalho cabecalho-acao">
         <div>
-          <h1>COP</h1>
+          <h1>Montar envio para Itu (COP)</h1>
           <p>Monte o COP com os cortes prontos, feche para Itu fazer os SAs e envie quando os SAs e a NF estiverem prontos.</p>
         </div>
         {monta && <button className="primario" onClick={() => setNovo(true)}>Novo COP</button>}

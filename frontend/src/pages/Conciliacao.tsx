@@ -27,7 +27,7 @@ export default function Conciliacao() {
   return (
     <>
       <header className="cabecalho">
-        <h1>Conciliação com o Mega</h1>
+        <h1>Conferir estoque com o Mega</h1>
         <p>Para cada código do Estoque Mega: saldo no Mega × soma dos lotes no sistema. Diferença acima de {r?.limite_kg ?? 5} kg aparece em destaque. Só consulta nesta versão.</p>
       </header>
       <SyncMega />

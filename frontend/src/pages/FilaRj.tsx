@@ -34,7 +34,7 @@ export default function FilaRj() {
     <>
       <header className="cabecalho cabecalho-acao nao-imprimir">
         <div>
-          <h1>Fila RJ</h1>
+          <h1>Cortes a fazer no RJ</h1>
           <p>Solicitações enviadas e parciais, da mais urgente para a menos urgente.</p>
         </div>
         {!!fila?.length && <button className="secundario" onClick={() => window.print()}>Imprimir lista de corte</button>}

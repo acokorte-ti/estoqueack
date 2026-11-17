@@ -57,7 +57,7 @@ export default function CopDetalhe() {
       <p><Link to="/cops">← COPs</Link></p>
       <header className="cabecalho cabecalho-acao">
         <div>
-          <h1>COP {c.numero}</h1>
+          <h1>COP nº {c.numero}</h1>
           <p>
             <span className={`etiqueta ${SITUACAO_COP[c.situacao]?.classe ?? ""}`}>{SITUACAO_COP[c.situacao]?.nome ?? c.situacao}</span>{" "}
             {c.qtd_itens} item(ns) · {kg(c.peso_total_kg)} kg
@@ -172,7 +172,7 @@ function JanelaAdicionar({ cop, aoFechar, aoGravar }: { cop: Cop; aoFechar: () =
   return (
     <Janela titulo={`Adicionar cortes prontos ao COP ${cop.numero}`} aoFechar={aoFechar} larga>
       {prontos === null ? <p className="carregando">Buscando cortes…</p> : !prontos.length ? (
-        <p className="validacao alerta">Nenhum corte pronto fora de COP. Registre os cortes na Fila RJ primeiro.</p>
+        <p className="validacao alerta">Nenhum corte pronto fora de COP. Registre os cortes em "Cortes a fazer no RJ" primeiro.</p>
       ) : (
         <ul className="escolhas">
           {prontos.map((p) => (

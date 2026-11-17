@@ -57,7 +57,7 @@ export default function EntradasMega() {
   return (
     <>
       <header className="cabecalho">
-        <h1>Entradas Mega a classificar</h1>
+        <h1>Entradas do Mega sem lote</h1>
         <p>Código com mais saldo no Mega do que nos lotes do sistema (mais de {lista?.limite_kg ?? 5} kg). Crie o lote da entrada ou diga que a diferença não é entrada.{!altera && " Você só consulta esta tela."}</p>
       </header>
       <SyncMega />

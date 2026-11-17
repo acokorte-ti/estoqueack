@@ -104,7 +104,7 @@ export default function RegistrarCorte() {
 
   return (
     <>
-      <p><Link to="/fila-rj">← Fila RJ</Link></p>
+      <p><Link to="/fila-rj">← Cortes a fazer no RJ</Link></p>
       <header className="cabecalho">
         <h1>Registrar corte · OP {s.op}</h1>
         <p className="cartao-instrucao">{s.instrucao ?? `${s.quantidade} peça(s)`}</p>

@@ -63,9 +63,11 @@ function comLimite(ocs: Ocorrencia[], pctLim: number): Ocorrencia[] {
  * (peça inteira aguardando peso real, lote RJ em Itu, recebimento).
  */
 export default function LancamentoCorteItu({ op, megaFora, lote, previsto = null, misto = false, pecasInicial = "", pecaPendente = null,
-  voltar, aoGravar, aoRecomecar, textoRecomecar = "Novo corte em Itu", aviso }: {
+  voltar, aoGravar, aoRecomecar, textoRecomecar = "Novo corte em Itu", aviso, botoesNoTopo = false }: {
   op: { numero: number } | null; megaFora: boolean; lote: LoteCorteItu | null; previsto?: number | null; misto?: boolean;
   pecasInicial?: string; pecaPendente?: PecaPesoReal | null; voltar?: () => void; aoGravar?: () => void;
+  /** dentro de uma tela em passos: repete Voltar/Conferir/Confirmar no topo (Eduardo, 2026-11-17) */
+  botoesNoTopo?: boolean;
   aoRecomecar: () => void; textoRecomecar?: string; aviso?: ReactNode;
 }) {
   const [f, setF] = useState({ pecas: pecasInicial, consumo: "", sobra: "", naBitola: true, usado: "", data: hojeIso(), obs: "",
@@ -169,8 +171,20 @@ export default function LancamentoCorteItu({ op, megaFora, lote, previsto = null
     );
   }
 
+  const acoes = (
+    <>
+      {voltar && <button className="secundario" onClick={voltar} disabled={ocupado}>Voltar</button>}
+      {!v ? (
+        <button className="primario" disabled={!pronto || ocupado} onClick={() => void conferir()}>{ocupado ? "Conferindo…" : "Conferir corte"}</button>
+      ) : (
+        <button className="primario" disabled={ocupado || regraPendente || !podeGravar(ocsPainel, conf)} onClick={() => void confirmar()}>{ocupado ? "Gravando…" : "Confirmar corte em Itu"}</button>
+      )}
+    </>
+  );
+
   return (
     <>
+      {botoesNoTopo && <div className="botoes botoes-topo" aria-label="Navegação dos passos">{acoes}</div>}
       <section className="painel-form" style={{ marginTop: "var(--esp-4)" }}>
         <h2>Corte</h2>
         {aviso}
@@ -270,14 +284,7 @@ export default function LancamentoCorteItu({ op, megaFora, lote, previsto = null
       )}
 
       {erro && <p className="erro" role="alert">{erro}</p>}
-      <div className="rodape-acao">
-        {voltar && <button className="secundario" onClick={voltar} disabled={ocupado}>Voltar</button>}
-        {!v ? (
-          <button className="primario" disabled={!pronto || ocupado} onClick={() => void conferir()}>{ocupado ? "Conferindo…" : "Conferir corte"}</button>
-        ) : (
-          <button className="primario" disabled={ocupado || regraPendente || !podeGravar(ocsPainel, conf)} onClick={() => void confirmar()}>{ocupado ? "Gravando…" : "Confirmar corte em Itu"}</button>
-        )}
-      </div>
+      <div className="rodape-acao">{acoes}</div>
     </>
   );
 }

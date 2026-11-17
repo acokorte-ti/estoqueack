@@ -17,6 +17,19 @@ const estimado = (s: SolicItem) => {
   return s.pecas_cortadas && s.quantidade > 0 ? (s.peso_previsto_kg * Math.max(faltam, 0)) / s.quantidade : s.peso_previsto_kg;
 };
 
+/** Dias esperando no RJ, desde o envio (API: dias_em_aberto; reserva: conta pela data de envio ou da solicitação). */
+const diasEsperando = (s: SolicItem) => {
+  if (s.dias_em_aberto !== null && s.dias_em_aberto !== undefined) return s.dias_em_aberto;
+  const ref = s.enviada_em ?? s.data;
+  return ref ? Math.max(0, Math.floor((Date.now() - new Date(ref.length === 10 ? `${ref}T12:00:00` : ref).getTime()) / 86400000)) : null;
+};
+const inicioEspera = (s: SolicItem) => {
+  const ref = s.enviada_em ?? s.data;
+  return ref ? new Date(ref.length === 10 ? `${ref}T12:00:00` : ref).getTime() : Number.MAX_SAFE_INTEGER;
+};
+type Ordem = "ESPERA" | "PRAZO";
+const ORDEM_NOME: Record<Ordem, string> = { ESPERA: "há mais tempo esperando", PRAZO: "prazo" };
+
 /** T09 Fila RJ: o que o Marcelo tem para cortar, por prazo. Cartões grandes para tablet/celular. */
 export default function FilaRj() {
   const { usuario } = useSessao();
@@ -28,14 +41,19 @@ export default function FilaRj() {
   const [insuf, setInsuf] = useState<SolicItem | null>(null);
   const [aviso, setAviso] = useState("");
   const [busca, setBusca] = useState("");
+  // padrão: há mais tempo esperando no topo (Eduardo, 2026-11-17); "prazo" = ordem da API
+  const [ordem, setOrdem] = useState<Ordem>("ESPERA");
   // cartões compactos: abrem ao clicar; o que veio do link do sino já abre
   const [abertos, setAbertos] = useState<Set<number>>(() => new Set(destaque ? [destaque] : []));
   const alternar = (id: number) => setAbertos((a) => { const n = new Set(a); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const visiveis = useMemo(() => {
     const termo = normalizar(busca.trim());
-    if (!fila || !termo) return fila ?? [];
-    return fila.filter((s) => normalizar([s.op, s.cliente, s.lote.liga, s.lote.bitola, s.lote.conteiner, s.lote.codigo, material(s.lote)].filter(Boolean).join(" ")).includes(termo));
-  }, [fila, busca]);
+    const achados = !fila ? [] : !termo ? fila
+      : fila.filter((s) => normalizar([s.op, s.cliente, s.lote.liga, s.lote.bitola, s.lote.conteiner, s.lote.codigo, material(s.lote)].filter(Boolean).join(" ")).includes(termo));
+    if (ordem === "PRAZO") return achados;
+    // sort estável: empate no envio fica na ordem de prazo da API
+    return [...achados].sort((a, b) => inicioEspera(a) - inicioEspera(b));
+  }, [fila, busca, ordem]);
   const totalEstimado = useMemo(() => visiveis.reduce((t, s) => t + (estimado(s) ?? 0), 0), [visiveis]);
 
   const carregar = useCallback(async () => {
@@ -55,7 +73,7 @@ export default function FilaRj() {
       <header className="cabecalho cabecalho-acao nao-imprimir">
         <div>
           <h1>Cortes a fazer no RJ</h1>
-          <p>Solicitações enviadas e parciais, da mais urgente para a menos urgente.</p>
+          <p>Solicitações enviadas e parciais, {ordem === "ESPERA" ? "da que está há mais tempo esperando para a mais nova" : "da mais urgente (prazo) para a menos urgente"}.</p>
         </div>
         {!!visiveis.length && <button className="secundario" onClick={() => window.print()}>Imprimir lista de corte</button>}
       </header>
@@ -74,7 +92,7 @@ export default function FilaRj() {
               <tr className="lista-corte-titulo">
                 <th colSpan={10}>
                   <strong>Lista de corte · RJ</strong> · {new Date().toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                  {" "}· {visiveis.length} item(ns) · {kg(totalEstimado)} kg estimados · por prazo{busca.trim() ? ` · pesquisa “${busca.trim()}”` : ""}
+                  {" "}· {visiveis.length} item(ns) · {kg(totalEstimado)} kg estimados · por {ORDEM_NOME[ordem]}{busca.trim() ? ` · pesquisa “${busca.trim()}”` : ""}
                 </th>
               </tr>
               <tr className="lista-corte-colunas">
@@ -93,7 +111,7 @@ export default function FilaRj() {
                     <td>{s.pecas_cortadas ? `faltam ${s.quantidade - s.pecas_cortadas} de ${s.quantidade}` : s.quantidade}</td>
                     <td className="num sem-quebra">{est === null ? "—" : kg(est)}</td>
                     <td className="sem-quebra">{data(s.prazo)}</td>
-                    <td className="sem-quebra">{s.dias_em_aberto ?? "—"}{s.atraso === "ATRASADO" ? " !" : ""}</td>
+                    <td className="sem-quebra">{diasEsperando(s) ?? "—"}{s.atraso === "ATRASADO" ? " !" : ""}</td>
                     <td>{s.item_descricao ?? "—"}<br />{s.cliente ?? "—"}</td>
                     <td className="em-branco" /><td className="em-branco" />
                   </tr>
@@ -121,6 +139,12 @@ export default function FilaRj() {
           <label style={{ flexBasis: "24rem" }}>Pesquisar
             <input type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="OP, cliente, liga, bitola, contêiner ou lote" />
           </label>
+          <label>Ordem
+            <select value={ordem} onChange={(e) => setOrdem(e.target.value as Ordem)}>
+              <option value="ESPERA">Há mais tempo esperando</option>
+              <option value="PRAZO">Prazo</option>
+            </select>
+          </label>
           <span className="desc">{busca.trim() ? `${visiveis.length} de ${fila.length}` : `${fila.length}`} corte(s) · {kg(totalEstimado)} kg estimados</span>
         </div>
       )}
@@ -134,16 +158,18 @@ export default function FilaRj() {
           const pecas = s.pecas_cortadas ? `faltam ${faltam} de ${s.quantidade}` : `${s.quantidade}`;
           const aberto = abertos.has(s.id);
           const est = estimado(s);
+          const espera = diasEsperando(s);
           return (
             <li key={s.id} className={["cartao", "cartao-compacto", s.atraso === "ATRASADO" ? "atrasado" : "", destaque === s.id ? "destaque" : ""].join(" ")}>
               <button type="button" className="cartao-linha" aria-expanded={aberto} onClick={() => alternar(s.id)}>
                 <span className="cartao-op">OP {s.op}</span>
                 <span className="cartao-linha-material">{material(s.lote)}</span>
+                {espera !== null && <span className="cartao-espera">há {espera} dia{espera === 1 ? "" : "s"}</span>}
                 <span>{pecas} peça(s)</span>
                 {est !== null && <span>≈ {kg(est)} kg</span>}
                 <span>prazo {data(s.prazo)}</span>
                 <span className="cartao-linha-etiquetas">
-                  <EtiquetaAtraso a={s.atraso} dias={s.dias_em_aberto} />
+                  <EtiquetaAtraso a={s.atraso} />
                   {s.situacao !== "ENVIADA" && <EtiquetaSituacao s={s.situacao} />}
                 </span>
                 <span className="cartao-linha-seta" aria-hidden="true">{aberto ? "▴" : "▾"}</span>

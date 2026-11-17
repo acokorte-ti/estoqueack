@@ -212,6 +212,7 @@ input[type="radio"], input[type="checkbox"] { min-height: 0; width: 1.25rem; hei
 
 /* ===================== Assistente (passos) ===================== */
 .passos { list-style: none; margin: 0 0 var(--esp-5); padding: 0; display: flex; gap: var(--esp-2); flex-wrap: wrap; }
+.botoes-topo { margin: calc(-1 * var(--esp-2)) 0 var(--esp-5); }
 .passos li {
   display: flex; align-items: center; gap: var(--esp-2); padding: var(--esp-2) var(--esp-4) var(--esp-2) var(--esp-2);
   border: 1.5px solid var(--aco-linha); border-radius: var(--raio); background: var(--branco); color: var(--aco-medio); font-weight: 600;
@@ -305,6 +306,7 @@ tr.linha-aviso .validacao { margin: 0 0 var(--esp-2); font-size: var(--t-pequeno
 .cartao-linha:focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; border-radius: var(--raio-painel); }
 .cartao-linha .cartao-op { margin-right: 0; font-size: 1.125rem; }
 .cartao-linha-material { font-weight: 700; color: var(--aco-preto); }
+.cartao-espera { color: var(--aco-medio); font-weight: 600; }
 .cartao-linha-etiquetas { display: inline-flex; flex-wrap: wrap; gap: var(--esp-2); margin-left: auto; }
 .cartao-linha-seta { color: var(--aco-medio); font-size: 1.25rem; }
 .secao { margin-top: var(--esp-6); }
@@ -346,7 +348,7 @@ tr.linha-aviso .validacao { margin: 0 0 var(--esp-2); font-size: var(--t-pequeno
 @media print {
   @page { size: A4 landscape; margin: 10mm; }
   :root, body { background: #fff; font-size: 10pt; }
-  .topo, .lateral, .fundo-menu, .nao-imprimir, .rodape-acao, .sino, dialog { display: none !important; }
+  .topo, .lateral, .fundo-menu, .nao-imprimir, .rodape-acao, .botoes-topo, .sino, dialog { display: none !important; }
   .moldura { display: block; min-height: 0; }
   .conteudo { padding: 0; max-width: none; }
   .so-impressao { display: block; }
@@ -498,6 +500,8 @@ tr.linha-aviso .validacao { margin: 0 0 var(--esp-2); font-size: var(--t-pequeno
 .grupo-sugestao h3 { margin: 0 0 var(--esp-1); font-size: 1rem; }
 .lado-a-lado { display: grid; grid-template-columns: 1fr 1fr; gap: var(--esp-4); }
 .kg-uso { display: flex; align-items: center; gap: var(--esp-2); margin: var(--esp-1) 0 0 var(--esp-5); font-size: var(--t-pequeno); }
+.kg-uso-linha { display: flex; flex-wrap: wrap; gap: 0 var(--esp-4); margin: var(--esp-1) 0 0 var(--esp-5); }
+.kg-uso-linha .kg-uso { margin: 0; }
 .linha-detalhe td { background: #f7f7f7; }
 @media (max-width: 900px) { .lado-a-lado { grid-template-columns: 1fr; } }
 .texto-bloqueio { color: var(--bloqueio); }

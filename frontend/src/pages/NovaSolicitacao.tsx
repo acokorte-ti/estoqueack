@@ -95,6 +95,8 @@ export default function NovaSolicitacao() {
   const [lotes, setLotes] = useState<LoteCompativel[] | null>(null);
   const [grupos, setGrupos] = useState<Grupo[] | null>(null);
   const [itens, setItens] = useState<ItemCorte[]>([]);
+  /** lotes cujas peças a pessoa digitou: não são ajustados sozinhos (balanceamento, Eduardo 2026-11-17) */
+  const [editados, setEditados] = useState<Set<number>>(() => new Set());
   const [prazo, setPrazo] = useState("");
   const [observacao, setObservacao] = useState("");
 
@@ -219,28 +221,84 @@ export default function NovaSolicitacao() {
       liga_equivalente: gl.liga_equivalente, indicadores: gl.indicadores };
   }
 
+  /** kg a usar que acompanha as peças: peças × previsto por peça, sem passar do disponível (lote inteiro). */
+  const kgDasPecas = (i: ItemCorte, n: number) => {
+    const k = kgPorPeca(i.lote);
+    return k ? n2s(Math.round(Math.min(i.lote.disponivel_kg, n * k) * 10) / 10) : i.kg_uso;
+  };
+
+  /**
+   * Balanceamento de peças entre lotes da mesma OP (DECISOES 2026-11-17): do menor disponível para o maior,
+   * os menores recebem as peças que comportam (disponível ÷ previsto por peça, para baixo, no mínimo 1:
+   * lote que não cobre 1 peça é consumido por inteiro) e o maior fica com o restante. Vale também para o consumo misto.
+   */
+  function distribuir(lista: ItemCorte[]): ItemCorte[] {
+    const q = num(quantidadeOp);
+    setEditados(new Set());
+    if (!q || !lista.length) return lista;
+    if (lista.length === 1) return lista.map((i) => ({ ...i, quantidade: String(q) }));
+    const ordem = [...lista].sort((a, b) => a.lote.disponivel_kg - b.lote.disponivel_kg);
+    const totalDisp = lista.reduce((t, i) => t + i.lote.disponivel_kg, 0);
+    const pecas = new Map<number, number>();
+    let resto = q;
+    ordem.slice(0, -1).forEach((i) => {
+      const k = kgPorPeca(i.lote);
+      const cabe = k ? Math.floor(i.lote.disponivel_kg / k + 1e-9) : totalDisp > 0 ? Math.floor((q * i.lote.disponivel_kg) / totalDisp) : 0;
+      const n = Math.min(Math.max(1, cabe), resto);
+      pecas.set(i.lote.id, n);
+      resto -= n;
+    });
+    pecas.set(ordem[ordem.length - 1].lote.id, Math.max(0, resto));
+    return lista.map((i) => {
+      const n = pecas.get(i.lote.id) ?? 0;
+      return { ...i, quantidade: String(n), kg_uso: kgDasPecas(i, n) };
+    });
+  }
+
+  /** A pessoa mudou as peças de um lote: o de maior disponível entre os que ela não editou fecha o total da OP. */
+  function mudarPecas(id: number, v: string) {
+    const q = num(quantidadeOp);
+    const ed = new Set(editados).add(id);
+    setEditados(ed);
+    const outros = itens.filter((i) => i.lote.id !== id);
+    const livres = outros.filter((i) => !ed.has(i.lote.id));
+    const alvo = (livres.length ? livres : outros).reduce<ItemCorte | null>((m, i) => (!m || i.lote.disponivel_kg > m.lote.disponivel_kg ? i : m), null);
+    const nEditado = num(v);
+    const somaFixos = itens.filter((i) => i.lote.id !== alvo?.lote.id)
+      .reduce((t, i) => t + ((i.lote.id === id ? nEditado : num(i.quantidade)) ?? 0), 0);
+    setItens(itens.map((i) => {
+      if (i.lote.id === id) return { ...i, quantidade: v, kg_uso: nEditado !== undefined && !Number.isNaN(nEditado) ? kgDasPecas(i, nEditado) : i.kg_uso };
+      if (alvo && q && i.lote.id === alvo.lote.id) {
+        const n = Math.max(0, q - somaFixos);
+        return { ...i, quantidade: String(n), kg_uso: kgDasPecas(i, n) };
+      }
+      return i;
+    }));
+  }
+
   function alternarLote(l: LoteCompativel) {
     const ja = itens.find((i) => i.lote.id === l.id);
-    if (ja) return setItens(itens.filter((i) => i.lote.id !== l.id));
+    if (ja) return setItens(distribuir(itens.filter((i) => i.lote.id !== l.id)));
     // sugere usar o que falta para o necessário (a decisão é de quem monta; nada é escolhido sozinho)
     const g = grupoDoLote(l.id);
     const nec = necessario ?? g?.peso_necessario_kg ?? g?.peso_previsto_kg ?? l.peso_previsto_kg ?? 0;
     const falta = Math.max(0, nec - kgEscolhido);
     const item = { ...novoItem(l), kg_uso: n2s(Math.round(Math.min(l.disponivel_kg, falta || l.disponivel_kg) * 10) / 10) };
     // lotes do RJ podem ser vários; de Itu, um por vez (cada um é um corte na T13). Itu + RJ = consumo misto
-    if (emItu(l)) return setItens([...itens.filter((i) => !emItu(i.lote)), item]);
-    setItens([...itens, item]);
+    if (emItu(l)) return setItens(distribuir([...itens.filter((i) => !emItu(i.lote)), item]));
+    setItens(distribuir([...itens, item]));
   }
 
-  /** Passo 2 → 3: com mais de um lote, sugere as peças de cada parte proporcionais aos kg escolhidos. */
-  function irParaCorte() {
-    const total = itens.reduce((t, i) => t + (num(i.kg_uso) ?? 0), 0);
-    const q = num(quantidadeOp);
-    if (itens.length > 1 && q && total > 0) {
-      setItens(itens.map((i) => ({ ...i, quantidade: String(Math.max(1, Math.round((q * (num(i.kg_uso) ?? 0)) / total))) })));
-    }
-    setPasso(3);
-  }
+  /** Passo 2 → 3: as peças já vêm do balanceamento do passo 2; nada é recalculado aqui. */
+  const irParaCorte = () => setPasso(3);
+  const qtdOpNum = num(quantidadeOp) ?? null;
+  const totalPecas = itens.reduce((t, i) => t + (num(i.quantidade) ?? 0), 0);
+  const quadroTotal = itens.length > 1 && qtdOpNum ? (
+    <p className={totalPecas > qtdOpNum ? "validacao erro" : totalPecas < qtdOpNum ? "validacao alerta" : "frase-resultado"} role="status">
+      Total: {totalPecas} de {qtdOpNum} peças
+      {totalPecas > qtdOpNum ? `: passou ${totalPecas - qtdOpNum} da OP; diminua as peças de um lote.` : totalPecas < qtdOpNum ? `: faltam ${qtdOpNum - totalPecas} peça(s) para a OP.` : "."}
+    </p>
+  ) : null;
 
   const mudarItem = (id: number, p: Partial<ItemCorte>) => setItens(itens.map((i) => (i.lote.id === id ? { ...i, ...p } : i)));
 
@@ -306,6 +364,39 @@ export default function NovaSolicitacao() {
   const liberaEnviar = !!validacao && podeGravar(validacao.ocorrencias, conf) && !bloqueadoPesoReal;
   const temErro = !!validacao?.ocorrencias.some((o) => o.nivel === "ERRO");
 
+  /* botões de navegação de cada passo: aparecem no rodapé e repetidos no topo, logo abaixo dos passos (Eduardo, 2026-11-17) */
+  const botoesPasso = (() => {
+    if (passo === 1) return (
+      <button className="primario" disabled={!passo1Ok || ocupado} onClick={() => void irParaLotes()}>
+        {ocupado ? "Buscando lotes…" : "Continuar: escolher lote"}
+      </button>
+    );
+    if (passo === 2 && lotes) return (
+      <>
+        <button className="primario" disabled={!itens.length} onClick={irParaCorte}>Continuar: dados do corte</button>
+        <button className="secundario" onClick={() => setPasso(1)}>Voltar</button>
+      </>
+    );
+    if (passo === 3 && !itu) return (
+      <>
+        <button className="primario" disabled={ocupado || itensRj.some((i) => !num(i.quantidade))} onClick={() => void revisar()}>
+          {ocupado ? "Calculando…" : "Continuar: revisar"}
+        </button>
+        <button className="secundario" onClick={() => setPasso(2)}>Voltar</button>
+      </>
+    );
+    if (passo === 4 && validacao) return (
+      <>
+        <button className="secundario" onClick={() => setPasso(3)} disabled={ocupado}>Voltar</button>
+        <button className="secundario" onClick={() => void gravar(false)} disabled={ocupado}>Salvar rascunho</button>
+        <button className="primario" onClick={() => void gravar(true)} disabled={ocupado || !liberaEnviar}>
+          {ocupado ? "Enviando…" : "Enviar ao RJ"}
+        </button>
+      </>
+    );
+    return null;
+  })();
+
   /* ---------- tela de sucesso ---------- */
   if (gravado) {
     return (
@@ -351,6 +442,7 @@ export default function NovaSolicitacao() {
           </li>
         ))}
       </ol>
+      {botoesPasso && <div className="botoes botoes-topo" aria-label="Navegação dos passos">{botoesPasso}</div>}
 
       {pesoReal && <FaixaPesoReal r={pesoReal} bloqueioApi={bloqueioPesoReal?.mensagem ?? null} />}
       {erro && <p className="erro" role="alert">{erro}</p>}
@@ -415,11 +507,7 @@ export default function NovaSolicitacao() {
             </div>
           )}
 
-          <div className="botoes">
-            <button className="primario" disabled={!passo1Ok || ocupado} onClick={() => void irParaLotes()}>
-              {ocupado ? "Buscando lotes…" : "Continuar: escolher lote"}
-            </button>
-          </div>
+          <div className="botoes">{botoesPasso}</div>
         </div>
       )}
 
@@ -436,8 +524,9 @@ export default function NovaSolicitacao() {
               {grupos.map((g) => (
                 <QuadroGrupo key={g.chave ?? `${g.liga}-${g.formato}-${g.bitola}-${g.multiplo ?? ""}`} g={g}
                   itens={itens} aoMarcar={(gl) => alternarLote(loteDoGrupo(gl, g))}
-                  aoMudarKg={(id, v) => mudarItem(id, { kg_uso: v })} />
+                  aoMudarKg={(id, v) => mudarItem(id, { kg_uso: v })} aoMudarPecas={mudarPecas} />
               ))}
+              {quadroTotal}
               {itens.length > 0 && necessario !== null && (
                 <p className={kgEscolhido + 0.05 < necessario ? "validacao alerta" : "frase-resultado"} role="status">
                   Necessário {kg1(necessario)} kg × escolhido {kg1(kgEscolhido)} kg
@@ -487,10 +576,7 @@ export default function NovaSolicitacao() {
           )}
           </>
           )}
-          <div className="botoes">
-            <button className="primario" disabled={!itens.length} onClick={irParaCorte}>Continuar: dados do corte</button>
-            <button className="secundario" onClick={() => setPasso(1)}>Voltar</button>
-          </div>
+          <div className="botoes">{botoesPasso}</div>
         </div>
       )}
 
@@ -505,7 +591,7 @@ export default function NovaSolicitacao() {
                 <CartaoLote lote={itemItu!.lote} />
               </section>
               <LancamentoCorteItu op={op} megaFora={megaFora} lote={itemItu!.lote} previsto={previstoItu} pecasInicial={itemItu!.quantidade}
-                pecaPendente={pecaPendenteItu} voltar={() => setPasso(2)} aoRecomecar={recomecar} textoRecomecar="Pedir outro corte" />
+                pecaPendente={pecaPendenteItu} voltar={() => setPasso(2)} botoesNoTopo aoRecomecar={recomecar} textoRecomecar="Pedir outro corte" />
             </>
           ) : (
             <>
@@ -516,15 +602,16 @@ export default function NovaSolicitacao() {
                   <div className="grade-form">
                     <label>
                       <span className="rotulo">Peças desta parte <span className="sugerido">sugerido</span></span>
-                      <input inputMode="numeric" value={itemItu.quantidade} onChange={(e) => mudarItem(itemItu.lote.id, { quantidade: e.target.value })} />
+                      <input inputMode="numeric" value={itemItu.quantidade} onChange={(e) => mudarPecas(itemItu.lote.id, e.target.value)} />
                     </label>
                     <div><span className="rotulo">Previsto desta parte</span><p className="numero">{previstoItu ? `${kg(previstoItu)} kg` : "—"}</p></div>
                   </div>
                 </section>
               )}
               {itensRj.map((i) => (
-                <ItemCorteForm key={i.lote.id} item={i} formato={medida.formato} aoMudar={(p) => mudarItem(i.lote.id, p)} />
+                <ItemCorteForm key={i.lote.id} item={i} formato={medida.formato} aoMudar={(p) => mudarItem(i.lote.id, p)} aoMudarPecas={(v) => mudarPecas(i.lote.id, v)} />
               ))}
+              {quadroTotal}
               <div className="painel-form">
                 <div className="grade-form">
                   <label>
@@ -537,12 +624,7 @@ export default function NovaSolicitacao() {
                   </label>
                 </div>
               </div>
-              <div className="botoes">
-                <button className="primario" disabled={ocupado || itensRj.some((i) => !num(i.quantidade))} onClick={() => void revisar()}>
-                  {ocupado ? "Calculando…" : "Continuar: revisar"}
-                </button>
-                <button className="secundario" onClick={() => setPasso(2)}>Voltar</button>
-              </div>
+              <div className="botoes">{botoesPasso}</div>
             </>
           )}
         </div>
@@ -562,11 +644,7 @@ export default function NovaSolicitacao() {
           <div className="rodape-acao">
             {temErro && !bloqueioPesoReal && <span className="resultado-frase">Corrija os itens em vermelho para enviar.</span>}
             {bloqueadoPesoReal && <span className="resultado-frase">Envio ao RJ bloqueado pelo peso real pendente. O rascunho pode ser salvo.</span>}
-            <button className="secundario" onClick={() => setPasso(3)} disabled={ocupado}>Voltar</button>
-            <button className="secundario" onClick={() => void gravar(false)} disabled={ocupado}>Salvar rascunho</button>
-            <button className="primario" onClick={() => void gravar(true)} disabled={ocupado || !liberaEnviar}>
-              {ocupado ? "Enviando…" : "Enviar ao RJ"}
-            </button>
+            {botoesPasso}
           </div>
         </div>
       )}
@@ -654,7 +732,7 @@ function FichaOp({ op, megaFora, bloqueada }: { op: OpMega; megaFora: boolean; b
   );
 }
 
-function ItemCorteForm({ item, formato, aoMudar }: { item: ItemCorte; formato: Formato; aoMudar: (p: Partial<ItemCorte>) => void }) {
+function ItemCorteForm({ item, formato, aoMudar, aoMudarPecas }: { item: ItemCorte; formato: Formato; aoMudar: (p: Partial<ItemCorte>) => void; aoMudarPecas: (v: string) => void }) {
   const l = item.lote;
   const b = item.bruto;
   return (
@@ -672,7 +750,7 @@ function ItemCorteForm({ item, formato, aoMudar }: { item: ItemCorte; formato: F
       <div className="grade-form">
         <label>
           Quantidade de peças
-          <input inputMode="numeric" value={item.quantidade} onChange={(e) => aoMudar({ quantidade: e.target.value })} required />
+          <input inputMode="numeric" value={item.quantidade} onChange={(e) => aoMudarPecas(e.target.value)} required />
         </label>
         <label>
           <span className="rotulo">Sobremetal no comprimento (mm) <span className="sugerido">sugerido</span></span>
@@ -762,8 +840,8 @@ function TabelaEfeitos({ efeitos }: { efeitos: Efeito[] }) {
 }
 
 /** Um grupo da sugestão (liga × bitola × comprimento × múltiplo): Itu (Estoque Mega + RJ em Itu) e RJ no Rio lado a lado. */
-function QuadroGrupo({ g, itens, aoMarcar, aoMudarKg }: {
-  g: Grupo; itens: ItemCorte[]; aoMarcar: (l: LoteGrupo) => void; aoMudarKg: (id: number, v: string) => void;
+function QuadroGrupo({ g, itens, aoMarcar, aoMudarKg, aoMudarPecas }: {
+  g: Grupo; itens: ItemCorte[]; aoMarcar: (l: LoteGrupo) => void; aoMudarKg: (id: number, v: string) => void; aoMudarPecas: (id: number, v: string) => void;
 }) {
   const ituLotes = g.estoques.ITU?.lotes ?? [];
   const rioLotes = g.estoques.RJ_NO_RIO?.lotes ?? [];
@@ -795,10 +873,16 @@ function QuadroGrupo({ g, itens, aoMarcar, aoMudarKg }: {
           <span className="kg"><strong className="numero">{kg(l.disponivel_kg)} kg</strong><span className="desc">disponível</span></span>
         </label>
         {item && (
-          <label className="kg-uso">
-            kg a usar deste lote
-            <input inputMode="decimal" className="campo-curto" value={item.kg_uso} onChange={(e) => aoMudarKg(l.id, e.target.value)} />
-          </label>
+          <div className="kg-uso-linha">
+            <label className="kg-uso">
+              Peças deste lote
+              <input inputMode="numeric" className="campo-curto" value={item.quantidade} onChange={(e) => aoMudarPecas(l.id, e.target.value)} />
+            </label>
+            <label className="kg-uso">
+              kg a usar deste lote
+              <input inputMode="decimal" className="campo-curto" value={item.kg_uso} onChange={(e) => aoMudarKg(l.id, e.target.value)} />
+            </label>
+          </div>
         )}
       </li>
     );

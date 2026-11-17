@@ -1,6 +1,18 @@
 # Estado — FRONTEND / UX
 
-Atualizado: 2026-11-17 (ajustes do teste manual)
+Atualizado: 2026-11-17 (teste manual: impressão RJ, SA no recebimento, balanceamento, ordem da fila, botões no topo)
+
+## 2026-11-17 Balanceamento, ordem da Fila RJ, botões no topo
+
+- **T07 passo 2/3 balanceamento de peças** (DECISOES 2026-11-17): ao marcar/desmarcar lotes, do menor disponível para o maior os menores recebem disponível ÷ previsto por peça (para baixo, mínimo 1 = lote inteiro) e o maior o restante (OP 50 → 1 + 49); campo "Peças deste lote" no quadro do grupo; editar ajusta o de maior disponível ainda não editado (ou o maior dos outros); "Total: X de Y peças" (vermelho acima, amarelo abaixo). Vale para o consumo misto. Saiu o rateio por kg ao passar para o passo 3 (dava 1 + 50). `PECAS_ACIMA_OP` vem da API.
+- **T09** ordem padrão "há mais tempo esperando" (`enviada_em`, que a API já devolve; reserva `data`), seletor Ordem (espera / prazo), "há N dias" no cartão; a impressão segue a ordem e diz qual é.
+- **Botões no topo:** T07 repete os botões de cada passo logo abaixo dos passos (mesmos estados); no passo 3 de lote em Itu o `LancamentoCorteItu` repete Voltar/Conferir/Confirmar no topo do corte (`botoesNoTopo`). T11 já tinha os botões no cabeçalho; não há outra tela em passos.
+- **Testado:** `tsc` + `build`; sem navegador (o Eduardo testa à mão).
+
+## 2026-11-17 Pedidos 2, 3 e 4 do teste manual (commit `2aad997`)
+
+- **No ar:** (2) T09 "Imprimir lista de corte": no papel só a tabela; `@page` margem 0 só enquanto a T09 está aberta (o navegador não põe cabeçalho/rodapé), respiro pelo padding lateral e pelas linhas de cabeça/pé da tabela repetidas em cada página; título de uma linha (data/hora, itens, kg estimados, pesquisa aplicada), `table-layout: fixed` na largura toda, linha não quebra entre páginas, fonte 10,5 pt; imprime o que está na tela (pesquisa aplicada, spec T09). (3) **Peso estimado** (previsto com sobremetal; na parcial, proporcional às peças que faltam) por item e total na impressão, no cartão fechado ("≈ X kg"), no aberto e ao lado da pesquisa. (4) T12: **SA** (código + situação) em cada item do COP; a API já devolvia `itens[].sa`, sem pedido ao TÉCNICO.
+- **Testado:** `tsc` + `build`; API real lida (21 na fila, COP 605 com SA 69038 confirmado).
 
 ## 2026-11-17 "Pedir corte" como porta única (Eduardo)
 

@@ -8,8 +8,12 @@
 # Uso no system-lab: deploy/implantacao/conferir.sh      (sai com código 1 se 1, 2 ou 3 falharem)
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-PSQL=${PSQL_CMD:-docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -AtF " | " -f -'}
-q() { eval "$PSQL"; }
+# $POSTGRES_USER/$POSTGRES_DB são do container db (aspas simples: não expandir no host). Em 2026-11-17 a versão
+# com PSQL=${PSQL_CMD:-…} + eval perdia as aspas e expandia no host ("POSTGRES_USER: unbound variable").
+q() {
+  if [ -n "${PSQL_CMD:-}" ]; then eval "$PSQL_CMD"; return; fi
+  docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -AtF " | " -f -'
+}
 
 LOTES_MEGA="SELECT i.codigo_mega AS codigo, SUM(l.saldo_kg) AS kg FROM lote l JOIN item_mp i ON i.id = l.item_mp_id
              WHERE l.planta_fiscal = 'ITU' AND l.local_fisico = 'ITU' AND i.codigo_mega IS NOT NULL GROUP BY i.codigo_mega"

@@ -166,6 +166,7 @@ def escolher_lote(db, pf: str, lf: str, minimo: float, exceto: set[int], *, reta
         q = q.filter(ItemMP.codigo_mega.is_not(None))
     lote = q.order_by(Lote.saldo_kg.desc()).first()
     esperar(lote is not None, f"sem lote {pf}/{lf} com {minimo} kg para o teste")
+    _ = lote.item.formato        # carrega o item antes de a sessão fechar (_sobra_fora usa o formato)
     return lote
 
 
@@ -316,7 +317,8 @@ def caminho_b(c: Cliente, u: dict, lote, op: int, mega: MegaE2E, num_cop: int, e
     sobra = round(barra - real - 1, 3)
     corte = gravar(c, "/api/cortes-itu/validar", "/api/cortes-itu",
                    {"op": op, "lote_id": sug["lote_id"], "consumo_kg": real, "sobra_kg": max(sobra, 0.5),
-                    "sobra_na_bitola": False, "pecas": 1, "observacao": "TESTE E2E caminho B"})
+                    "sobra_na_bitola": False, **_sobra_fora(lote, reto=True), "pecas": 1,
+                    "observacao": "TESTE E2E caminho B"})
     esperar(corte.get("pendencia_peso_real_resolvida") is True, "B: a T13 deveria resolver a pendência do peso real")
     c.entrar(u["itu"])
     st, pend = c.req("GET", "/api/pendencias-peso-real")
@@ -335,6 +337,11 @@ def caminho_b(c: Cliente, u: dict, lote, op: int, mega: MegaE2E, num_cop: int, e
 
 def caminho_b2(c: Cliente, u: dict, lote, op: int, mega: MegaE2E, lote_rj=None) -> dict:
     c.entrar(u["itu"])
+    corpo = antes = None
+    if lote_rj is not None:      # P26: a OP real já pode ter solicitação/SA na base (carga) → OP_DUPLICADA de antes
+        corpo = {"op": op, "liga": lote_rj.item.liga.codigo, "medida": medida_para(lote_rj),
+                 "itens": [{"lote_id": lote_rj.id, "modo": "CORTAR_RJ", "quantidade": 1}], "enviar": True}
+        antes = "OP_DUPLICADA" in _codigos(c, "/api/solicitacoes/validar", {**corpo, "consumo_misto": True})
     corte = gravar(c, "/api/cortes-itu/validar", "/api/cortes-itu",
                    {"op": op, "lote_id": lote.id, "consumo_kg": 10, "sobra_kg": 9.5, "sobra_na_bitola": True,
                     "peso_usado_kg": 20, "pecas": 1, "consumo_misto": True, "observacao": "TESTE E2E caminho B2"})
@@ -344,15 +351,17 @@ def caminho_b2(c: Cliente, u: dict, lote, op: int, mega: MegaE2E, lote_rj=None) 
     st, d = c.req("POST", "/api/sas/nf", {"ids": [corte["sa_id"]], "numero": "E2EB2", "emitente": "OUTRO"})
     esperar(st == 200, f"B2: NF só fiscal {st} {d}")
     out = {"corte_itu": corte["id"], "sa": corte["sa_id"]}
-    if lote_rj is not None:      # P26 opção A: a parte do RJ da mesma OP (só prévia, nada gravado)
+    if corpo is not None:        # P26 opção A: a parte do RJ da mesma OP (só prévia, nada gravado)
         c.entrar(u["itu"])
-        corpo = {"op": op, "liga": lote_rj.item.liga.codigo, "medida": medida_para(lote_rj),
-                 "itens": [{"lote_id": lote_rj.id, "modo": "CORTAR_RJ", "quantidade": 1}], "enviar": True}
         com = _codigos(c, "/api/solicitacoes/validar", {**corpo, "consumo_misto": True})
         sem = _codigos(c, "/api/solicitacoes/validar", corpo)
-        esperar("OP_DUPLICADA" not in com, f"B2: consumo misto marcado ainda avisa OP_DUPLICADA ({com})")
+        # o corte em Itu marcado não pode criar OP_DUPLICADA para a parte marcada; o que já havia na base continua
+        esperar(("OP_DUPLICADA" in com) == antes,
+                f"B2: com a marca, OP_DUPLICADA {'sumiu' if antes else 'apareceu'} depois do corte misto ({com})")
         esperar("OP_DUPLICADA" in sem, f"B2: solicitação sem a marca deveria avisar OP_DUPLICADA ({sem})")
-        out["consumo_misto"] = "OK: com a marca sem OP_DUPLICADA; sem a marca com OP_DUPLICADA"
+        out["consumo_misto"] = ("OK: com a marca sem OP_DUPLICADA; sem a marca com OP_DUPLICADA" if not antes else
+                                "OK: o corte misto não acrescentou OP_DUPLICADA (a OP já tinha solicitação/SA na "
+                                "base, que continua avisando); sem a marca com OP_DUPLICADA")
     return out
 
 
@@ -366,10 +375,24 @@ def caminho_c(c: Cliente, u: dict, lote, op: int) -> dict:
     c.entrar(u["itu"])
     corte = gravar(c, "/api/cortes-itu/validar", "/api/cortes-itu",
                    {"op": op, "lote_id": lote.id, "consumo_kg": 10, "sobra_kg": 4, "sobra_na_bitola": False,
-                    "peso_usado_kg": 15, "pecas": 1, "observacao": "TESTE E2E caminho C"})
+                    **_sobra_fora(lote, reto=False), "peso_usado_kg": 15, "pecas": 1,
+                    "observacao": "TESTE E2E caminho C"})
     esperar(bool(corte.get("instrucao_mega")), "C: faltou a instrução 'Fazer no Mega'")
     esperar(not corte.get("sa_id"), "C: material Mega não gera SA")
-    return {"corte_itu": corte["id"], "instrucao_mega": corte["instrucao_mega"]}
+    # spec v3.13 (regra do RETO, P35(c)): sobra fora da regra = lote novo com a medida da sobra, sem transferência
+    esperar(corte.get("sobra_destino") == "LOTE_NOVO" and corte.get("lote_sobra"),
+            f"C: sobra fora da regra do RETO deveria virar lote novo ({corte.get('sobra_destino')})")
+    esperar("Transferir" not in corte["instrucao_mega"], "C: lote novo da sobra não tem transferência no Mega")
+    return {"corte_itu": corte["id"], "instrucao_mega": corte["instrucao_mega"],
+            "lote_sobra": (corte.get("lote_sobra") or {}).get("codigo")}
+
+
+def _sobra_fora(lote, *, reto: bool) -> dict:
+    """Campos da sobra fora da bitola (spec v3.13, regra do RETO): placa 40 × 180 vai para RETO, 40 × 200 não; redondo
+    pela escolha do operador."""
+    if lote.item.formato == "REDONDO":
+        return {"sobra_vai_para_reto": reto, "sobra_diametro_mm": None if reto else 30, "conferi_regra_reto": True}
+    return {"sobra_espessura_mm": 40, "sobra_largura_mm": 180 if reto else 200, "conferi_regra_reto": True}
 
 
 def caminho_d(c: Cliente, u: dict, liga: str) -> dict:

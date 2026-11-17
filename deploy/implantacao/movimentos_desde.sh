@@ -6,10 +6,15 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 DESDE=${1:?informe a data/hora da liberação, ex. "AAAA-MM-DD HH:MM"}
 [[ "$DESDE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}$ ]] || { echo "formato: AAAA-MM-DD HH:MM"; exit 2; }
-PSQL=${PSQL_CMD:-docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q -f -'}
+# $POSTGRES_USER/$POSTGRES_DB são do container db (aspas simples). Corrigido em 2026-11-17: o PSQL=${PSQL_CMD:-…} + eval
+# perdia as aspas e expandia no host ("POSTGRES_USER: unbound variable").
+q() {
+  if [ -n "${PSQL_CMD:-}" ]; then eval "$PSQL_CMD"; return; fi
+  docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q -f -'
+}
 DIR=${ROLLBACK_DIR:-$HOME/estoqueack-carga/rollback}; mkdir -p "$DIR"; chmod 700 "$DIR"
 ARQ="$DIR/lancado_no_sistema_desde_$(date +%Y%m%d_%H%M).csv"
-eval "$PSQL" > "$ARQ" <<SQL
+q > "$ARQ" <<SQL
 COPY (
   SELECT to_char(m.criado_em AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI') AS quando,
          u.login AS quem, m.tipo, l.codigo AS lote, c.codigo AS conteiner, i.descricao AS material,

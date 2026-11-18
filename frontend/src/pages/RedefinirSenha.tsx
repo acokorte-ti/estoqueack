@@ -68,7 +68,7 @@ export default function RedefinirSenha() {
             </p>
             <CampoSenha rotulo="Nova senha" autoComplete="new-password" valor={nova} aoMudar={setNova} autoFocus />
             <CampoSenha rotulo="Repita a nova senha" autoComplete="new-password" valor={repetir} aoMudar={setRepetir} />
-            <p className="dica">Mínimo de 6 caracteres.</p>
+            <p className="dica">Mínimo de 6 caracteres; não pode conter o seu login.</p>
             {erro && <p className="erro" role="alert">{erro}</p>}
             <button className="primario" disabled={enviando}>
               {enviando ? "Salvando…" : "Salvar nova senha"}

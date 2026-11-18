@@ -18,3 +18,28 @@ def test_disponivel_normal_nao_muda():
     r = regras.validar_saldo(100, 40, 110, peso_peca_kg=90)
     oc = {o.codigo: o for o in r.ocorrencias}
     assert oc["USA_SALDO_RESERVADO"].dados["disponivel_kg"] == 60
+
+
+def test_senha_nao_pode_conter_o_login():
+    """Eduardo, 2026-11-18: além do tamanho mínimo, a senha não pode conter o login (sem diferença de maiúscula)."""
+    from app.core.seguranca import problemas_senha
+    assert problemas_senha("joao.silva2026", "joao.silva", 6) == ["A senha não pode conter o login."]
+    assert problemas_senha("XJOAO.SILVAx", "joao.silva", 6) == ["A senha não pode conter o login."]
+    assert problemas_senha("joao.s", "joao.silva", 6) == []          # pedaço do login não basta para barrar
+    assert problemas_senha("123456", "joao.silva", 6) == []          # continua podendo ser só números
+    assert problemas_senha("123", "joao.silva", 6) == ["A senha deve ter pelo menos 6 caracteres."]
+
+
+def test_trocar_senha_recusa_senha_com_o_login(client):
+    import pytest as _pytest
+    _pytest.importorskip("fastapi")
+    from tests.conftest import login
+    r = login(client)
+    h = {"X-CSRF-Token": r.json()["csrf"]}
+    login_admin = r.json()["usuario"]["login"]
+    ruim = client.post("/api/auth/trocar-senha", headers=h,
+                       json={"senha_atual": "SenhaInicial123", "nova_senha": f"{login_admin.upper()}2026"})
+    assert ruim.status_code == 400 and "não pode conter o login" in ruim.json()["detail"]
+    ok = client.post("/api/auth/trocar-senha", headers=h,
+                     json={"senha_atual": "SenhaInicial123", "nova_senha": "NovaSenha2026x"})
+    assert ok.status_code == 204

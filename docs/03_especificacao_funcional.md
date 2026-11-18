@@ -348,7 +348,7 @@ Toda gravação gera um registro na auditoria com usuário, data/hora e IP.
 
 ### T02. Trocar senha
 
-Campos: senha atual, nova senha e repetição da nova [DIGITADO]. **Botão "Salvar nova senha".** A senha precisa ter **pelo menos 6 caracteres**, sem outra exigência (pode ser só números) **[R017]**.
+Campos: senha atual, nova senha e repetição da nova [DIGITADO]. **Botão "Salvar nova senha".** A senha precisa ter **pelo menos 6 caracteres** e **não pode conter o login** (maiúscula ou minúscula não importa; Eduardo, 2026-11-18), sem outra exigência (pode ser só números) **[R017]**. Vale também na recuperação por e-mail e na senha definida pelo Admin.
 
 ### T03. Painel de pendências
 

@@ -40,16 +40,23 @@ export default function Estoque() {
   const exportar = `/api/exportar/${visao === "lote" ? "lotes" : "lotes-agrupado"}.xlsx${qs(base())}`;
 
   useEffect(() => {
+    // "vivo": resposta de um filtro antigo que chega depois da nova não sobrescreve a tela (revisão de 2026-11-18)
+    let vivo = true;
     const t = window.setTimeout(async () => {
       setErro("");
       try {
-        if (visao === "lote") setLotes(await api.get<Pagina<Lote>>(`/lotes${filtros()}`));
-        else setGrupos(await api.get<Pagina<Agrupado>>(`/lotes/agrupado${filtros()}`));
+        if (visao === "lote") {
+          const r = await api.get<Pagina<Lote>>(`/lotes${filtros()}`);
+          if (vivo) setLotes(r);
+        } else {
+          const r = await api.get<Pagina<Agrupado>>(`/lotes/agrupado${filtros()}`);
+          if (vivo) setGrupos(r);
+        }
       } catch (e) {
-        setErro(e instanceof Error ? e.message : "Não foi possível consultar o estoque.");
+        if (vivo) setErro(e instanceof Error ? e.message : "Não foi possível consultar o estoque.");
       }
     }, 300);
-    return () => window.clearTimeout(t);
+    return () => { vivo = false; window.clearTimeout(t); };
   }, [filtros, visao]);
 
   const mudar = (p: Partial<typeof f>) => { setF({ ...f, ...p }); setPag(1); };

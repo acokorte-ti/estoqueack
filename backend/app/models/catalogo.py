@@ -40,7 +40,7 @@ class ItemMP(Base):
     # 0009 (B09, 2026-11-17): restrição do material, passada a todo lote novo do item (destinação RESTRICAO)
     restricao_uso: Mapped[str | None] = mapped_column(String(300))
     # 0009 (paridade manual, §1.4 item 8): item RJ na mesma linha deste item de Itu, por confirmação do usuário
-    paridade_item_id: Mapped[int | None] = mapped_column(ForeignKey("item_mp.id"))
+    paridade_item_id: Mapped[int | None] = mapped_column(ForeignKey("item_mp.id"), index=True)   # índice: 0011
     substituido_por_id: Mapped[int | None] = mapped_column(ForeignKey("item_mp.id"))   # "SUBSTITUÍDO POR …"
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
     criado_pela_t15: Mapped[bool] = mapped_column(Boolean, default=False)   # 0007: "criado pela T15, revisar" (T22)

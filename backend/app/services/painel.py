@@ -10,7 +10,7 @@ from datetime import timedelta
 from typing import Any
 
 from sqlalchemy import or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models import CadastroSa, Cop, Destinacao, ItemMP, Lote, MegaSaldo, Movimento, SolicitacaoCorte, Usuario
 
@@ -82,10 +82,13 @@ def _p(codigo: str, titulo: str, itens: list[dict], link: str, *, nivel: str = "
 
 def _cops_segurando(db: Session) -> list[dict]:
     out = []
-    for c in db.scalars(select(Cop).where(Cop.situacao == "FECHADO").order_by(Cop.fechado_em)):
-        pend = [i for i in c.itens if (s := svc_cops._sa_do_item(db, i)) is None or s.situacao != "CONFIRMADO"]
-        if pend:
-            out.append({"cop_id": c.id, "cop": c.numero, "sas_pendentes": len(pend), "itens": len(c.itens),
+    q = select(Cop).options(selectinload(Cop.itens)).where(Cop.situacao == "FECHADO").order_by(Cop.fechado_em)
+    for c in db.scalars(q):
+        # spec v3.16: o COP fica "segurando" até ter SA confirmado e R$/kg do precificador em todos os itens
+        sem_sa, sem_rs = svc_sas.pendencias_nf(db, list(c.itens))
+        if sem_sa or sem_rs:
+            out.append({"cop_id": c.id, "cop": c.numero, "sas_pendentes": len(sem_sa),
+                        "precificador_pendentes": len(sem_rs), "itens": len(c.itens),
                         "fechado_em": c.fechado_em.isoformat() if c.fechado_em else None})
     return out
 
@@ -151,12 +154,15 @@ def pendencias_rj(db: Session) -> list[dict]:
 def pendencias_analise(db: Session) -> list[dict]:
     dias = int(parametro(db, "AVISO_RESERVA_DIAS"))
     vencendo = []
+    # códigos dos lotes numa consulta só (antes: um db.get por reserva)
+    codigos = dict(db.execute(select(Lote.id, Lote.codigo).join(Destinacao, Destinacao.lote_id == Lote.id)
+                              .where(Destinacao.ativa.is_(True))).all())
     for d in db.scalars(select(Destinacao).where(Destinacao.ativa.is_(True), Destinacao.validade.is_not(None),
                                                  Destinacao.validade >= hoje(),
                                                  Destinacao.validade <= hoje() + timedelta(days=dias))
                         .order_by(Destinacao.validade)):
-        lote = db.get(Lote, d.lote_id)
-        vencendo.append({"destinacao_id": d.id, "lote_id": d.lote_id, "lote": lote.codigo if lote else None,
+        lote = codigos.get(d.lote_id)
+        vencendo.append({"destinacao_id": d.id, "lote_id": d.lote_id, "lote": lote,
                          "tipo": d.tipo, "descricao": d.descricao, "kg": d.kg, "validade": d.validade.isoformat()})
     conc = conciliacao(db, somente_divergentes=True)
     excecoes = excecoes_da_semana(db)

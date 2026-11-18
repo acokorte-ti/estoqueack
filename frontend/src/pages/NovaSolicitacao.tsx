@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { api, data, ErroApi, ESTOQUE_NOME, kg, num, qs, validacaoDoErro, type Validacao } from "../api/cliente";
+import { api, data, ErroApi, ESTOQUE_NOME, kg, num, pct, qs, validacaoDoErro, type Validacao } from "../api/cliente";
 import PainelValidacao, { confirmacoesValidas, podeGravar, type Confirmacoes } from "../components/PainelValidacao";
 import { bloqueiaEm, linkPeca, textoPeca, usePesoReal, type ResumoPesoReal } from "../api/pesoReal";
 import LancamentoCorteItu, { CartaoLote } from "../components/LancamentoCorteItu";
@@ -69,9 +69,7 @@ const PROCESSOS = ["Retificar espessura", "Retificar largura", "Peça bipartida"
 const juntarProcessos = (i: { processos: string[]; processo_livre: string }) =>
   [...i.processos, i.processo_livre.trim()].filter(Boolean).join("; ");
 const emItu = (l: LoteCompativel) => l.estoque !== "RJ_NO_RIO";
-const kg1 = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const n2s = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v).replace(".", ","));
-const pct = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} %`);
 const SITUACAO_BLOQUEIA = ["EN", "CA"]; // Encerrada / Cancelada (R026)
 
 /* ------------------------------------------------------------------ tela */
@@ -529,9 +527,9 @@ export default function NovaSolicitacao() {
               {quadroTotal}
               {itens.length > 0 && necessario !== null && (
                 <p className={kgEscolhido + 0.05 < necessario ? "validacao alerta" : "frase-resultado"} role="status">
-                  Necessário {kg1(necessario)} kg × escolhido {kg1(kgEscolhido)} kg
-                  {misto && ` (Itu ${kg1(kgItu)} kg + RJ ${kg1(kgEscolhido - kgItu)} kg)`}
-                  {kgEscolhido + 0.05 < necessario ? `: faltam ${kg1(necessario - kgEscolhido)} kg para a OP (vira solicitação parcial).` : "."}
+                  Necessário {kg(necessario)} kg × escolhido {kg(kgEscolhido)} kg
+                  {misto && ` (Itu ${kg(kgItu)} kg + RJ ${kg(kgEscolhido - kgItu)} kg)`}
+                  {kgEscolhido + 0.05 < necessario ? `: faltam ${kg(necessario - kgEscolhido)} kg para a OP (vira solicitação parcial).` : "."}
                 </p>
               )}
             </>
@@ -849,8 +847,8 @@ function QuadroGrupo({ g, itens, aoMarcar, aoMudarKg, aoMudarPecas }: {
   const kgRjItu = ituLotes.filter((l) => l.estoque !== "ESTOQUE_MEGA").reduce((t, l) => t + l.disponivel_kg, 0);
   const nec = g.peso_necessario_kg ?? g.peso_previsto_kg ?? null;
   const frase = g.frase ?? (nec !== null
-    ? `Necessário ${kg1(nec)} kg × disponível ${kg1(g.total_disponivel_kg)} kg: ${nec > g.total_disponivel_kg ? `falta ${kg1(nec - g.total_disponivel_kg)} kg` : `sobra ${kg1(g.total_disponivel_kg - nec)} kg`}`
-    : `Disponível ${kg1(g.total_disponivel_kg)} kg`);
+    ? `Necessário ${kg(nec)} kg × disponível ${kg(g.total_disponivel_kg)} kg: ${nec > g.total_disponivel_kg ? `falta ${kg(nec - g.total_disponivel_kg)} kg` : `sobra ${kg(g.total_disponivel_kg - nec)} kg`}`
+    : `Disponível ${kg(g.total_disponivel_kg)} kg`);
   const falta = (g.falta_kg ?? (nec !== null ? nec - g.total_disponivel_kg : 0)) > 0;
 
   const linha = (l: LoteGrupo) => {

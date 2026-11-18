@@ -307,6 +307,7 @@ def _preencher(sol: SolicitacaoCorte, e: SolicitacaoEntrada, dados: ops.DadosOp,
 
 def criar(db: Session, cfg: Config, e: SolicitacaoEntrada, *, enviar: bool, usuario: Usuario,
           ip: str | None) -> list[SolicitacaoCorte]:
+    movimentos.travar_lotes(db, [it.lote_id for it in e.itens])   # reserva calculada com o saldo travado
     previa, dados, itens = validar(db, cfg, e, enviar=enviar)
     conf = exigir_sem_pendencias(previa, e.confirmacoes) if enviar else {}
     if not enviar and any(o.codigo.startswith(("MODO_", "LOTE_SEM_SALDO", "DIMENSOES")) for o in
@@ -357,6 +358,7 @@ def atualizar_rascunho(db: Session, cfg: Config, sol_id: int, e: SolicitacaoEntr
         raise ErroNegocio("Só um rascunho pode ser editado.")
     if len(e.itens) != 1:
         raise ErroNegocio("Um rascunho tem exatamente um lote.")
+    movimentos.travar_lotes(db, [it.lote_id for it in e.itens])
     previa, dados, itens = validar(db, cfg, e, ignorar_solicitacao=sol.id, enviar=enviar)
     conf = exigir_sem_pendencias(previa, e.confirmacoes) if enviar else {}
     _preencher(sol, e, dados, itens[0])
@@ -455,6 +457,7 @@ def trocar_lote(db: Session, cfg: Config, sol_id: int, lote_id: int, confirmacoe
         raise ErroNegocio("A solicitação já tem corte; crie outra solicitação para o restante.")
     e = entrada_de(sol, lote_id=lote_id)
     e.confirmacoes = confirmacoes
+    movimentos.travar_lotes(db, [it.lote_id for it in e.itens])
     previa, dados, itens = validar(db, cfg, e, ignorar_solicitacao=sol.id)
     conf = exigir_sem_pendencias(previa, confirmacoes)
     antigo = sol.lote.codigo
@@ -625,6 +628,7 @@ def validar_corte(db: Session, cfg: Config, sol: SolicitacaoCorte, e: CorteEntra
 def registrar_corte(db: Session, cfg: Config, sol_id: int, e: CorteEntrada, *, usuario: Usuario,
                     ip: str | None) -> SolicitacaoCorte:
     sol = obter(db, sol_id, travar=True)
+    movimentos.travar_lotes(db, [l.lote_id for l in e.linhas])   # saldo da prévia = saldo da gravação
     previa = validar_corte(db, cfg, sol, e)
     conf = exigir_sem_pendencias(previa, e.confirmacoes)
     d = e.data_corte or hoje()

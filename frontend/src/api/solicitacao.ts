@@ -1,3 +1,4 @@
+import { kg } from "./cliente";
 /** Tipos e rótulos da solicitação de corte (contrato F1 §2). */
 
 export type SituacaoSolic =
@@ -24,7 +25,7 @@ export interface SolicItem {
 export interface ConsumoMisto { itu_kg: number; rj_kg: number; texto: string }
 
 export const textoMisto = (c: ConsumoMisto) =>
-  c.texto || `OP com consumo misto: Itu ${c.itu_kg.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg + RJ ${c.rj_kg.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`;
+  c.texto || `OP com consumo misto: Itu ${kg(c.itu_kg)} kg + RJ ${kg(c.rj_kg)} kg`;
 
 export interface Medida { formato: "RETANGULAR" | "REDONDO"; espessura: number | null; largura: number | null; diametro: number | null; comprimento: number | null }
 

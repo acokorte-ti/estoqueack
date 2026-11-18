@@ -147,3 +147,10 @@ export const NOME_PERFIL: Record<Perfil, string> = {
 
 export const kg = (v: number) =>
   v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+/** Valor em R$ com 2 casas: "1.234,50" (valor precificador, totais). */
+export const reais = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** R$/kg (precificador, custo): ao menos 2 casas, até 4: "42,50", "12,3456". */
+export const rsKg = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+/** Percentual com até 1 casa: "8,1 %"; vazio → "—". */
+export const pct = (v: number | null | undefined) =>
+  v === null || v === undefined ? "—" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} %`;

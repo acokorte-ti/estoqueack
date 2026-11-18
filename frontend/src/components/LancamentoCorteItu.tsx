@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { api, ESTOQUE_NOME, kg, num, validacaoDoErro, type Ocorrencia, type Validacao } from "../api/cliente";
+import { api, ESTOQUE_NOME, kg, num, pct, validacaoDoErro, type Ocorrencia, type Validacao } from "../api/cliente";
 import PainelValidacao, { confirmacoesValidas, podeGravar, type Confirmacoes } from "./PainelValidacao";
 import { diasDe, textoPeca, type PecaPesoReal } from "../api/pesoReal";
 
@@ -24,7 +24,6 @@ interface Gravado { id: number; op: number; consumo_kg: number; sobra_kg: number
   lote_sobra?: { id: number; codigo: string; bitola: string } | null; sobra_destino?: "RETO" | "LOTE_NOVO" | null }
 
 const hojeIso = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-const pctBr = (v: number) => `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} %`;
 /** Tolerância da T13 pelo lote, enquanto a API não diz: RJ em Itu 8 %, Estoque Mega 5 %. */
 const limitePadrao = (l: LoteCorteItu | null) => (l?.estoque === "RJ_EM_ITU" ? 8 : 5);
 const limiteDe = (pctLim: number) => (pctLim >= 8 ? "para material do RJ" : "para lote do Estoque Mega");
@@ -53,7 +52,7 @@ function comLimite(ocs: Ocorrencia[], pctLim: number): Ocorrencia[] {
   return ocs.map((o) => {
     if (!o.codigo.startsWith("EXCESSO_TOLERANCIA") || /limite/i.test(o.mensagem)) return o;
     const lim = typeof o.dados?.limite_pct === "number" ? (o.dados.limite_pct as number) : pctLim;
-    return { ...o, mensagem: `${o.mensagem} Limite: ${pctBr(lim)} ${limiteDe(lim)}.` };
+    return { ...o, mensagem: `${o.mensagem} Limite: ${pct(lim)} ${limiteDe(lim)}.` };
   });
 }
 
@@ -195,7 +194,7 @@ export default function LancamentoCorteItu({ op, megaFora, lote, previsto = null
           </p>
         )}
         {misto && <p className="validacao alerta">Parte de Itu de uma OP com consumo misto (Itu + RJ). A parte do RJ segue pela solicitação enviada.</p>}
-        {previsto ? <p className="dica">Peso previsto: {kg(previsto)} kg. Tolerância: {pctBr(limitePadrao(lote))} {limiteDe(limitePadrao(lote))}.</p> : null}
+        {previsto ? <p className="dica">Peso previsto: {kg(previsto)} kg. Tolerância: {pct(limitePadrao(lote))} {limiteDe(limitePadrao(lote))}.</p> : null}
         <div className="grade-form">
           <label>Peças produzidas<input inputMode="numeric" value={f.pecas} onChange={(e) => mudar({ pecas: e.target.value })} /></label>
           <label>Consumo da OP (kg, balança)<input inputMode="decimal" className="campo-grande" value={f.consumo} onChange={(e) => mudar({ consumo: e.target.value })} /></label>
@@ -269,11 +268,11 @@ export default function LancamentoCorteItu({ op, megaFora, lote, previsto = null
           {v.resultado?.frase && <p className="frase-resultado resultado-frase">{v.resultado.frase}</p>}
           {v.resultado && (
             <dl className="dados ficha">
-              {v.resultado.perda_kg !== undefined && <div><dt>Perda de corte</dt><dd>{kg(v.resultado.perda_kg)} kg{v.resultado.perda_pct !== undefined && ` (${pctBr(v.resultado.perda_pct)} do material usado)`}</dd></div>}
-              {v.resultado.perda_max_pct !== undefined && <div><dt>Perda máxima</dt><dd>{pctBr(v.resultado.perda_max_pct)}{v.resultado.perda_max_kg !== undefined && ` = ${kg(v.resultado.perda_max_kg)} kg`}</dd></div>}
+              {v.resultado.perda_kg !== undefined && <div><dt>Perda de corte</dt><dd>{kg(v.resultado.perda_kg)} kg{v.resultado.perda_pct !== undefined && ` (${pct(v.resultado.perda_pct)} do material usado)`}</dd></div>}
+              {v.resultado.perda_max_pct !== undefined && <div><dt>Perda máxima</dt><dd>{pct(v.resultado.perda_max_pct)}{v.resultado.perda_max_kg !== undefined && ` = ${kg(v.resultado.perda_max_kg)} kg`}</dd></div>}
               {v.resultado.perda_pct === undefined && v.resultado.perda_esperada_kg !== undefined && <div><dt>Perda esperada (serra)</dt><dd>{kg(v.resultado.perda_esperada_kg)} kg</dd></div>}
               {v.resultado.previsto_kg ? <div><dt>Previsto</dt><dd>{kg(v.resultado.previsto_kg)} kg</dd></div> : null}
-              {v.resultado.previsto_kg ? <div><dt>Tolerância usada</dt><dd>{pctBr(v.resultado.tolerancia_excesso_pct ?? limitePadrao(lote))} {limiteDe(v.resultado.tolerancia_excesso_pct ?? limitePadrao(lote))}</dd></div> : null}
+              {v.resultado.previsto_kg ? <div><dt>Tolerância usada</dt><dd>{pct(v.resultado.tolerancia_excesso_pct ?? limitePadrao(lote))} {limiteDe(v.resultado.tolerancia_excesso_pct ?? limitePadrao(lote))}</dd></div> : null}
               {v.resultado.gera_sa !== undefined && <div><dt>Gera pedido de SA</dt><dd>{v.resultado.gera_sa ? "Sim (material fiscal RJ)" : "Não"}</dd></div>}
               {v.resultado.instrucao_mega && <div className="largo"><dt>Fazer no Mega</dt><dd>{v.resultado.instrucao_mega}</dd></div>}
             </dl>

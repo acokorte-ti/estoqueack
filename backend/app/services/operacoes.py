@@ -154,7 +154,7 @@ def entrada_dict(db: Session, nf: EntradaNf) -> dict:
 
 def criar_destinacao(db: Session, lote_id: int, tipo: str, descricao: str, kg: float | None, validade: date | None,
                      *, usuario: Usuario, ip: str | None) -> Destinacao:
-    lote = movimentos.lote_ou_404(db, lote_id)
+    lote = movimentos.lote_ou_404(db, lote_id, travar=True)
     if tipo == "RESERVA" and kg is not None and kg > float(lote.saldo_kg) + 1e-6:
         raise ErroNegocio(f"A reserva ({kg_br(kg)}) é maior que o saldo do lote ({kg_br(float(lote.saldo_kg))}).")
     d = Destinacao(lote_id=lote.id, tipo=tipo, descricao=descricao.strip(), kg=kg if tipo == "RESERVA" else None,
@@ -199,9 +199,10 @@ def ajustar(db: Session, lote_id: int, saldo_contado: float, justificativa: str,
             ip: str | None) -> Movimento:
     if not (justificativa or "").strip():   # sem mínimo de caracteres (spec v3.14 §9, Eduardo, 2026-11-17)
         raise ErroNegocio("Escreva a justificativa.")
+    # trava ANTES de calcular a diferença: com um corte no meio, o saldo final continua igual ao contado
+    lote = movimentos.lote_ou_404(db, lote_id, travar=True)
     previa = validar_ajuste(db, lote_id, saldo_contado)
     exigir_sem_pendencias(previa, {})
-    lote = movimentos.lote_ou_404(db, lote_id, travar=True)
     m = movimentos.lancar(db, lote, "AJUSTE_INVENTARIO", previa.extra["diferenca_kg"], usuario_id=usuario.id,
                           justificativa=justificativa.strip())
     auditoria.registrar(db, "AJUSTE_INVENTARIO", usuario_id=usuario.id, entidade="lote", entidade_id=lote.id,

@@ -52,7 +52,6 @@ export const temPrecificador = (i: CopItem) => (i.sa?.rs_kg ?? 0) > 0;
 export function faltasNf(itens: CopItem[]) {
   return { sa: itens.filter((i) => i.sa?.situacao !== "CONFIRMADO").length, rs: itens.filter((i) => !temPrecificador(i)).length };
 }
-export const reais = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const SA_ITEM: Record<string, { nome: string; classe: string }> = {
   PENDENTE: { nome: "SA pendente", classe: "" },

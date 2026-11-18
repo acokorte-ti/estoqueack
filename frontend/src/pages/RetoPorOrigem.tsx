@@ -32,11 +32,14 @@ export default function RetoPorOrigem({ soRj, estoqueInicial, aoVoltar }: { soRj
   }), [f, soRj]);
 
   useEffect(() => {
+    let vivo = true;   // resposta de um filtro antigo não sobrescreve a nova (revisão de 2026-11-18)
     const t = window.setTimeout(() => {
       setErro("");
-      api.get<Resposta>(`/lotes/reto-por-origem${qs(q)}`).then(setR).catch((e: Error) => setErro(e.message));
+      api.get<Resposta>(`/lotes/reto-por-origem${qs(q)}`)
+        .then((r) => { if (vivo) setR(r); })
+        .catch((e: Error) => { if (vivo) setErro(e.message); });
     }, 300);
-    return () => window.clearTimeout(t);
+    return () => { vivo = false; window.clearTimeout(t); };
   }, [q]);
   const m = (p: Partial<typeof f>) => setF({ ...f, ...p });
 

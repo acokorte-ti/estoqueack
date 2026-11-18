@@ -33,6 +33,13 @@ def lote_ou_404(db: Session, lote_id: int, *, travar: bool = False) -> Lote:
     return lote
 
 
+def travar_lotes(db: Session, lote_ids) -> None:
+    """Trava os lotes ANTES da validação de uma gravação (revisão de 2026-11-18): a prévia e a gravação passam a ver
+    o mesmo saldo. Ordem por id, para dois pedidos com os mesmos lotes não travarem um ao outro."""
+    for i in sorted({int(x) for x in lote_ids if x is not None}):
+        lote_ou_404(db, i, travar=True)
+
+
 def lancar(db: Session, lote: Lote, tipo: str, kg: float, *, usuario_id: int | None, **campos) -> Movimento:
     """Grava o movimento e atualiza o saldo do lote. kg > 0 entra, kg < 0 sai."""
     kg = round(float(kg), 3)

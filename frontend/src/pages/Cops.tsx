@@ -86,7 +86,8 @@ function JanelaNovoCop({ aoFechar, aoGravar }: { aoFechar: () => void; aoGravar:
   const [obs, setObs] = useState("");
   const [erro, setErro] = useState("");
   useEffect(() => {
-    api.get<{ numero: number }>("/cops/proximo-numero").then((r) => { setSugerido(r.numero); setNumero(String(r.numero)); }).catch(() => undefined);
+    api.get<{ numero: number }>("/cops/proximo-numero").then((r) => { setSugerido(r.numero); setNumero(String(r.numero)); })
+      .catch(() => setErro("Não foi possível sugerir o próximo número do COP; digite o número."));
   }, []);
   async function ok(e: FormEvent) {
     e.preventDefault();

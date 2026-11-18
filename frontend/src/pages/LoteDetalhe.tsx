@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, data, ESTOQUE_NOME, kg, num, qs, validacaoDoErro, type Validacao } from "../api/cliente";
+import { api, data, ESTOQUE_NOME, kg, num, qs, rsKg, validacaoDoErro, type Validacao } from "../api/cliente";
 import { useSessao } from "../api/sessao";
 import { TIPO_LOTE, type Destinacao, type LoteDetalhe as TLote, type Movimento, type NoArvore, type Nota } from "../api/lote";
 import Janela, { fecharJanela } from "../components/Janela";
@@ -45,7 +45,8 @@ export default function LoteDetalhe() {
     }
   }, [id]);
   const carregarMovs = useCallback(
-    () => api.get<Pagina<Movimento>>(`/lotes/${id}/movimentos${qs({ pagina: pagMov, por_pagina: 50 })}`).then(setMovs).catch(() => undefined),
+    () => api.get<Pagina<Movimento>>(`/lotes/${id}/movimentos${qs({ pagina: pagMov, por_pagina: 50 })}`).then(setMovs)
+      .catch((e: Error) => setErro(`Não foi possível carregar os movimentos (${e.message}).`)),
     [id, pagMov],
   );
   useEffect(() => { void carregar(); }, [carregar]);
@@ -113,7 +114,7 @@ export default function LoteDetalhe() {
           <div><dt>Peças iniciais</dt><dd>{l.pecas_iniciais ?? "—"}</dd></div>
           <div><dt>NF de entrada</dt><dd>{l.documento_entrada ?? "—"}</dd></div>
           <div><dt>Data de entrada</dt><dd>{data(l.data_entrada)}</dd></div>
-          {l.custo_kg !== null && <div><dt>R$/kg</dt><dd>{l.custo_kg.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</dd></div>}
+          {l.custo_kg !== null && <div><dt>R$/kg</dt><dd>{rsKg(l.custo_kg)}</dd></div>}
           {l.origem && <div className="largo"><dt>Origem</dt><dd>{l.origem.lote} · {l.origem.conteiner ?? "—"} · {l.origem.bitola}</dd></div>}
         </dl>
         <div className="botoes" style={{ marginTop: "var(--esp-4)" }}>
@@ -332,7 +333,7 @@ function JanelaOrigem({ lote, aoFechar, aoGravar }: { lote: TLote; aoFechar: () 
     return () => window.clearTimeout(t);
   }, [conteiner]);
   async function buscarPai() {
-    const r = await api.get<{ itens: typeof pais }>(`/lotes${qs({ busca: paiBusca.trim() || conteiner.trim(), liga: lote.liga, com_saldo: false, por_pagina: 20 })}`).catch(() => null);
+    const r = await api.get<{ itens: typeof pais }>(`/lotes${qs({ busca: paiBusca.trim() || conteiner.trim(), liga: lote.liga, com_saldo: false, por_pagina: 20 })}`).catch((e: Error) => { setErro(`Não foi possível buscar os lotes (${e.message}).`); return null; });
     setPais((r?.itens ?? []).filter((x) => x.id !== lote.id));
   }
   async function ok(e: FormEvent) {

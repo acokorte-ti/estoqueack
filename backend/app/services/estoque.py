@@ -324,7 +324,7 @@ def arvore(db: Session, lote: Lote, usuario: Usuario | None = None) -> dict:
     """Árvore de origem. [P10] Para a Operação RJ, lotes que não são do RJ no Rio (filhos em Itu) não aparecem, nem
     o saldo deles; a raiz passa a ser o ancestral mais alto ainda visível."""
     from .base import lote_visivel
-    ver = (lambda l: True) if usuario is None else (lambda l: lote_visivel(usuario, l))
+    ver = (lambda _l: True) if usuario is None else (lambda l: lote_visivel(usuario, l))
     r = lote
     vistos_: set[int] = set()
     while r.lote_pai_id is not None and r.id not in vistos_:

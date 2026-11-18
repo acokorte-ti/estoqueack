@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api, data, ESTOQUE_NOME, kg, qs, validacaoDoErro, type Ocorrencia, type Validacao } from "../api/cliente";
+import { api, data, ESTOQUE_NOME, kg, pct, qs, validacaoDoErro, type Ocorrencia, type Validacao } from "../api/cliente";
 import { useSessao } from "../api/sessao";
 import { MODO_NOME, material, numerosCop, textoMisto, type SolicDetalhe } from "../api/solicitacao";
 import { EtiquetaAtraso, EtiquetaSituacao } from "../components/Etiquetas";
@@ -96,7 +96,7 @@ export default function SolicitacaoDetalhe() {
           <div><dt>Peso previsto</dt><dd>{s.peso_previsto_kg !== null ? `${kg(s.peso_previsto_kg)} kg` : "—"}</dd></div>
           <div><dt>Peso real</dt><dd>{s.peso_real_kg !== null ? `${kg(s.peso_real_kg)} kg` : "—"}</dd></div>
           <div><dt>Reservado no lote</dt><dd>{s.reserva_kg ? `${kg(s.reserva_kg)} kg` : "—"}</dd></div>
-          <div><dt>Sobremetal</dt><dd>{s.sobremetal_pct !== null ? `${s.sobremetal_pct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} %` : "—"}</dd></div>
+          <div><dt>Sobremetal</dt><dd>{pct(s.sobremetal_pct)}</dd></div>
           <div className="largo"><dt>Instrução para o RJ</dt><dd>{s.instrucao ?? "—"}{s.instrucao_processo && ` · ${s.instrucao_processo}`}</dd></div>
           {s.observacao && <div className="largo"><dt>Observação</dt><dd>{s.observacao}</dd></div>}
           <div><dt>COP</dt><dd>{numerosCop(s.cops) || "—"}</dd></div>
@@ -308,7 +308,7 @@ function JanelaTrocarLote({ s, aoFechar, aoGravar }: { s: SolicDetalhe; aoFechar
               <label className={lote === l.id ? "escolha-lote marcada" : "escolha-lote"}>
                 <input type="radio" name="novo-lote" checked={lote === l.id} onChange={() => void escolher(l.id)} />
                 <span><span className="titulo">{l.liga} {l.bitola} · {l.conteiner ?? "—"}{l.liga_equivalente && <span className="etiqueta atencao">liga equivalente</span>}</span>
-                  <span className="linha2">{l.codigo} · sobremetal {l.sobremetal_pct !== null ? `${l.sobremetal_pct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} %` : "—"}</span></span>
+                  <span className="linha2">{l.codigo} · sobremetal {pct(l.sobremetal_pct)}</span></span>
                 <span className="kg"><strong>{kg(l.disponivel_kg)} kg</strong><span className="desc">disponível</span></span>
               </label>
             </li>

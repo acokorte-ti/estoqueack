@@ -60,6 +60,7 @@ Entra: T03–T14, T15 mínima e aba RETO por origem (v3.4, 06/11), T16 mínima, 
 
 ## 6. Rodadas
 
+- **R10 (18/11):** revisão de código completa (4 revisores + análise estática, achados conferidos): travas antes de validar, disponível ≥ 0, N+1 do painel, índice 0011, frontend (corridas, erros, janelas, formatação). Detalhe em `00_RETOMAR_COORDENACAO.md` §3.
 - **R9 (18/11):** ajustes do teste manual de 18/11 feitos pela COORDENAÇÃO direto (sessão sem os subagentes): spec v3.16, contrato §4/§7, backend (trava da NF por SA confirmado + R$/kg, `PRECIFICADOR_PENDENTE`, precificador no item do COP), testes (`test_v316_precificador_nf.py`), T14 por COP, T11 com precificador, largura toda e menu recolhível.
 - **R8 (17–18/11):** ajustes do teste manual (DECISOES 2026-11-17), spec v3.14–v3.15, unificação de "Pedir corte", vários lotes na OP, deploy esperando sequência de commits (não estava travado). Documento de retomada `00_RETOMAR_COORDENACAO.md` e histórico exportado em `../historico_claude/`.
 - **R7 (17/11):** respostas dos usuários de 17/11; spec v3.11–v3.13; menu renomeado; bloqueio do peso real; regra do RETO; recarga do zero conferida; ponta a ponta 5/5; ferramenta "Confirmar SA (teste)" (só fora de produção; desligar na implantação, `06_implantacao.md` §2.3).

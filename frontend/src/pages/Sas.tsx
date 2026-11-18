@@ -1,7 +1,8 @@
-import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { Fragment, useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { api, data, kg, num, qs, validacaoDoErro, type Validacao } from "../api/cliente";
+import { api, data, kg, num, qs, reais, rsKg, validacaoDoErro, type Validacao } from "../api/cliente";
 import { useSessao } from "../api/sessao";
+import Janela, { fecharJanela } from "../components/Janela";
 import PainelValidacao, { confirmacoesValidas, podeGravar, type Confirmacoes } from "../components/PainelValidacao";
 import { EMITENTES_LANCAMENTO, nomeEmitente } from "../api/cop";
 
@@ -268,7 +269,7 @@ export default function Sas() {
                     <br /><span className="desc">{s.nf ? `NF ${s.nf.numero} (${nomeEmitente(s.nf.emitente)})` : "sem NF"}</span>
                   </td>
                   <td className="num">
-                    {(s.rs_kg ?? 0) > 0 ? (s.rs_kg ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })
+                    {(s.rs_kg ?? 0) > 0 ? rsKg(s.rs_kg ?? 0)
                       : s.origem === "CARGA" ? "—" : <span className="etiqueta atencao" title="Obrigatório antes da NF de transferência">falta</span>}
                   </td>
                   <td className="acoes">
@@ -324,16 +325,8 @@ export default function Sas() {
 
 /* ------------------------------------------------------------------ janelas */
 
-function useJanela() {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    ref.current?.showModal();
-  }, []);
-  return ref;
-}
-
+// janelas usam o componente compartilhado components/Janela (antes: useJanela + <dialog> repetidos aqui)
 function JanelaCodigo({ sa, aoFechar, aoGravar }: { sa: Sa; aoFechar: () => void; aoGravar: (msg: string) => void }) {
-  const ref = useJanela();
   const [codigo, setCodigo] = useState(String(sa.sa_codigo ?? sa.sa_codigo_sugerido ?? ""));
   const [validacao, setValidacao] = useState<Validacao | null>(null);
   const [conf, setConf] = useState<Confirmacoes>({});
@@ -372,9 +365,8 @@ function JanelaCodigo({ sa, aoFechar, aoGravar }: { sa: Sa; aoFechar: () => void
   }
 
   return (
-    <dialog ref={ref} className="janela" aria-labelledby="titulo-codigo" onClose={aoFechar}>
-      <div className="painel-form">
-        <h2 id="titulo-codigo">Código do SA · OP {sa.op}</h2>
+    <Janela titulo={`Código do SA · OP ${sa.op}`} aoFechar={aoFechar}>
+      <div className="bloco-passo" style={{ gap: "var(--esp-4)" }}>
         <p className="desc">{sa.item_codigo} · {sa.item_descricao}</p>
         <p className="dica">Informe o código depois que o SA estiver cadastrado no Mega pela Amanda. Fica "Aguardando Mega" e o sistema já tenta confirmar.</p>
         {sa.sa_novo && !sa.sa_codigo_sugerido && (
@@ -396,16 +388,15 @@ function JanelaCodigo({ sa, aoFechar, aoGravar }: { sa: Sa; aoFechar: () => void
           <button className="primario" disabled={!validacao || ocupado || !podeGravar(validacao.ocorrencias, conf)} onClick={() => void gravar()}>
             Gravar código
           </button>
-          <button type="button" className="secundario" onClick={() => ref.current?.close()}>Cancelar</button>
+          <button type="button" className="secundario" onClick={(e) => fecharJanela(e.currentTarget)}>Cancelar</button>
         </div>
       </div>
-    </dialog>
+    </Janela>
   );
 }
 
 /** contrato §7.1 (R070): linha sem código pede o código antes de confirmar em teste */
 function JanelaTeste({ sa, aoFechar, aoGravar }: { sa: Sa; aoFechar: () => void; aoGravar: (r: Sa) => void }) {
-  const ref = useJanela();
   const [codigo, setCodigo] = useState(String(sa.sa_codigo_sugerido ?? ""));
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
@@ -426,9 +417,9 @@ function JanelaTeste({ sa, aoFechar, aoGravar }: { sa: Sa; aoFechar: () => void;
   }
 
   return (
-    <dialog ref={ref} className="janela" aria-labelledby="titulo-teste" onClose={aoFechar}>
-      <form className="painel-form" onSubmit={(e) => void confirmar(e)}>
-        <h2 id="titulo-teste">Confirmar SA (teste) · OP {sa.op} <span className="etiqueta atencao">só homologação</span></h2>
+    <Janela titulo={`Confirmar SA (teste) · OP ${sa.op}`} aoFechar={aoFechar}>
+      <form className="bloco-passo" style={{ gap: "var(--esp-4)" }} onSubmit={(e) => void confirmar(e)}>
+        <p><span className="etiqueta atencao">só homologação</span></p>
         <p className="desc">{sa.item_codigo} · {sa.item_descricao}</p>
         <p className="dica">Esta linha ainda não tem código do SA. Informe um código para marcar como confirmado sem ler o Mega.</p>
         <label>
@@ -438,15 +429,14 @@ function JanelaTeste({ sa, aoFechar, aoGravar }: { sa: Sa; aoFechar: () => void;
         {erro && <p className="erro" role="alert">{erro}</p>}
         <div className="botoes">
           <button className="primario" disabled={ocupado}>Confirmar SA (teste)</button>
-          <button type="button" className="secundario" onClick={() => ref.current?.close()}>Cancelar</button>
+          <button type="button" className="secundario" onClick={(e) => fecharJanela(e.currentTarget)}>Cancelar</button>
         </div>
       </form>
-    </dialog>
+    </Janela>
   );
 }
 
 function JanelaEditar({ sa, soRs, aoFechar, aoGravar }: { sa: Sa; soRs: boolean; aoFechar: () => void; aoGravar: () => void }) {
-  const ref = useJanela();
   const [f, setF] = useState({
     rs_kg: sa.rs_kg !== null ? String(sa.rs_kg).replace(".", ",") : "",
     sa_descricao: sa.sa_descricao ?? "", ncm: sa.ncm ?? "", icms: sa.icms ?? "", ipi: sa.ipi ?? "", pedido: sa.pedido ?? "",
@@ -469,15 +459,14 @@ function JanelaEditar({ sa, soRs, aoFechar, aoGravar }: { sa: Sa; soRs: boolean;
   const valor = num(f.rs_kg) !== undefined && sa.quantidade ? ((num(f.rs_kg) ?? 0) * sa.peso_kg) / sa.quantidade : null;
 
   return (
-    <dialog ref={ref} className="janela" aria-labelledby="titulo-editar-sa" onClose={aoFechar}>
-      <form className="painel-form" onSubmit={(e) => void salvar(e)}>
-        <h2 id="titulo-editar-sa">Pedido de SA · OP {sa.op}</h2>
+    <Janela titulo={`Pedido de SA · OP ${sa.op}`} aoFechar={aoFechar}>
+      <form className="bloco-passo" style={{ gap: "var(--esp-4)" }} onSubmit={(e) => void salvar(e)}>
         {sa.exportado_renato_em && <p className="validacao alerta">Já exportado para o Renato em {data(sa.exportado_renato_em)}. A alteração avisa o Renato.</p>}
         <label>
           R$/kg do precificador{sa.origem !== "CARGA" && " (obrigatório)"}
           <input inputMode="decimal" value={f.rs_kg} onChange={(e) => setF({ ...f, rs_kg: e.target.value })} autoFocus required={sa.origem !== "CARGA"} />
           {sa.origem !== "CARGA" && <small className="dica">Sem o R$/kg o RJ não consegue informar a NF de transferência{sa.cop ? ` do COP ${sa.cop.numero}` : ""}.</small>}
-          <small className="dica">{valor !== null ? `Valor precificador: R$ ${valor.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} por peça` : "Preenchido por quem cuida do custo; o sistema não calcula."}</small>
+          <small className="dica">{valor !== null ? `Valor precificador: R$ ${reais(valor)} por peça` : "Preenchido por quem cuida do custo; o sistema não calcula."}</small>
         </label>
         {!soRs && (
           <>
@@ -493,15 +482,14 @@ function JanelaEditar({ sa, soRs, aoFechar, aoGravar }: { sa: Sa; soRs: boolean;
         {erro && <p className="erro" role="alert">{erro}</p>}
         <div className="botoes">
           <button className="primario">Salvar alterações</button>
-          <button type="button" className="secundario" onClick={() => ref.current?.close()}>Cancelar</button>
+          <button type="button" className="secundario" onClick={(e) => fecharJanela(e.currentTarget)}>Cancelar</button>
         </div>
       </form>
-    </dialog>
+    </Janela>
   );
 }
 
 function JanelaNf({ ids, aoFechar, aoGravar }: { ids: number[]; aoFechar: () => void; aoGravar: (numero: string) => void }) {
-  const ref = useJanela();
   const [f, setF] = useState({ numero: "", emitente: "FIO_CERTO", data: "" });
   const [erro, setErro] = useState("");
 
@@ -517,9 +505,8 @@ function JanelaNf({ ids, aoFechar, aoGravar }: { ids: number[]; aoFechar: () => 
   }
 
   return (
-    <dialog ref={ref} className="janela" aria-labelledby="titulo-nf" onClose={aoFechar}>
-      <form className="painel-form" onSubmit={(e) => void salvar(e)}>
-        <h2 id="titulo-nf">NF de transferência · {ids.length} linha(s) de corte em Itu</h2>
+    <Janela titulo={`NF de transferência · ${ids.length} linha(s) de corte em Itu`} aoFechar={aoFechar}>
+      <form className="bloco-passo" style={{ gap: "var(--esp-4)" }} onSubmit={(e) => void salvar(e)}>
         <label>Nº da NF<input value={f.numero} onChange={(e) => setF({ ...f, numero: e.target.value })} autoFocus required /></label>
         {EMITENTES_LANCAMENTO.length === 1 ? (
           <p className="desc">Emitente: <strong>{EMITENTES_LANCAMENTO[0].nome}</strong></p>
@@ -538,9 +525,9 @@ function JanelaNf({ ids, aoFechar, aoGravar }: { ids: number[]; aoFechar: () => 
         {erro && <p className="erro" role="alert">{erro}</p>}
         <div className="botoes">
           <button className="primario">Informar NF</button>
-          <button type="button" className="secundario" onClick={() => ref.current?.close()}>Cancelar</button>
+          <button type="button" className="secundario" onClick={(e) => fecharJanela(e.currentTarget)}>Cancelar</button>
         </div>
       </form>
-    </dialog>
+    </Janela>
   );
 }

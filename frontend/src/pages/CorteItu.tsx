@@ -34,17 +34,23 @@ export default function CorteItu() {
   function usarPeca(p: PecaPesoReal) {
     if (!p.op) return;
     setOpNum(String(p.op));
-    if (p.lote_id) api.get<Lote>(`/lotes/${p.lote_id}`).then(setLote).catch(() => undefined);
+    if (p.lote_id) api.get<Lote>(`/lotes/${p.lote_id}`).then(setLote).catch((e: Error) => setErro(e.message || "Não foi possível carregar o lote."));
     void buscarOp(String(p.op), !!p.lote_id);
   }
 
-  // vindo do Painel, do lote RJ em Itu ou do recebimento de peça inteira
+  // vindo do Painel, do lote RJ em Itu ou do recebimento de peça inteira; relê quando a URL muda com a tela
+  // já aberta (outro atalho), não só ao abrir (revisão de 2026-11-18)
+  const chaveUrl = params.toString();
   useEffect(() => {
     const lid = params.get("lote_id");
-    if (lid) api.get<Lote>(`/lotes/${lid}`).then(setLote).catch(() => undefined);
-    if (params.get("op")) void buscarOp(params.get("op")!);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const opUrl = params.get("op");
+    if (lid) api.get<Lote>(`/lotes/${lid}`).then(setLote).catch((e: Error) => setErro(e.message || "Não foi possível carregar o lote."));
+    if (opUrl) {
+      setOpNum(opUrl);
+      void buscarOp(opUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- depende só da URL (chaveUrl); buscarOp lê o resto
+  }, [chaveUrl]);
 
   async function buscarOp(n: string, temLote = !!params.get("lote_id")) {
     setErro("");
@@ -59,6 +65,7 @@ export default function CorteItu() {
       else setErro(e instanceof Error ? e.message : "Não foi possível consultar a OP.");
     }
     if (!temLote) {
+      // sugestão é opcional: se falhar, o operador escolhe o lote; não é erro para mostrar
       const s = await api.get<{ lote_id: number | null }>(`/cortes-itu/sugestao?op=${numero}`).catch(() => null);
       if (s?.lote_id) api.get<Lote>(`/lotes/${s.lote_id}`).then(setLote).catch(() => undefined);
     }

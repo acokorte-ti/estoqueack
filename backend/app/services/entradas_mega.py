@@ -172,8 +172,8 @@ def _nome(db: Session, uid: int | None) -> str | None:
     return u.nome if u else None
 
 
-def pendencia_dict(db: Session, p: PendenciaMega, *, item: ItemMP | None = None, descricao: str | None = None,
-                   lotes_codigo: bool = True) -> dict[str, Any]:
+def pendencia_dict(db: Session, p: PendenciaMega, *, item: ItemMP | None = None,
+                   descricao: str | None = None) -> dict[str, Any]:
     item = item if item is not None else _item_do_codigo(db, p.codigo)
     mega = db.get(MegaSaldo, p.codigo)
     descricao = descricao or (mega.descricao if mega else None) or (item.descricao if item else None)

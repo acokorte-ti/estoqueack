@@ -2,6 +2,7 @@
 exportações. As linhas nascem do COP fechado (caminhos A e B) e do corte em Itu de lote fiscal RJ (B2)."""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
@@ -18,6 +19,8 @@ from . import auditoria
 from .base import ErroNegocio, NaoEncontrado, Previa, agora, exigir_sem_pendencias, notificar, parametro
 from .estoque import bitola
 from .fluxo import recalcular_solicitacao
+
+log = logging.getLogger(__name__)
 
 # Emitente da NF de transferência RJ → Itu. Lançamento novo: só Fio Certo (Eduardo, 2026-11-17). MEDIO_VALE e OUTRO
 # continuam válidos só na leitura (NFs já gravadas); a carga grava EMITENTE_CARGA (app/carga/gravar.py).
@@ -42,7 +45,8 @@ def sa_da_estrutura(op: int | None) -> tuple[int, str | None] | None:
         return None
     try:
         comps = fabrica.obter().estrutura_op(op)
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 - sem o Mega fica só o histórico, mas o motivo vai para o log
+        log.warning("Estrutura da OP %s não lida no Mega; SA sugerido só pelo histórico", op, exc_info=True)
         return None
     sa = next((c for c in comps if c.tipo == "SA"), None)
     return (sa.codigo, sa.descricao) if sa else None
@@ -322,8 +326,13 @@ def pendencias_nf(db: Session, itens: list[CopItem]) -> tuple[list[CopItem], lis
     """(itens sem SA confirmado, itens sem R$/kg). A NF do COP só libera sem nenhum dos dois (spec v3.16 T11)."""
     sem_sa: list[CopItem] = []
     sem_rs: list[CopItem] = []
+    ids = [i.id for i in itens]
+    # uma consulta só para todos os itens (antes era uma por item: N+1 no painel e nas listas de COP)
+    por_item: dict[int, CadastroSa] = {}
+    if ids:
+        por_item = {s.cop_item_id: s for s in db.scalars(select(CadastroSa).where(CadastroSa.cop_item_id.in_(ids)))}
     for i in itens:
-        sa = db.scalar(select(CadastroSa).where(CadastroSa.cop_item_id == i.id))
+        sa = por_item.get(i.id)
         if sa is None or sa.situacao != "CONFIRMADO":
             sem_sa.append(i)
         if not tem_precificador(sa):

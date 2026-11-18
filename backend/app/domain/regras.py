@@ -32,7 +32,8 @@ def validar_saldo(saldo_kg: float, reservado_outros_kg: float, solicitado_kg: fl
     r = validar_quantidade_kg(solicitado_kg)
     if r.erros:
         return r
-    disponivel = round(saldo_kg - max(reservado_outros_kg, 0), 3)
+    # nunca negativo: reserva antiga maior que o saldo (ex.: depois de um ajuste) não "invade" mais que o lote
+    disponivel = round(max(saldo_kg - max(reservado_outros_kg, 0), 0.0), 3)
     if solicitado_kg > saldo_kg + EPS and peso_peca_kg is not None and saldo_kg + EPS >= peso_peca_kg:
         r.adicionar("CONSUMO_LOTE_INTEIRO", Nivel.CIENCIA,
                     f"O lote {lote or 'escolhido'} será consumido por inteiro ({kg_br(saldo_kg)}); previsto "

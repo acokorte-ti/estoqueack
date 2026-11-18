@@ -337,11 +337,11 @@ def montar(ctx: Contexto, estoque: list[P.LinhaEstoque2026], historico: list[dic
     _paridade(pl, estoque, geral)
     _esgotados_historico(pl, ctx, estoque, historico, lotes_rj)
     _rj_em_itu(pl, ctx, geral)
-    _estoque_mega(pl, ctx, geral)
+    _estoque_mega(pl, ctx)
     _ligar_reto_origem(pl)
     _correcoes_nao_aplicadas(pl, ctx)
     _restricoes_e_avisos(pl, ctx, geral)
-    _solicitacoes(pl, ctx, corte, lotes_rj, estoque, sas)
+    _solicitacoes(pl, ctx, corte, lotes_rj, sas)
     _sas(pl, sas, lotes_rj)
     _notas_das_correcoes(pl)
     _ops_mal_digitadas(pl, ctx, estoque, corte)
@@ -791,7 +791,7 @@ def _ligar_reto_origem(pl: Plano) -> None:
                 "\"Atribuir origem\" na T05 quando souber o contêiner")
 
 
-def _estoque_mega(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
+def _estoque_mega(pl: Plano, ctx: Contexto) -> None:
     if not ctx.mega_saldo:
         pl.pend("SEM_SALDO_MEGA", "BLOQUEIA", "Sem saldo do Mega (sincronização não rodou): os lotes do Estoque "
                 "Mega não podem ser criados.", None, "Rodar \"Sincronizar agora\" antes da carga")
@@ -907,7 +907,7 @@ def _parse_medida(txt: str | None) -> tuple[float | None, float | None, float | 
     return nums[0], nums[1], nums[2]
 
 
-def _previsto(lote: LoteP, it: ItemP, dens: float, instr: str | None, qtd: int, peso: float | None) -> float:
+def _previsto(it: ItemP, dens: float, instr: str | None, peso: float | None) -> float:
     if peso and peso > 0:
         return round(peso, 3)
     m = re.search(r"(\d+)\s*PE[CÇ]AS?\s*COM\s*(\d+(?:[.,]\d+)?)\s*MM", instr or "", re.I)
@@ -992,7 +992,7 @@ def _pecas_divididas(pecas: int, kgs: list[float]) -> list[int]:
 
 
 def _solicitacoes(pl: Plano, ctx: Contexto, corte: list[P.LinhaCorte], idx: dict[tuple, list[LoteP]],
-                  estoque, sas: list[P.LinhaSa] | None = None) -> None:
+                  sas: list[P.LinhaSa] | None = None) -> None:
     consumo_por_ct_op: dict[tuple, list[MovP]] = defaultdict(list)
     lote_do_mov: dict[int, LoteP] = {}
     for l in pl.lotes:
@@ -1045,7 +1045,7 @@ def _solicitacoes(pl: Plano, ctx: Contexto, corte: list[P.LinhaCorte], idx: dict
         if c.op in SITUACAO_REVISADA and sit in ("ENVIADA", "CORTADA", "CORTADA_PARCIAL", "MATERIAL_INSUFICIENTE"):
             sit = SITUACAO_REVISADA[c.op]          # revisão do Fabiano (§10.7)
         s = SolP(c.op, c.item, c.cliente, lote, modo, qtd, it.formato, _parse_medida(c.medida),
-                 _previsto(lote, it, dens, c.instrucao, qtd, c.peso), (c.instrucao or "")[:300] or None,
+                 _previsto(it, dens, c.instrucao, c.peso), (c.instrucao or "")[:300] or None,
                  (c.instrucao_processo or "")[:300] or None,
                  "; ".join(x for x in (c.observacao if c.observacao not in ("-", None) else None,
                                        f"Peso informado: {c.peso_texto}" if c.peso is None and c.peso_texto and

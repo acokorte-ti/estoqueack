@@ -74,12 +74,14 @@ function NovaEntrada({ aoSair }: { aoSair: (gravada: Entrada | null) => void }) 
   const [ocupado, setOcupado] = useState(false);
 
   useEffect(() => {
-    api.get<Liga[]>("/ligas").then((l) => setLigas(l.filter((x) => x.ativo).map((x) => x.codigo))).catch(() => undefined);
+    api.get<Liga[]>("/ligas").then((l) => setLigas(l.filter((x) => x.ativo).map((x) => x.codigo)))
+      .catch((e: Error) => setErro(`Não foi possível carregar as ligas (${e.message}). Recarregue a página.`));
   }, []);
   useEffect(() => {
     const t = window.setTimeout(() => {
       if (cab.conteiner.trim().length < 2) return;
-      api.get<{ id: number; codigo: string }[]>(`/conteineres?busca=${encodeURIComponent(cab.conteiner.trim())}`).then(setConts).catch(() => undefined);
+      // só a lista de sugestões de contêiner: se falhar, o campo continua aceitando digitação livre
+      api.get<{ id: number; codigo: string }[]>(`/conteineres?busca=${encodeURIComponent(cab.conteiner.trim())}`).then(setConts).catch(() => setConts([]));
     }, 250);
     return () => window.clearTimeout(t);
   }, [cab.conteiner]);

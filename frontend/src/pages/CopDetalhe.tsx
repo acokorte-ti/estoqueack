@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, data, kg, validacaoDoErro, type Ocorrencia } from "../api/cliente";
+import { api, data, kg, reais, rsKg, validacaoDoErro, type Ocorrencia } from "../api/cliente";
 import { useSessao } from "../api/sessao";
-import { EMITENTES_LANCAMENTO, faltasNf, nfTexto, nomeEmitente, reais, SA_ITEM, SITUACAO_COP, temPrecificador, type Cop, type CortePronto } from "../api/cop";
+import { EMITENTES_LANCAMENTO, faltasNf, nfTexto, nomeEmitente, SA_ITEM, SITUACAO_COP, temPrecificador, type Cop, type CortePronto } from "../api/cop";
 import { MODO_NOME } from "../api/solicitacao";
 import Janela, { fecharJanela } from "../components/Janela";
 import PainelValidacao, { JUSTIFICATIVA_MIN } from "../components/PainelValidacao";
@@ -135,7 +135,7 @@ export default function CopDetalhe() {
                       {i.sa ? <span className={`etiqueta ${SA_ITEM[i.sa.situacao]?.classe ?? ""}`}>{SA_ITEM[i.sa.situacao]?.nome ?? i.sa.situacao}</span> : aberto ? "—" : <span className="etiqueta">sem SA</span>}
                       {i.sa?.sa_codigo && <><br /><span className="desc">{i.sa.sa_codigo}</span></>}
                       {i.sa && (temPrecificador(i)
-                        ? <><br /><span className="desc">R$ {reais(i.sa.rs_kg ?? 0)}/kg{i.sa.valor_precificador != null && ` · precificador R$ ${reais(i.sa.valor_precificador)} por peça`}</span></>
+                        ? <><br /><span className="desc">R$ {rsKg(i.sa.rs_kg ?? 0)}/kg{i.sa.valor_precificador != null && ` · precificador R$ ${reais(i.sa.valor_precificador)} por peça`}</span></>
                         : !aberto && <><br /><span className="etiqueta atencao">falta R$/kg</span></>)}
                     </td>
                     <td>{i.nf ? `${i.nf.numero} · ${nomeEmitente(i.nf.emitente)}` : "—"}</td>

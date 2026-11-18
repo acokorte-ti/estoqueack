@@ -24,7 +24,8 @@ const s = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 function resumo(codigo: string, i: Item): { texto: string; link?: string } {
   switch (codigo) {
     case "SA_SEGURANDO_COP":
-      return { texto: `COP ${s(i.cop)}: ${s(i.sas_pendentes)} SA(s) pendente(s) de ${s(i.itens)}`, link: i.cop_id ? `/cops/${s(i.cop_id)}` : undefined };
+      // spec v3.16: precificador_pendentes é campo novo (opcional; API antiga não manda)
+      return { texto: `COP ${s(i.cop)}: ${s(i.sas_pendentes)} SA(s) e ${s(i.precificador_pendentes ?? 0)} R$/kg pendente(s) de ${s(i.itens)}`, link: i.cop_id ? `/cops/${s(i.cop_id)}` : undefined };
     case "COP_EM_TRANSITO": case "COP_ABERTO": case "COP_AGUARDANDO_SA": case "COP_AGUARDANDO_NF":
       return { texto: `COP ${s(i.numero)} · ${s(i.qtd_itens)} item(ns) · ${typeof i.peso_total_kg === "number" ? `${kg(i.peso_total_kg)} kg` : ""}`,
         link: codigo === "COP_EM_TRANSITO" ? `/recebimentos/${s(i.id)}` : `/cops/${s(i.id)}` };

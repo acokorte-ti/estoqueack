@@ -108,3 +108,52 @@ def test_dois_cortes_simultaneos_no_mesmo_lote(client, monkeypatch):
         assert saldo == pytest.approx(400) and soma == pytest.approx(saldo)   # nada negativo, nada perdido
     finally:
         fab.definir(None)
+
+
+def test_ajuste_de_inventario_durante_um_corte_termina_no_saldo_contado(client, monkeypatch):
+    """Revisão de 2026-11-18: o ajuste calcula a diferença DEPOIS de travar o lote. Lote de 1.000 kg; um corte de
+    600 kg segura a trava; no meio, o inventário conta 500 kg. Antes, a diferença saía do saldo velho (1.000) e o
+    ajuste não fechava; agora o saldo final é o contado (500)."""
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+    u = criar_usuarios(client)
+    ids = catalogo_e_lotes()
+    fab = mega_falso()
+    try:
+        h = entrar(client, u["itu"])
+        r = client.post("/api/solicitacoes", json=corpo_solicitacao(ids["l33"]), headers=h)
+        assert r.status_code == 201, r.text
+        sid = r.json()["solicitacoes"][0]["id"]
+
+        _segura_transacao(monkeypatch, 1.5)
+        resultados: dict[str, int] = {}
+
+        def cortar():
+            with TestClient(app) as c:
+                hh = entrar(c, u["rj"])
+                resultados["corte"] = c.post(f"/api/solicitacoes/{sid}/corte", headers=hh, json={
+                    "linhas": [{"lote_id": ids["l33"], "pecas": 12, "peso_real_kg": 600}],
+                    "confirmacoes": {"EXCESSO_TOLERANCIA": "Teste de concorrência no lote",
+                                     "PECAS_ACIMA_SOLICITADO": "Teste de concorrência no lote"}}).status_code
+
+        def ajustar():
+            time.sleep(0.5)   # começa enquanto o corte segura a trava
+            with TestClient(app) as c:
+                hh = entrar(c, u["itu"])
+                resultados["ajuste"] = c.post(f"/api/lotes/{ids['l33']}/ajuste", headers=hh, json={
+                    "saldo_contado_kg": 500, "justificativa": "Inventário de teste"}).status_code
+
+        t1, t2 = threading.Thread(target=cortar), threading.Thread(target=ajustar)
+        t1.start(), t2.start()
+        t1.join(30), t2.join(30)
+
+        assert resultados == {"corte": 201, "ajuste": 201}, resultados
+        from app.core.db import engine
+        with engine.connect() as c:
+            saldo = float(c.execute(text("SELECT saldo_kg FROM lote WHERE id = :i"), {"i": ids["l33"]}).scalar())
+            soma = float(c.execute(text("SELECT sum(kg) FROM movimento WHERE lote_id = :i"),
+                                   {"i": ids["l33"]}).scalar())
+        assert saldo == pytest.approx(500) and soma == pytest.approx(saldo)
+    finally:
+        fab.definir(None)

@@ -65,8 +65,8 @@ def _kardex():
     def consultar(codigos: list[int]) -> set[int] | None:
         try:
             return fabrica.obter().codigos_com_movimento(codigos, date.today() - timedelta(days=730))
-        except Exception as e:  # noqa: BLE001
-            log.error("kardex do Mega indisponível: %s", e)
+        except Exception:  # noqa: BLE001 - erro inesperado: guarda o rastro para o diagnóstico
+            log.exception("kardex do Mega indisponível")
             return None
     return consultar
 

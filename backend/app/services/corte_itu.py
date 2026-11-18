@@ -232,6 +232,8 @@ def instrucao_mega(lote: Lote, op: int, baixa_kg: float, reto_kg: float, db: Ses
 
 
 def registrar(db: Session, cfg: Config, e: CorteItuEntrada, *, usuario: Usuario, ip: str | None) -> CorteItu:
+    # trava ANTES de validar: perda e "material usado" saem do mesmo saldo (revisão de 2026-11-18)
+    movimentos.travar_lotes(db, [e.lote_id])
     previa, dados, lote, sol = validar(db, cfg, e)
     conf = exigir_sem_pendencias(previa, e.confirmacoes)
     lote = movimentos.lote_ou_404(db, lote.id, travar=True)

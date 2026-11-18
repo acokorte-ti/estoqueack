@@ -15,7 +15,7 @@ Dono do projeto: **Eduardo Macedo** (TI). Usuários: Fabiano Camargo e Matheus A
 | Retomar a parte técnica (inventário, segredos, operação, lições) | `docs/tecnico/00_RETOMAR_PROJETO.md` |
 | Carga inicial, roteiro de aceite, implantação, backup externo | `docs/tecnico/03` a `06` |
 | UX e tema visual | `docs/ux/` |
-| **Coordenação** (estado de cada frente, decisões, pedidos) | `docs/coordenacao/` |
+| **Coordenação** (estado de cada frente, decisões, pedidos) | `docs/coordenacao/` (para retomar a coordenação: `docs/coordenacao/00_RETOMAR_COORDENACAO.md`) |
 | Planilhas reais e relatórios da carga (**fora do repo**) | `../planilhas/<data>/`, `../carga/relatorios/` |
 
 ## Como o trabalho é organizado

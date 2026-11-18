@@ -1,6 +1,6 @@
 # Estado — COORDENAÇÃO (arquiteto-chefe)
 
-Chat COORDENAÇÃO (Claude Code). Atualizado 2026-11-17 (recarga do zero com as regras v3.13, ponta a ponta OK, teste manual liberado).
+Chat COORDENAÇÃO (Claude Code). Atualizado 2026-11-18. **Para retomar (troca de conta do Claude): ler `00_RETOMAR_COORDENACAO.md`.**
 
 > **Sem prazo fixo (decisão do Eduardo, 2026-11-04).** Não existe data alvo nem marcos com data. O que vale é a **ordem** abaixo; a implantação acontece quando os critérios de go/no-go (§4) estiverem atendidos e o Eduardo liberar. Documentos que citam 13/11 (ex.: roteiro de implantação) leem "dia da implantação".
 
@@ -21,7 +21,7 @@ Chat COORDENAÇÃO (Claude Code). Atualizado 2026-11-17 (recarga do zero com as 
 | 10 | Regras novas (spec v3.5–v3.13): paridade liga × bitola, 8 % RJ, consumo misto, peso real com bloqueio, regra do RETO, menu renomeado | TÉCNICO + FRONTEND | ✅ no ar (até `b0cf389`) |
 | 10b | Paridade conferida pelo Fabiano (3 exceções) e respostas de 17/11 aplicadas | Eduardo + Fabiano | ✅ (restam dúvidas menores em `../carga/PENDENCIAS_USUARIOS_2026-11-17.txt`) |
 | 11 | Recarga do zero (planilhas 2026-11-17) + conferência + ponta a ponta 5 caminhos | TÉCNICO + BANCO E TESTES | ✅ 2026-11-17: Estoque Mega = Mega; RJ no Rio = ESTOQUE 2026; 5 caminhos OK |
-| 12 | Teste manual do Eduardo (roteiro `../carga/ROTEIRO_TESTE_MANUAL_2026-11-17.md`, botão "Confirmar SA (teste)" só na homologação) → aceite com Fabiano, Matheus, Marcelo e Renato | Eduardo | ⏳ em andamento |
+| 12 | Teste manual do Eduardo (roteiro `../carga/ROTEIRO_TESTE_MANUAL_2026-11-17.md`) com ajustes pedidos por ele (17/11: filtro "contém", Fila RJ, vários lotes na OP, lote estritamente maior, menu, impressão) → aceite com os usuários | Eduardo + todas | ⏳ em andamento; falta programar anexos/NF enriquecida (R074–R076) e o fechamento mensal (espera a Inês) |
 | 13 | Go/no-go → implantação pelo roteiro | Eduardo + COORDENAÇÃO | depois do 12 |
 
 ## 2. Escopo da F1 (validado 2026-11-04)
@@ -60,6 +60,7 @@ Entra: T03–T14, T15 mínima e aba RETO por origem (v3.4, 06/11), T16 mínima, 
 
 ## 6. Rodadas
 
+- **R8 (17–18/11):** ajustes do teste manual (DECISOES 2026-11-17), spec v3.14–v3.15, unificação de "Pedir corte", vários lotes na OP, deploy esperando sequência de commits (não estava travado). Documento de retomada `00_RETOMAR_COORDENACAO.md` e histórico exportado em `../historico_claude/`.
 - **R7 (17/11):** respostas dos usuários de 17/11; spec v3.11–v3.13; menu renomeado; bloqueio do peso real; regra do RETO; recarga do zero conferida; ponta a ponta 5/5; ferramenta "Confirmar SA (teste)" (só fora de produção; desligar na implantação, `06_implantacao.md` §2.3).
 - **R6 (06–12/11, auditoria + respostas):** P19–P31 respondidas e registradas em DECISOES; spec v3.5–v3.10; TÉCNICO R044–R049, R053, R055 (500 da T04); FRONTEND R041–R052 conferido na homologação; BANCO E TESTES R042, R048, e2e preparado. Git autentica pelo `gh` (credential helper local do repo).
 - **R5 (06/11, auditoria):** spec v3.4 commitada (`4b383d6`); pedidos R040 (TÉCNICO), R041 (FRONTEND), R042 (BANCO E TESTES). TÉCNICO corrigindo carga/bug (em andamento). Depende do Eduardo: P19–P25 e perguntas ao Fabiano (`../carga/texto_fabiano_auditoria_2026-11-06.md`).

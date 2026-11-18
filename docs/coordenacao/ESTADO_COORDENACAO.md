@@ -19,7 +19,7 @@ Chat COORDENAÇÃO (Claude Code). Atualizado 2026-11-18. **Para retomar (troca d
 | 9 | Spec atualizada com as decisões de 04/11 + R037 + R024 (perda até 6 %) | FUNCIONAL | ✅ feito (v3.3) |
 | 9b | Correção da auditoria de 06/11 (RETO do RJ em Itu em sub-lotes + RETO, leitor Ø/RED/ROUND, solicitação parcial; T15 mínima, RETO por origem; telas; testes) | todas | ✅ feito (até `d339372`) |
 | 10 | Regras novas (spec v3.5–v3.13): paridade liga × bitola, 8 % RJ, consumo misto, peso real com bloqueio, regra do RETO, menu renomeado | TÉCNICO + FRONTEND | ✅ no ar (até `b0cf389`) |
-| 10b | Paridade conferida pelo Fabiano (3 exceções) e respostas de 17/11 aplicadas | Eduardo + Fabiano | ✅ (restam dúvidas menores em `../carga/PENDENCIAS_USUARIOS_2026-11-17.txt`) |
+| 10b | Paridade conferida pelo Fabiano (3 exceções) e respostas de 17/11 aplicadas | Eduardo + Fabiano | ✅ (restam dúvidas menores em `../carga/PENDENCIAS_USUARIOS_2026-11-18.txt`) |
 | 11 | Recarga do zero (planilhas 2026-11-17) + conferência + ponta a ponta 5 caminhos | TÉCNICO + BANCO E TESTES | ✅ 2026-11-17: Estoque Mega = Mega; RJ no Rio = ESTOQUE 2026; 5 caminhos OK |
 | 12 | Teste manual do Eduardo (roteiro `../carga/ROTEIRO_TESTE_MANUAL_2026-11-17.md`) com ajustes pedidos por ele (17/11: filtro "contém", Fila RJ, vários lotes na OP, lote estritamente maior, menu, impressão) → aceite com os usuários | Eduardo + todas | ⏳ em andamento; falta programar anexos/NF enriquecida (R074–R076) e o fechamento mensal (espera a Inês) |
 | 13 | Go/no-go → implantação pelo roteiro | Eduardo + COORDENAÇÃO | depois do 12 |
@@ -60,6 +60,7 @@ Entra: T03–T14, T15 mínima e aba RETO por origem (v3.4, 06/11), T16 mínima, 
 
 ## 6. Rodadas
 
+- **R9 (18/11):** ajustes do teste manual de 18/11 feitos pela COORDENAÇÃO direto (sessão sem os subagentes): spec v3.16, contrato §4/§7, backend (trava da NF por SA confirmado + R$/kg, `PRECIFICADOR_PENDENTE`, precificador no item do COP), testes (`test_v316_precificador_nf.py`), T14 por COP, T11 com precificador, largura toda e menu recolhível.
 - **R8 (17–18/11):** ajustes do teste manual (DECISOES 2026-11-17), spec v3.14–v3.15, unificação de "Pedir corte", vários lotes na OP, deploy esperando sequência de commits (não estava travado). Documento de retomada `00_RETOMAR_COORDENACAO.md` e histórico exportado em `../historico_claude/`.
 - **R7 (17/11):** respostas dos usuários de 17/11; spec v3.11–v3.13; menu renomeado; bloqueio do peso real; regra do RETO; recarga do zero conferida; ponta a ponta 5/5; ferramenta "Confirmar SA (teste)" (só fora de produção; desligar na implantação, `06_implantacao.md` §2.3).
 - **R6 (06–12/11, auditoria + respostas):** P19–P31 respondidas e registradas em DECISOES; spec v3.5–v3.10; TÉCNICO R044–R049, R053, R055 (500 da T04); FRONTEND R041–R052 conferido na homologação; BANCO E TESTES R042, R048, e2e preparado. Git autentica pelo `gh` (credential helper local do repo).

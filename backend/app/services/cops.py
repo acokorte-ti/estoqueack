@@ -39,9 +39,8 @@ def _sa_do_item(db: Session, item: CopItem) -> CadastroSa | None:
 
 
 def situacao_exibida(db: Session, cop: Cop) -> str:
-    """'AGUARDANDO_NF' é derivada: COP fechado com todos os SAs confirmados (§3.2)."""
-    if cop.situacao == "FECHADO" and cop.itens and all(
-            (s := _sa_do_item(db, i)) is not None and s.situacao == "CONFIRMADO" for i in cop.itens):
+    """'AGUARDANDO_NF' é derivada: COP fechado com todos os SAs confirmados e todos os R$/kg (§3.2, v3.16)."""
+    if cop.situacao == "FECHADO" and cop.itens and not any(sas.pendencias_nf(db, list(cop.itens))):
         return "AGUARDANDO_NF"
     return cop.situacao
 
@@ -171,6 +170,9 @@ def informar_nf(db: Session, cop_id: int, numero: str, emitente: str, data, item
     alvo = [i for i in cop.itens if item_ids is None or i.id in item_ids]
     if item_ids is not None and len(alvo) != len(set(item_ids)):
         raise ErroNegocio("Algum item informado não é deste COP.")
+    sem_sa, sem_rs = sas.pendencias_nf(db, alvo)
+    if sem_sa or sem_rs:   # spec v3.16 T11: NF só depois do SA confirmado e do R$/kg do precificador
+        raise ErroNegocio(sas.frase_nf_bloqueada(len(sem_sa), len(sem_rs)))
     for i in alvo:
         i.nf_id = nf.id
         s = _sa_do_item(db, i)
@@ -187,10 +189,14 @@ def validar_envio(db: Session, cop: Cop) -> Previa:
     r = p.resultado
     if cop.situacao != "FECHADO":
         r.adicionar("COP_NAO_FECHADO", Nivel.ERRO, "Feche o COP antes de enviar.")
-    sem_sa = [i for i in cop.itens if (s := _sa_do_item(db, i)) is None or s.situacao != "CONFIRMADO"]
+    sem_sa, sem_rs = sas.pendencias_nf(db, list(cop.itens))
     if sem_sa:
         r.adicionar("SA_PENDENTE", Nivel.ERRO, f"{len(sem_sa)} item(ns) ainda sem SA confirmado em Itu.",
                     itens=[i.id for i in sem_sa])
+    if sem_rs:
+        r.adicionar("PRECIFICADOR_PENDENTE", Nivel.ERRO,
+                    f"{len(sem_rs)} item(ns) sem o R$/kg do precificador no Cadastro de SA.",
+                    itens=[i.id for i in sem_rs])
     sem_nf = [i for i in cop.itens if i.nf_id is None]
     if sem_nf:
         r.adicionar("NF_PENDENTE", Nivel.ERRO, f"{len(sem_nf)} item(ns) sem NF de transferência.",
@@ -333,7 +339,8 @@ def item_dict(db: Session, i: CopItem) -> dict[str, Any]:
             "cliente": sol.cliente, "material": f"{lib.lote.item.liga.codigo} {bitola(lib.lote.item)}",
             "conteiner": lib.lote.conteiner.codigo if lib.lote.conteiner else None, "lote": lib.lote.codigo,
             "modo": sol.modo, "pecas": lib.pecas, "peso_kg": lib.peso_real_kg, "situacao": i.situacao,
-            "sa": {"id": s.id, "situacao": s.situacao, "sa_codigo": s.sa_codigo} if s else None,
+            "sa": {"id": s.id, "situacao": s.situacao, "sa_codigo": s.sa_codigo, "rs_kg": s.rs_kg,
+                   "valor_precificador": sas.valor_precificador(s)} if s else None,
             "nf": {"numero": i.nf.numero, "emitente": i.nf.emitente} if i.nf else None,
             "peso_conferido_kg": i.peso_conferido_kg, "lote_itu_id": i.lote_itu_id,
             "divergencias": [{"tipo": d.tipo, "pecas": d.pecas, "kg": d.kg, "observacao": d.observacao}

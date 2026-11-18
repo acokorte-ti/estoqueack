@@ -73,7 +73,23 @@ a { color: var(--ack-vermelho-escuro); text-underline-offset: 3px; }
 .breve { font-size: 0.75rem; font-weight: 400; color: #9ea3a8; white-space: nowrap; }
 .grupo { padding: var(--esp-5) var(--esp-5) var(--esp-2); font-size: var(--t-pequeno); color: #aeb3b8; font-weight: 600; }
 
-.conteudo { grid-area: conteudo; padding: var(--esp-6) var(--esp-6) var(--esp-7); max-width: 76rem; width: 100%; }
+/* spec v3.16 §4 (2026-11-18): conteúdo usa a largura toda (antes max-width 76rem deixava ~20 % em branco à direita) */
+.conteudo { grid-area: conteudo; padding: var(--esp-6) var(--esp-6) var(--esp-7); width: 100%; min-width: 0; }
+
+/* menu lateral recolhível no computador (o celular/tablet continua com o botão "Menu") */
+.recolher-menu {
+  display: inline-flex; align-items: center; gap: var(--esp-2); min-height: var(--toque); padding: 0 var(--esp-3);
+  background: none; color: var(--aco-grafite); border: 1px solid var(--aco-linha); border-radius: var(--raio); font-weight: 600;
+}
+.recolher-menu:hover { background: var(--aco-claro, #f1f2f3); }
+@media (min-width: 901px) {
+  .moldura.menu-recolhido { grid-template-columns: minmax(0, 1fr); grid-template-areas: "topo" "conteudo"; }
+  .moldura.menu-recolhido .lateral { display: none; }
+}
+@media (max-width: 900px) { .recolher-menu { display: none; } }
+
+/* T14 agrupada por COP (spec v3.16) */
+.tabela tr.grupo-cop td { background: var(--aco-claro, #f1f2f3); border-top: 2px solid var(--aco-linha); padding-top: var(--esp-3); padding-bottom: var(--esp-3); }
 .cabecalho { margin-bottom: var(--esp-6); max-width: 46rem; }
 .cabecalho p { color: var(--aco-medio); margin-top: var(--esp-2); }
 

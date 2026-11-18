@@ -62,6 +62,7 @@ def test_caminho_a_corte_rj(amb):
     _confirmar_no_mega(fab, 50001)
     assert client.post("/api/sas/verificar", json={}, headers=h).json()["confirmados"] == 1
     assert client.get(f"/api/solicitacoes/{sid}").json()["situacao"] == "SA_PRONTO"
+    client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h)   # v3.16: R$/kg antes da NF
 
     # RJ: NF + envio
     h = entrar(client, u["rj"])
@@ -122,6 +123,7 @@ def test_caminho_b_peca_inteira_gera_lote_rj_em_itu(amb):
     client.post(f"/api/sas/{sa['id']}/codigo", json={"sa_codigo": 60001}, headers=h)
     _confirmar_no_mega(fab, 60001)
     client.post("/api/sas/verificar", json={"ids": [sa["id"]]}, headers=h)
+    client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h)   # v3.16: R$/kg antes da NF
     h = entrar(client, u["rj"])
     client.post(f"/api/cops/{cop['id']}/nf", json={"numero": "900", "emitente": "FIO_CERTO"}, headers=h)
     assert client.post(f"/api/cops/{cop['id']}/enviar", headers=h).status_code == 200
@@ -202,6 +204,7 @@ def test_aviso_nf_diferente_da_entrada_no_mega(amb):
     fab.obter().situacoes_sa[37983] = SituacaoSa(37983, True, "SA FACA - CÓD.777", True, date(2016, 9, 8), 12,
                                                  "3215", "82081000", 5.2)
     client.post(f"/api/sas/{sa['id']}/codigo", json={"sa_codigo": 37983}, headers=h)
+    client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h)   # v3.16: R$/kg antes da NF
     cop_id = client.get(f"/api/sas/{sa['id']}").json()["cop"]["id"]
     h = entrar(client, u["rj"])
     client.post(f"/api/cops/{cop_id}/nf", json={"numero": "3215", "emitente": "FIO_CERTO"}, headers=h)

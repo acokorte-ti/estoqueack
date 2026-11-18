@@ -39,6 +39,7 @@ Detalhes em `DECISOES.md` (mais recente em cima) e na spec.
 - 8 % de tolerância para material do RJ, 5 % para o resto; consumo misto RJ + Itu; peça inteira do RJ com **pendência de peso real** (bloqueia o "Enviar ao RJ" depois de 7 dias); SA **não** é corrigido no Mega; quem cadastra o SA é a **Amanda** (o Fabiano pede).
 - **Regra do RETO** pela espessura × largura da sobra (E ≤ 50 e L < 200, ou E > 50 e L < 250), com "Conferi a regra".
 - Menu renomeado por função; "Pedir corte de material" é a **única porta de entrada** (lote de Itu continua na mesma tela para o lançamento do corte).
+- **Ajustes do teste de 18/11 (spec v3.16):** Cadastro de SA agrupado e filtrado por COP; R$/kg do precificador obrigatório; NF do COP (e do B2) só depois do SA confirmado e do R$/kg (`PRECIFICADOR_PENDENTE`); precificador visível no COP; telas na largura toda; botão "Esconder menu". Detalhes da P44 com proposta padrão (pendências item 17).
 - Ajustes do teste de 17/11: filtro de liga por "contém"; instrução de processo com várias opções; justificativa sem mínimo (não vazia); Fila RJ com pesquisa, cartões que expandem e ordem por tempo de espera; só Fio Certo como emitente; lote **estritamente maior** que a peça; vários lotes na mesma OP com **balanceamento de peças** e **lote menor consumido por inteiro**; impressão do RJ limpa com peso estimado; SA no recebimento; botões Voltar/Avançar no topo.
 
 ## 4. O que está pela metade / próximos passos (nesta ordem)
@@ -46,7 +47,7 @@ Detalhes em `DECISOES.md` (mais recente em cima) e na spec.
 1. **Anexos e entrada por NF enriquecida** (spec v3.15 pronta; **não programado**): pedidos **R074** (TÉCNICO), **R075** (FRONTEND), **R076** (BANCO E TESTES: revisar migração, e os anexos entram no backup). NF/packing list/precificador escaneados (PDF/JPG/PNG, XLSX no precificador, até 10 MB), R$/kg por item, campos novos da NF, tudo visível no detalhe do lote. Seguir as propostas do arquivo de pendências itens 7–8 até o Eduardo responder.
 2. **Fechamento mensal do material do RJ para a Inês**: modelo na spec (T19 item 10, "[proposta, a validar com a Inês]"), item 9 do arquivo de pendências. **Só programar depois que a Inês validar.**
 3. **Melhoria do deploy** (pergunta aberta ao Eduardo): quando a ponta da `main` estiver com CI rodando, publicar o último commit já verde (`deploy/auto/auto_deploy.sh`). Hoje, commits seguidos atrasam a publicação até a sequência parar.
-4. **Arquivo único de pendências dos usuários**: `../carga/PENDENCIAS_USUARIOS_2026-11-17.txt` (16 itens, cada um com proposta padrão; o sistema já funciona com as propostas). Quando as respostas chegarem: registrar em `DECISOES.md`, mandar FUNCIONAL atualizar a spec e TÉCNICO/FRONTEND ajustarem; se mudar a carga, recarregar.
+4. **Arquivo único de pendências dos usuários**: `../carga/PENDENCIAS_USUARIOS_2026-11-18.txt` (17 itens, cada um com proposta padrão; o sistema já funciona com as propostas). Quando as respostas chegarem: registrar em `DECISOES.md`, mandar FUNCIONAL atualizar a spec e TÉCNICO/FRONTEND ajustarem; se mudar a carga, recarregar.
 5. **Pedidos menores abertos:** R066 (BANCO E TESTES revisar a 0010), R068 (FUNCIONAL registrar leituras do TÉCNICO), R069 (pontos menores da 0009: fuso do dia da pendência, ciclo na paridade, prazo no rollback), R071/R073 (formato da API para o FRONTEND; provavelmente já atendidos, conferir e fechar).
 6. **Limpeza do `PEDIDOS.md`:** vários pedidos antigos estão "ABERTO" mas já foram atendidos (R023, R025, R033, R039, R046, R047, R049, R050, R051, R052, R053, R054). Fechar com uma linha cada e mover para `PEDIDOS_ARQUIVO.md`.
 7. **Repetir o ponta a ponta** (`deploy/e2e/rodar_e2e.sh`, BANCO E TESTES) depois dos ajustes de tela/regra de 17/11, e uma **recarga final** com as planilhas mais novas antes do aceite.
@@ -69,7 +70,7 @@ Detalhes em `DECISOES.md` (mais recente em cima) e na spec.
 
 | O quê | Onde (`C:\Users\eduardo.macedo\Documents\projeto-controle_mp\`) |
 |---|---|
-| Pendências dos usuários (arquivo único atual) | `carga\PENDENCIAS_USUARIOS_2026-11-17.txt` |
+| Pendências dos usuários (arquivo único atual) | `carga\PENDENCIAS_USUARIOS_2026-11-18.txt` |
 | Roteiro do teste manual e OPs sugeridas | `carga\ROTEIRO_TESTE_MANUAL_2026-11-17.md`, `carga\ops_teste_manual_2026-11-17.txt` |
 | Correções da carga (respostas do Fabiano aplicadas) | `carga\correcoes_carga.json` (vai junto em toda recarga) |
 | Relatórios da carga, paridade e leitura | `carga\relatorios\` (paridade conferida: `paridade_rj_itu_previa_20261112_0904_RESPONDIDO.xlsx`; carga atual: `carga_resultado_20261117_1322.xlsx`) |

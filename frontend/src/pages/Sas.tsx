@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, data, kg, num, qs, validacaoDoErro, type Validacao } from "../api/cliente";
 import { useSessao } from "../api/sessao";
 import PainelValidacao, { confirmacoesValidas, podeGravar, type Confirmacoes } from "../components/PainelValidacao";
@@ -48,10 +48,12 @@ export default function Sas() {
   // spec v3.13 T14 / contrato §7 [P36]: a Amanda (perfil Análise) também informa o código do SA depois de cadastrar no Mega
   const informaCodigo = altera || usuario?.perfil === "ANALISE";
 
-  const [params] = useSearchParams();
-  const copFiltro = params.get("cop");
+  // spec v3.16 T14 (Eduardo, 2026-11-18): a fila é vista e filtrada por COP (um COP tem várias OPs), não por OP;
+  // o número do COP fica na URL (?cop=), o mesmo link do aviso "COP fechado: SA a fazer"
+  const [params, setParams] = useSearchParams();
+  const copFiltro = params.get("cop") ?? "";
+  const mudarCop = (v: string) => setParams(v.trim() ? { cop: v.trim() } : {}, { replace: true });
   const [filtro, setFiltro] = useState("abertos");
-  const [opFiltro, setOpFiltro] = useState("");
   const [historico, setHistorico] = useState(false);
   const [pag, setPag] = useState(1);
   const [lista, setLista] = useState<Lista | null>(null);
@@ -64,24 +66,24 @@ export default function Sas() {
     setErro("");
     const f = FILTROS.find((x) => x.chave === filtro)!;
     try {
-      const r = await api.get<Lista>(`/sas${qs({ situacao: f.situacao, op: num(opFiltro), cop: copFiltro ?? undefined,
+      const r = await api.get<Lista>(`/sas${qs({ situacao: f.situacao, cop: num(copFiltro),
         origem: historico ? ["COP", "CORTE_ITU", "CARGA"] : undefined, pagina: pag, por_pagina: 100 })}`);
       setLista(r);
       setSel((s) => s.filter((id) => r.itens.some((i) => i.id === id)));
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível carregar a fila de SA.");
     }
-  }, [filtro, opFiltro, copFiltro, historico, pag]);
+  }, [filtro, copFiltro, historico, pag]);
 
   useEffect(() => {
     void carregar();
   }, [carregar]);
-  useEffect(() => setPag(1), [filtro, opFiltro, historico]);
+  useEffect(() => setPag(1), [filtro, copFiltro, historico]);
 
   const itens = lista?.itens ?? [];
   const selecionados = itens.filter((i) => sel.includes(i.id));
   const fAtual = FILTROS.find((x) => x.chave === filtro)!;
-  const exportarHref = `/api/exportar/sas.xlsx${qs(sel.length ? { ids: sel } : { situacao: fAtual.situacao, op: num(opFiltro), cop: copFiltro ?? undefined,
+  const exportarHref = `/api/exportar/sas.xlsx${qs(sel.length ? { ids: sel } : { situacao: fAtual.situacao, cop: num(copFiltro),
     origem: historico ? ["COP", "CORTE_ITU", "CARGA"] : undefined })}`;
   const alternar = (id: number) => setSel(sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]);
 
@@ -131,12 +133,27 @@ export default function Sas() {
   const [nfAberta, setNfAberta] = useState(false);
   const selB2 = selecionados.filter((s) => s.origem === "CORTE_ITU");
 
+  // spec v3.16 T14: um grupo por COP, na ordem em que aparecem; corte em Itu (B2) num grupo próprio
+  const NCOL = altera ? 12 : 11;
+  const grupos: { chave: string; titulo: string; cop: Sa["cop"]; itens: Sa[] }[] = [];
+  for (const s of itens) {
+    const chave = s.cop ? `cop-${s.cop.id}` : s.origem === "CORTE_ITU" ? "corte-itu" : "outros";
+    let g = grupos.find((x) => x.chave === chave);
+    if (!g) {
+      g = { chave, cop: s.cop, itens: [],
+        titulo: s.cop ? `COP ${s.cop.numero}` : s.origem === "CORTE_ITU" ? "Corte em Itu (sem COP)" : "Histórico da carga (sem COP)" };
+      grupos.push(g);
+    }
+    g.itens.push(s);
+  }
+
   return (
     <>
       <header className="cabecalho">
         <h1>Cadastro de SA (semiacabado)</h1>
-        <p>Pedidos de SA que nascem do COP fechado e do corte em Itu de material RJ. O Fabiano confere e pede o SA (marca como preparado ou exporta);
-          a Amanda cadastra o SA no Mega e informa o código aqui. O sistema confirma lendo o Mega.</p>
+        <p>Pedidos de SA agrupados por COP (e os do corte em Itu de material RJ). O Fabiano confere e pede o SA (marca como preparado ou exporta);
+          a Amanda cadastra o SA no Mega e informa o código aqui. O sistema confirma lendo o Mega. O <strong>R$/kg do precificador</strong> é
+          obrigatório: sem ele e sem o SA confirmado, o RJ não consegue informar a NF de transferência do COP.</p>
       </header>
 
       {!!lista?.cops_aguardando_sa.length && (
@@ -160,14 +177,13 @@ export default function Sas() {
           ))}
         </div>
         <label>
-          OP
-          <input inputMode="numeric" value={opFiltro} onChange={(e) => setOpFiltro(e.target.value)} placeholder="todas" />
+          COP
+          <input inputMode="numeric" value={copFiltro} onChange={(e) => mudarCop(e.target.value)} placeholder="todos" />
         </label>
         <label className="marcar">
           <input type="checkbox" checked={historico} onChange={(e) => setHistorico(e.target.checked)} />
           <span>Incluir histórico da carga (planilha de SA)</span>
         </label>
-        {copFiltro && <span className="etiqueta info">Só o COP {copFiltro}</span>}
       </div>
 
       {!altera && (
@@ -206,7 +222,26 @@ export default function Sas() {
               </tr>
             </thead>
             <tbody>
-              {itens.map((s) => (
+              {grupos.map((g) => {
+                const conf = g.itens.filter((s) => s.situacao === "CONFIRMADO").length;
+                const comRs = g.itens.filter((s) => (s.rs_kg ?? 0) > 0).length;
+                const todosSel = g.itens.every((s) => sel.includes(s.id));
+                return (
+                <Fragment key={g.chave}>
+                <tr className="grupo-cop">
+                  {altera && (
+                    <td><input type="checkbox" aria-label={`Selecionar ${g.titulo}`} checked={todosSel}
+                      onChange={() => setSel(todosSel ? sel.filter((id) => !g.itens.some((s) => s.id === id)) : [...new Set([...sel, ...g.itens.map((s) => s.id)])])} /></td>
+                  )}
+                  <td colSpan={NCOL - (altera ? 1 : 0)}>
+                    <strong>{g.cop ? <Link to={`/cops/${g.cop.id}`}>{g.titulo}</Link> : g.titulo}</strong>
+                    {" · "}{g.itens.length} OP(s) · SA confirmado <strong>{conf} de {g.itens.length}</strong> · R$/kg <strong>{comRs} de {g.itens.length}</strong>
+                    {g.cop && (conf === g.itens.length && comRs === g.itens.length
+                      ? <> <span className="etiqueta ok">pronto para a NF do RJ</span></>
+                      : g.cop.situacao === "FECHADO" && <> <span className="etiqueta atencao">NF do RJ bloqueada até SA e R$/kg</span></>)}
+                  </td>
+                </tr>
+                {g.itens.map((s) => (
                 <Fragment key={s.id}>
                 <tr className={[s.atrasado ? "atrasado" : "", sel.includes(s.id) ? "selecionada" : "", s.avisos?.length ? "com-aviso" : ""].join(" ")}>
                   {altera && (
@@ -232,7 +267,10 @@ export default function Sas() {
                     {s.cop ? `COP ${s.cop.numero}` : s.origem === "CORTE_ITU" ? "Corte em Itu" : "—"}
                     <br /><span className="desc">{s.nf ? `NF ${s.nf.numero} (${nomeEmitente(s.nf.emitente)})` : "sem NF"}</span>
                   </td>
-                  <td className="num">{s.rs_kg !== null ? s.rs_kg.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "—"}</td>
+                  <td className="num">
+                    {(s.rs_kg ?? 0) > 0 ? (s.rs_kg ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })
+                      : s.origem === "CARGA" ? "—" : <span className="etiqueta atencao" title="Obrigatório antes da NF de transferência">falta</span>}
+                  </td>
                   <td className="acoes">
                     {informaCodigo && s.situacao !== "CONFIRMADO" && <button className="link" onClick={() => setCodigoDe(s)}>Informar código do SA</button>}
                     {confirmaTeste && s.situacao !== "CONFIRMADO" && (
@@ -245,13 +283,16 @@ export default function Sas() {
                 </tr>
                 {!!s.avisos?.length && (
                   <tr className="linha-aviso">
-                    <td colSpan={altera ? 12 : 11}>
+                    <td colSpan={NCOL}>
                       {s.avisos.map((a) => <p key={a.codigo} className="validacao alerta">{a.mensagem}</p>)}
                     </td>
                   </tr>
                 )}
                 </Fragment>
-              ))}
+                ))}
+                </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -433,8 +474,9 @@ function JanelaEditar({ sa, soRs, aoFechar, aoGravar }: { sa: Sa; soRs: boolean;
         <h2 id="titulo-editar-sa">Pedido de SA · OP {sa.op}</h2>
         {sa.exportado_renato_em && <p className="validacao alerta">Já exportado para o Renato em {data(sa.exportado_renato_em)}. A alteração avisa o Renato.</p>}
         <label>
-          R$/kg (opcional)
-          <input inputMode="decimal" value={f.rs_kg} onChange={(e) => setF({ ...f, rs_kg: e.target.value })} autoFocus />
+          R$/kg do precificador{sa.origem !== "CARGA" && " (obrigatório)"}
+          <input inputMode="decimal" value={f.rs_kg} onChange={(e) => setF({ ...f, rs_kg: e.target.value })} autoFocus required={sa.origem !== "CARGA"} />
+          {sa.origem !== "CARGA" && <small className="dica">Sem o R$/kg o RJ não consegue informar a NF de transferência{sa.cop ? ` do COP ${sa.cop.numero}` : ""}.</small>}
           <small className="dica">{valor !== null ? `Valor precificador: R$ ${valor.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} por peça` : "Preenchido por quem cuida do custo; o sistema não calcula."}</small>
         </label>
         {!soRs && (

@@ -103,6 +103,8 @@ def test_confirmar_sa_teste_libera_o_envio_do_cop(amb, modo):
         assert aud.depois["confirmacao"] == "confirmação de teste" and aud.depois["usuario"] == "admin"
         assert aud.antes["situacao"] == "PENDENTE"
 
+    client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h)   # v3.16: R$/kg antes da NF
+
     # RJ segue o fluxo normal: aviso, NF e envio
     h = entrar(client, u["rj"])
     assert "COP_SA_PRONTO" in [n["tipo"] for n in client.get("/api/notificacoes").json()["itens"]]

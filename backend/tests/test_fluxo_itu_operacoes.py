@@ -8,6 +8,11 @@ from tests.fluxo_util import catalogo_e_lotes, corpo_solicitacao, criar_usuarios
 pytest.importorskip("fastapi")
 
 
+def _falta(r) -> str:
+    """Parte variável da mensagem da NF bloqueada (depois de "Falta"), spec v3.16."""
+    return r.json()["detail"].split("Falta")[-1]
+
+
 @pytest.fixture()
 def amb(client):
     u = criar_usuarios(client)
@@ -71,6 +76,7 @@ def _peca_inteira_recebida(client, u, ids, fab):
     sa = client.get("/api/sas").json()["itens"][0]
     fab.obter().situacoes_sa[70001] = SituacaoSa(70001, True, "SA BLOCO", True, date.today(), 837)
     client.post(f"/api/sas/{sa['id']}/codigo", json={"sa_codigo": 70001}, headers=h)
+    client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h)   # v3.16: R$/kg antes da NF
     h = entrar(client, u["rj"])
     client.post(f"/api/cops/{cop['id']}/nf", json={"numero": "777", "emitente": "FIO_CERTO"}, headers=h)
     client.post(f"/api/cops/{cop['id']}/enviar", headers=h)
@@ -104,7 +110,20 @@ def test_peca_inteira_corte_itu_conclui_e_sobra_vira_b2(amb):
     assert r.status_code == 201, r.text
     sa = client.get(f"/api/sas/{r.json()['sa_id']}").json()
     assert sa["origem"] == "CORTE_ITU" and sa["peso_kg"] == 50 and sa["op"] == 100508
-    r = client.post("/api/sas/nf", json={"ids": [sa["id"]], "numero": "558", "emitente": "FIO_CERTO"}, headers=h)
+    # v3.16 [proposta, P44(a)]: NF só fiscal do B2 só depois do SA confirmado e do R$/kg
+    nf = {"ids": [sa["id"]], "numero": "558", "emitente": "FIO_CERTO"}
+    r = client.post("/api/sas/nf", json=nf, headers=h)
+    assert r.status_code == 400 and "SA confirmado" in _falta(r) and "R$/kg" in _falta(r)
+    from app.integrations.mega.gateway import SituacaoSa
+    fab.obter().situacoes_sa[70009] = SituacaoSa(70009, True, "SA PECA", True, date.today(), 10)
+    v = client.post(f"/api/sas/{sa['id']}/codigo/validar", json={"sa_codigo": 70009}, headers=h).json()
+    conf = {o["codigo"]: "Teste" for o in v["ocorrencias"]}
+    client.post(f"/api/sas/{sa['id']}/codigo", json={"sa_codigo": 70009, "confirmacoes": conf}, headers=h)
+    assert client.get(f"/api/sas/{sa['id']}").json()["situacao"] == "CONFIRMADO"
+    r = client.post("/api/sas/nf", json=nf, headers=h)
+    assert r.status_code == 400 and "SA confirmado" not in _falta(r) and "R$/kg" in _falta(r)
+    client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h)   # v3.16: R$/kg antes da NF
+    r = client.post("/api/sas/nf", json=nf, headers=h)
     assert r.json()[0]["nf"]["numero"] == "558"
 
 

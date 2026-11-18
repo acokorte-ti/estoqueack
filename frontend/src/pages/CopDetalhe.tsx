@@ -2,12 +2,12 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, data, kg, validacaoDoErro, type Ocorrencia } from "../api/cliente";
 import { useSessao } from "../api/sessao";
-import { EMITENTES_LANCAMENTO, nfTexto, nomeEmitente, SA_ITEM, SITUACAO_COP, type Cop, type CortePronto } from "../api/cop";
+import { EMITENTES_LANCAMENTO, faltasNf, nfTexto, nomeEmitente, reais, SA_ITEM, SITUACAO_COP, temPrecificador, type Cop, type CortePronto } from "../api/cop";
 import { MODO_NOME } from "../api/solicitacao";
 import Janela, { fecharJanela } from "../components/Janela";
 import PainelValidacao, { JUSTIFICATIVA_MIN } from "../components/PainelValidacao";
 
-const ETAPAS = ["Montar", "Fechar", "SAs em Itu", "NF", "Enviar", "Recebido"];
+const ETAPAS = ["Montar", "Fechar", "SA e precificador em Itu", "NF", "Enviar", "Recebido"];
 function etapa(c: Cop): number {
   if (c.situacao === "ABERTO") return 0;
   if (c.situacao === "FECHADO") return 2;
@@ -50,6 +50,11 @@ export default function CopDetalhe() {
   const fechado = c.situacao === "FECHADO" || c.situacao === "AGUARDANDO_NF";
   const saOk = itens.filter((i) => i.sa?.situacao === "CONFIRMADO").length;
   const comNf = itens.filter((i) => i.nf).length;
+  const comRs = itens.filter(temPrecificador).length;
+  // spec v3.16 T11: a NF só libera com SA confirmado e R$/kg em todos os itens (ou em todos os selecionados)
+  const faltam = faltasNf(sel.length ? itens.filter((i) => sel.includes(i.id)) : itens);
+  const nfLiberada = !faltam.sa && !faltam.rs;
+  const motivoNf = nfLiberada ? "" : `Falta ${[faltam.sa ? `SA confirmado em ${faltam.sa} item(ns)` : "", faltam.rs ? `R$/kg do precificador em ${faltam.rs} item(ns)` : ""].filter(Boolean).join(" e ")} (Cadastro de SA, em Itu).`;
   const e = etapa(c);
 
   return (
@@ -79,11 +84,11 @@ export default function CopDetalhe() {
       {erro && <p className="erro" role="alert">{erro}</p>}
       {aviso && <p className="validacao ok" role="status">{aviso}</p>}
       {fechado && (
-        <p className={saOk === itens.length && comNf === itens.length ? "validacao ok" : "validacao alerta"}>
+        <p className={saOk === itens.length && comRs === itens.length && comNf === itens.length ? "validacao ok" : "validacao alerta"}>
           <span>
-            SAs confirmados em Itu: <strong>{saOk} de {itens.length}</strong> · NF informada: <strong>{comNf} de {itens.length}</strong>.
-            {saOk < itens.length && " Itu está fazendo os SAs a partir deste COP."}
-            {comNf < itens.length && " Informe a NF de transferência."}
+            SAs confirmados em Itu: <strong>{saOk} de {itens.length}</strong> · R$/kg do precificador: <strong>{comRs} de {itens.length}</strong> · NF informada: <strong>{comNf} de {itens.length}</strong>.
+            {(saOk < itens.length || comRs < itens.length) && " Itu está fazendo os SAs e o precificador a partir deste COP; a NF libera quando os dois estiverem prontos."}
+            {saOk === itens.length && comRs === itens.length && comNf < itens.length && " Informe a NF de transferência."}
           </span>
         </p>
       )}
@@ -92,7 +97,12 @@ export default function CopDetalhe() {
         <div className="barra-acoes">
           <span className="contagem">{sel.length ? `${sel.length} item(ns) selecionado(s)` : ""}</span>
           {aberto && <button className="secundario" onClick={() => setJanela("adicionar")}>Adicionar cortes prontos</button>}
-          {fechado && <button className="secundario" onClick={() => setJanela("nf")}>{sel.length ? "NF diferente para itens selecionados" : "Informar NF"}</button>}
+          {fechado && (
+            <button className="secundario" disabled={!nfLiberada} title={motivoNf || undefined} onClick={() => setJanela("nf")}>
+              {sel.length ? "NF diferente para itens selecionados" : "Informar NF"}
+            </button>
+          )}
+          {fechado && !nfLiberada && <span className="desc">NF bloqueada: {motivoNf}</span>}
           {fechado && <button className="perigo" onClick={() => setJanela("reabrir")}>Reabrir COP</button>}
         </div>
       )}
@@ -124,6 +134,9 @@ export default function CopDetalhe() {
                     <td>
                       {i.sa ? <span className={`etiqueta ${SA_ITEM[i.sa.situacao]?.classe ?? ""}`}>{SA_ITEM[i.sa.situacao]?.nome ?? i.sa.situacao}</span> : aberto ? "—" : <span className="etiqueta">sem SA</span>}
                       {i.sa?.sa_codigo && <><br /><span className="desc">{i.sa.sa_codigo}</span></>}
+                      {i.sa && (temPrecificador(i)
+                        ? <><br /><span className="desc">R$ {reais(i.sa.rs_kg ?? 0)}/kg{i.sa.valor_precificador != null && ` · precificador R$ ${reais(i.sa.valor_precificador)} por peça`}</span></>
+                        : !aberto && <><br /><span className="etiqueta atencao">falta R$/kg</span></>)}
                     </td>
                     <td>{i.nf ? `${i.nf.numero} · ${nomeEmitente(i.nf.emitente)}` : "—"}</td>
                     {!aberto && !fechado && (
@@ -216,7 +229,7 @@ function JanelaFechar({ cop, aoFechar, aoGravar }: { cop: Cop; aoFechar: () => v
   return (
     <Janela titulo={`Fechar COP ${cop.numero}`} aoFechar={aoFechar}>
       <p>Ao fechar, o COP não aceita mais itens e o sistema cria <strong>um pedido de SA por item ({cop.qtd_itens})</strong> em "Cadastro de SA", em Itu.</p>
-      <p className="desc">Depois, informe a NF de transferência. O botão "Enviar" libera quando todos os SAs estiverem confirmados e a NF informada.</p>
+      <p className="desc">Depois, Itu confirma os SAs e preenche o R$/kg do precificador. Só então o botão "Informar NF" libera; o "Enviar" libera com a NF informada.</p>
       {erro && <p className="erro" role="alert">{erro}</p>}
       <div className="botoes">
         <button className="primario" disabled={ocupado} onClick={() => void ok()}>Fechar COP</button>

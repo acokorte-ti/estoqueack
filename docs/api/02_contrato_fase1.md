@@ -143,10 +143,10 @@ Várias linhas = "Usar outro lote / dividir". Ocorrências: `SITUACAO_INVALIDA`,
 | Remover item | `DELETE /api/cops/{id}/itens/{item_id}` (só Aberto) |
 | Fechar COP [P13] | `POST /api/cops/{id}/fechar` → gera uma linha de SA por item e avisa Itu |
 | Reabrir | `POST /api/cops/{id}/reabrir` `{ justificativa }` (só sem SA confirmado; apaga as linhas de SA ainda não confirmadas) |
-| NF | `POST /api/cops/{id}/nf` `{ numero, emitente?: "FIO_CERTO", data?, item_ids? }` (lançamento novo só Fio Certo desde 2026-11-17; omitido = `FIO_CERTO`; outro valor → 422. NFs já gravadas com `MEDIO_VALE`, `OUTRO` ou o texto da carga continuam aparecendo como vieram); sem `item_ids` vale para todos ("NF diferente para itens selecionados" = com `item_ids`) |
-| Enviar | `POST /api/cops/{id}/enviar/validar` e `POST /api/cops/{id}/enviar` (`SA_PENDENTE`, `NF_PENDENTE`, `COP_NAO_FECHADO`) |
+| NF | `POST /api/cops/{id}/nf` `{ numero, emitente?: "FIO_CERTO", data?, item_ids? }` (lançamento novo só Fio Certo desde 2026-11-17; omitido = `FIO_CERTO`; outro valor → 422. NFs já gravadas com `MEDIO_VALE`, `OUTRO` ou o texto da carga continuam aparecendo como vieram); sem `item_ids` vale para todos ("NF diferente para itens selecionados" = com `item_ids`). **Desde 2026-11-18 (spec v3.16 T11):** 400 se algum item alvo não tem SA `CONFIRMADO` ou não tem `rs_kg` > 0 na T14 (mensagem com quantos faltam de cada) |
+| Enviar | `POST /api/cops/{id}/enviar/validar` e `POST /api/cops/{id}/enviar` (`SA_PENDENTE`, `PRECIFICADOR_PENDENTE` (2026-11-18), `NF_PENDENTE`, `COP_NAO_FECHADO`; todos ERRO, com `dados.itens`) |
 
-COP: `{ id, numero, situacao, data, fechado_em, enviado_em, qtd_itens, peso_total_kg, nfs[], observacao, itens[] }`. `situacao`: `ABERTO`, `FECHADO`, **`AGUARDANDO_NF`** (derivada: fechado com todos os SAs confirmados), `ENVIADO`, `RECEBIDO_PARCIAL`, `RECEBIDO`. Item: `{ id, liberacao_id, solicitacao_id, op, item_codigo, cliente, material, conteiner, lote, modo, pecas, peso_kg, situacao (EM_COP/EM_TRANSITO/RECEBIDO), sa: {id, situacao, sa_codigo}|null, nf, peso_conferido_kg, lote_itu_id, divergencias[] }`.
+COP: `{ id, numero, situacao, data, fechado_em, enviado_em, qtd_itens, peso_total_kg, nfs[], observacao, itens[] }`. `situacao`: `ABERTO`, `FECHADO`, **`AGUARDANDO_NF`** (derivada: fechado com todos os SAs confirmados **e** com `rs_kg` > 0, 2026-11-18; o aviso `COP_SA_PRONTO` ao RJ sai quando o COP chega nesse ponto, pela confirmação do último SA ou pelo último R$/kg), `ENVIADO`, `RECEBIDO_PARCIAL`, `RECEBIDO`. Item: `{ id, liberacao_id, solicitacao_id, op, item_codigo, cliente, material, conteiner, lote, modo, pecas, peso_kg, situacao (EM_COP/EM_TRANSITO/RECEBIDO), sa: {id, situacao, sa_codigo, rs_kg, valor_precificador}|null (`rs_kg`/`valor_precificador` desde 2026-11-18; `null` sem R$/kg), nf, peso_conferido_kg, lote_itu_id, divergencias[] }`.
 
 ## 5. T12 Receber COP ✅ (Estoque Itu)
 
@@ -219,11 +219,12 @@ Vale quando `sobra_kg > 0` e `sobra_na_bitola: false` (sobra na bitola continua 
 
 - `sa_novo: true` → linha "SA novo – cadastrar no Mega". `atrasado: true` → vermelho (48 h sem confirmação).
 - `avisos[]` (R026, v3.1; aviso cinza, não bloqueia): `{ codigo, nivel: "ALERTA", mensagem, … }`. `NF_DIFERENTE_MEGA` (NF informada ≠ NF da entrada do SA no Mega; traz `nf`, `nf_mega`) e `IPI_DIFERENTE_MEGA` (IPI do histórico ≠ IPI do NCM no Mega; traz `ipi`, `ipi_mega` em %). `IPI_DIFERENTE_MEGA` também aparece como ALERTA no `/codigo/validar`; `NF_DIFERENTE_MEGA` também no `/cops/{id}/enviar/validar` (com `dados.itens`).
-- `PATCH /api/sas/{id}` `{ rs_kg, sa_descricao, ncm, icms, ipi, pedido, quantidade, peso_kg }` (Análise: só `rs_kg`; confirmado: só `rs_kg`).
+- `PATCH /api/sas/{id}` `{ rs_kg, sa_descricao, ncm, icms, ipi, pedido, quantidade, peso_kg }` (Análise: só `rs_kg`; confirmado: só `rs_kg`). **`rs_kg` é obrigatório antes da NF** (spec v3.16): com NF já informada, `rs_kg: null` → 400 (corrigir pode, apagar não).
+- Vista por COP (2026-11-18): a T14 filtra com `cop=<número do COP>` e agrupa no frontend por `cop.numero` (linhas sem `cop` = corte em Itu / B2).
 - `POST /api/sas/preparar` `{ ids }` → Preparado.
 - `POST /api/sas/{id}/codigo/validar` e `POST /api/sas/{id}/codigo` `{ sa_codigo, confirmacoes }`: `SA_CODIGO_TROCADO` (CIENCIA) se diferente do sugerido. Fica *Aguardando Mega* e o sistema já tenta confirmar. **Quem pode (2026-11-17, R063, spec v3.13 T14, [proposta, P36]):** Estoque Itu, **Análise** (a Amanda, que cadastra o SA no Mega, com usuário próprio nesse perfil) e Admin; o resto da T14 não muda.
 - `POST /api/sas/verificar` `{ ids? }` ("Verificar no Mega agora") → `{ verificados, confirmados, erro }`.
-- `POST /api/sas/nf` `{ ids, numero, emitente?, data? }` (`emitente` só `FIO_CERTO`, padrão): NF só fiscal do caminho B2 (linhas `CORTE_ITU`).
+- `POST /api/sas/nf` `{ ids, numero, emitente?, data? }` (`emitente` só `FIO_CERTO`, padrão): NF só fiscal do caminho B2 (linhas `CORTE_ITU`). Desde 2026-11-18 [proposta, P44(a)]: 400 se alguma linha não está `CONFIRMADO` ou não tem `rs_kg` > 0.
 - 📋 F1.1: "Exportar pedidos selecionados" e "Exportar SAs novos para o Renato" (Excel, layout da planilha de SA).
 
 ### 7.1 Ferramenta de teste "Confirmar SA (teste)" ✅ (2026-11-17, COORDENAÇÃO; só fora de produção)

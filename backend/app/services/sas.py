@@ -125,11 +125,16 @@ def editar(db: Session, sa_id: int, dados: dict[str, Any], *, usuario: Usuario, 
     sa = obter(db, sa_id, travar=True)
     if sa.situacao == "CONFIRMADO" and set(dados) - {"rs_kg"}:
         raise ErroNegocio("SA confirmado no Mega: só o R$/kg pode ser alterado.")
+    if "rs_kg" in dados and not dados["rs_kg"] and sa.nf_id is not None and sa.origem != "CARGA":
+        # spec v3.16 T14 [proposta, P44(d)]: depois da NF, o R$/kg pode ser corrigido, mas não apagado
+        raise ErroNegocio("A NF de transferência já foi informada: o R$/kg pode ser corrigido, mas não apagado.")
+    pronto_antes = sa.cop_item_id is not None and _cop_pronto(db, db.get(CopItem, sa.cop_item_id).cop)
     antes = {c: getattr(sa, c) for c in dados}
     for c, v in dados.items():
         if c in CAMPOS_EDITAVEIS:
             setattr(sa, c, v)
     _marcar_alteracao(db, sa)
+    _avisar_se_cop_pronto(db, sa, antes=pronto_antes)
     auditoria.registrar(db, "SA_EDITADO", usuario_id=usuario.id, entidade="sa", entidade_id=sa.id, antes=antes,
                         depois=dados, ip=ip)
     db.commit()
@@ -298,18 +303,55 @@ def _ao_confirmar(db: Session, sa: CadastroSa) -> None:
         sol = db.get(SolicitacaoCorte, sa.solicitacao_id)
         if sol is not None:
             recalcular_solicitacao(db, sol)
-    if sa.cop_item_id:
-        item = db.get(CopItem, sa.cop_item_id)
-        pend = [i for i in item.cop.itens if not _sa_confirmado(db, i)]
-        if not pend:
-            notificar(db, perfis=("OPERACAO_RJ",), tipo="COP_SA_PRONTO",
-                      texto=f"COP {item.cop.numero}: todos os SAs prontos. Informe a NF e envie.",
-                      link=f"/cops/{item.cop.id}")
+    _avisar_se_cop_pronto(db, sa)
 
 
-def _sa_confirmado(db: Session, item: CopItem) -> bool:
-    sa = db.scalar(select(CadastroSa).where(CadastroSa.cop_item_id == item.id))
-    return sa is not None and sa.situacao == "CONFIRMADO"
+def tem_precificador(sa: CadastroSa | None) -> bool:
+    """R$/kg do precificador preenchido na T14 (spec v3.16; zero conta como vazio, [proposta, P44(c)])."""
+    return sa is not None and sa.rs_kg is not None and float(sa.rs_kg) > 0
+
+
+def valor_precificador(sa: CadastroSa) -> float | None:
+    """Valor precificador por peça: R$/kg × peso ÷ quantidade (T14)."""
+    if sa.rs_kg and sa.peso_kg and sa.quantidade:
+        return round(sa.rs_kg * sa.peso_kg / sa.quantidade, 2)
+    return None
+
+
+def pendencias_nf(db: Session, itens: list[CopItem]) -> tuple[list[CopItem], list[CopItem]]:
+    """(itens sem SA confirmado, itens sem R$/kg). A NF do COP só libera sem nenhum dos dois (spec v3.16 T11)."""
+    sem_sa: list[CopItem] = []
+    sem_rs: list[CopItem] = []
+    for i in itens:
+        sa = db.scalar(select(CadastroSa).where(CadastroSa.cop_item_id == i.id))
+        if sa is None or sa.situacao != "CONFIRMADO":
+            sem_sa.append(i)
+        if not tem_precificador(sa):
+            sem_rs.append(i)
+    return sem_sa, sem_rs
+
+
+def frase_nf_bloqueada(sem_sa: int, sem_rs: int) -> str:
+    falta = [x for x in (f"SA confirmado em {sem_sa} item(ns)" if sem_sa else "",
+                         f"R$/kg do precificador em {sem_rs} item(ns)" if sem_rs else "") if x]
+    return ("A NF de transferência só pode ser informada depois do SA confirmado e do R$/kg do precificador "
+            f"(Cadastro de SA). Falta {' e '.join(falta)}.")
+
+
+def _cop_pronto(db: Session, cop) -> bool:
+    return cop.situacao == "FECHADO" and bool(cop.itens) and not any(pendencias_nf(db, list(cop.itens)))
+
+
+def _avisar_se_cop_pronto(db: Session, sa: CadastroSa, *, antes: bool = False) -> None:
+    """Avisa o RJ quando o COP fica com todos os SAs confirmados e todos os R$/kg (só na passagem)."""
+    if not sa.cop_item_id:
+        return
+    db.flush()
+    cop = db.get(CopItem, sa.cop_item_id).cop
+    if not antes and _cop_pronto(db, cop):
+        notificar(db, perfis=("OPERACAO_RJ",), tipo="COP_SA_PRONTO",
+                  texto=f"COP {cop.numero}: todos os SAs e o precificador prontos. Informe a NF e envie.",
+                  link=f"/cops/{cop.id}")
 
 
 def obter_nf(db: Session, numero: str, emitente: str, data=None) -> NfTransferencia:
@@ -334,9 +376,14 @@ def informar_nf_b2(db: Session, ids: list[int], numero: str, emitente: str, data
     """Caminho B2: NF só fiscal digitada pelo Fabiano no SA (várias linhas podem usar a mesma NF)."""
     nf = obter_nf(db, numero, emitente, data)
     sas = [obter(db, i, travar=True) for i in ids]
+    if any(sa.origem != "CORTE_ITU" for sa in sas):
+        raise ErroNegocio("A NF do SA de COP é informada no COP, pelo RJ.")
+    # spec v3.16 [proposta, P44(a)]: mesma trava da NF do COP (SA confirmado + R$/kg do precificador)
+    sem_sa = sum(1 for sa in sas if sa.situacao != "CONFIRMADO")
+    sem_rs = sum(1 for sa in sas if not tem_precificador(sa))
+    if sem_sa or sem_rs:
+        raise ErroNegocio(frase_nf_bloqueada(sem_sa, sem_rs))
     for sa in sas:
-        if sa.origem != "CORTE_ITU":
-            raise ErroNegocio("A NF do SA de COP é informada no COP, pelo RJ.")
         sa.nf_id = nf.id
         _marcar_alteracao(db, sa)
     auditoria.registrar(db, "SA_NF_INFORMADA", usuario_id=usuario.id, entidade="sa",
@@ -377,7 +424,7 @@ def listar(db: Session, f: dict[str, Any], usuario: Usuario | None = None) -> li
 
 def para_dict(db: Session, sa: CadastroSa) -> dict[str, Any]:
     cop = sa.cop_item.cop if sa.cop_item else None
-    valor = round(sa.rs_kg * sa.peso_kg / sa.quantidade, 2) if sa.rs_kg and sa.peso_kg and sa.quantidade else None
+    valor = valor_precificador(sa)
     sug = sugerir(db, sa.item_codigo, exceto_id=sa.id) if sa.situacao != "CONFIRMADO" else None
     return {
         "id": sa.id, "origem": sa.origem, "situacao": sa.situacao, "data": sa.data.isoformat(), "op": sa.op,
@@ -408,8 +455,8 @@ def atrasado(db: Session, sa: CadastroSa) -> bool:
 
 def validar_pendencias_cop(db: Session, cop) -> Resultado:
     r = Resultado()
-    for i in cop.itens:
-        if not _sa_confirmado(db, i):
-            r.adicionar("SA_PENDENTE", Nivel.ERRO, f"Item da OP {i.liberacao.solicitacao.op} ainda sem SA confirmado.")
-            break
+    sem_sa, _ = pendencias_nf(db, list(cop.itens))
+    if sem_sa:
+        op = sem_sa[0].liberacao.solicitacao.op
+        r.adicionar("SA_PENDENTE", Nivel.ERRO, f"Item da OP {op} ainda sem SA confirmado.")
     return r

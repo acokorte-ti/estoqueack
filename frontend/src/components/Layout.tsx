@@ -83,6 +83,12 @@ function Lista({ itens }: { itens: Item[] }) {
 export default function Layout() {
   const { usuario, sair, modoTeste } = useSessao();
   const [menuAberto, setMenuAberto] = useState(false);
+  // spec v3.16 §4 (Eduardo, 2026-11-18): no computador, o menu lateral pode ser escondido; o navegador lembra a escolha
+  const [menuRecolhido, setMenuRecolhido] = useState(() => localStorage.getItem("menu-recolhido") === "1");
+  const alternarMenu = () => setMenuRecolhido((v) => {
+    localStorage.setItem("menu-recolhido", v ? "0" : "1");
+    return !v;
+  });
   const local = useLocation();
   const planta = usuario?.planta === "RJ" ? "Barra Mansa" : "Itu";
 
@@ -98,8 +104,21 @@ export default function Layout() {
   }, [menuAberto]);
 
   return (
-    <div className="moldura">
+    <div className={menuRecolhido ? "moldura menu-recolhido" : "moldura"}>
       <header className="topo">
+        <button
+          type="button"
+          className="recolher-menu"
+          aria-controls="menu-principal"
+          aria-expanded={!menuRecolhido}
+          onClick={alternarMenu}
+          title={menuRecolhido ? "Mostrar o menu lateral" : "Esconder o menu lateral e usar a tela toda"}
+        >
+          <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M2 4h16M2 10h16M2 16h16" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+          </svg>
+          {menuRecolhido ? "Mostrar menu" : "Esconder menu"}
+        </button>
         <button
           className="abrir-menu"
           aria-expanded={menuAberto}

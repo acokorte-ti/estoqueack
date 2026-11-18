@@ -40,6 +40,7 @@ from datetime import date
 from typing import Any
 
 JUST = "Teste ponta a ponta (E2E) do chat BANCO E TESTES"
+RS_KG_E2E = 10.0   # R$/kg de teste do precificador (spec v3.16: obrigatório antes da NF); só na cópia do banco
 SENHA = "E2e-Teste-2026"
 
 
@@ -437,6 +438,9 @@ def _sa_confirmar(c: Cliente, u: dict, op: int, mega: MegaE2E, sa_id: int | None
         mega.simular.add(codigo)
         d = gravar(c, f"/api/sas/{s['id']}/codigo/validar", f"/api/sas/{s['id']}/codigo", {"sa_codigo": codigo})
         esperar(d["situacao"] == "CONFIRMADO", f"SA {codigo} não confirmou: {d['situacao']}")
+        # spec v3.16: a NF (do COP e do B2) só libera com o R$/kg do precificador preenchido no SA
+        st, d = c.req("PATCH", f"/api/sas/{s['id']}", {"rs_kg": RS_KG_E2E})
+        esperar(st == 200, f"SA {codigo}: R$/kg do precificador não gravou: {st} {d}")
 
 
 def _receber(c: Cliente, u: dict, cop_id: int) -> None:

@@ -1,6 +1,13 @@
 # Estado — FRONTEND / UX
 
-Atualizado: 2026-11-17 (teste manual: impressão RJ, SA no recebimento, balanceamento, ordem da fila, botões no topo)
+Atualizado: 2026-11-19 (layout A "Bancada" aplicado em todas as telas)
+
+## 2026-11-19 Layout A "Bancada" (Eduardo escolheu entre 3 protótipos)
+
+- **Tema** (`styles/tema.css`, `app.css`, `docs/ux/02_tema_visual.md`): IBM Plex Sans/Mono (`@fontsource`, saíram Raleway/Open Sans); bancada clara; botões com borda (`.link` virou botão pequeno com contorno; novos `.fantasma`, `.pequeno`, `.falta`, `.valor`); `.etiqueta` = pílula com ícone por máscara CSS; `.chips[role=group]` = controle segmentado; `details.avancado` com contorno e seta; 44 px no computador, 48 px em toque; tabelas com cabeçalho cinza e números em mono.
+- **Casca** (`components/Layout.tsx`, `Icone.tsx`): menu claro pelo caminho do material (spec v3.17 §4) com ícones e contadores (`api/pendencias.ts`: a leitura de `/painel/pendencias` é compartilhada pelo Painel e pelo menu, renovada a cada 2 min e ao trocar de tela se tiver mais de 1 min; limpa ao sair); "Esconder menu" no rodapé deixa a coluna de ícones; trilha "grupo › item" acima do título; "Pedir corte" no topo; avatar com iniciais.
+- **Painel** "Para fazer agora": lista de tarefas por grupo (ícone, itens com link, quantidade, botão com verbo; ALERTA primeiro) + "Saldo por estoque" com barrinhas. **Cadastro de SA:** grupo por COP com pílula (bloqueada/pronta) e barras "SA confirmado x de y" / "R$/kg x de y"; "Falta" tracejado ou valor com lápis na coluna R$/kg; "Informar código" na coluna do SA; "Dados do SA" abre descrição/NCM/ICMS/IPI/pedido; ações em lote numa barra que aparece ao marcar; cartões no celular.
+- **Testado:** `tsc` + `build`; navegador interno com API falsa (dados fictícios do contrato, sem login real nem gravação): 1440 px (Painel, SA, menu escondido, barra em lote, Estoque, COPs, sem rolagem lateral) e 375 px (gaveta, SA em cartões, Painel sem estouro). Não testado com dados reais nem pelos usuários.
 
 ## 2026-11-17 Balanceamento, ordem da Fila RJ, botões no topo
 

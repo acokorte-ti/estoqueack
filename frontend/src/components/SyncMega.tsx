@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ErroApi } from "../api/cliente";
 import { useSessao } from "../api/sessao";
+import Icone from "./Icone";
 
 interface Sync { id: number; tipo: "ESTOQUE" | "SA"; gatilho: "AGENDADA" | "MANUAL"; situacao: "OK" | "ERRO";
   iniciado_em: string; terminado_em: string | null; detalhes: unknown }
@@ -50,7 +51,7 @@ export default function SyncMega() {
       </span>
       {usuario && PODE_SINCRONIZAR.includes(usuario.perfil) && (
         <button className="secundario" onClick={() => void sincronizar()} disabled={rodando}>
-          {rodando ? "Sincronizando…" : "Sincronizar agora"}
+          <Icone nome="atualizar" />{rodando ? "Sincronizando…" : "Sincronizar com o Mega"}
         </button>
       )}
       {msg && <p className={`validacao ${msg.tipo === "ok" ? "ok" : msg.tipo === "erro" ? "erro" : "alerta"}`}>{msg.texto}</p>}

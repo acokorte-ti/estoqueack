@@ -25,8 +25,8 @@ Operador de chão de fábrica (Marcelo no RJ, Fabiano e Matheus em Itu), muitas 
 
 | Item | Regra |
 |---|---|
-| Alvo de toque | mínimo 48 px de altura em botões, campos e linhas clicáveis |
-| Fonte | 16 px base; números de peso em destaque 24–48 px (Barlow Semi Condensed, algarismos tabulares) |
+| Alvo de toque | mínimo 48 px de altura em botões, campos e linhas clicáveis no tablet/celular; 44 px no computador (mouse) |
+| Fonte | IBM Plex Sans, 16 px base no tablet/celular e 15 px no computador; números (pesos, R$/kg, códigos) em IBM Plex Mono com algarismos tabulares (`docs/ux/02_tema_visual.md`) |
 | Contraste | WCAG AA no mínimo; amarelo nunca é a única pista (sempre ícone + texto) |
 | Tabelas no celular (< 900 px) | viram **cartões** empilhados com os 3–4 dados principais; o resto em "ver mais" |
 | Rodapé de ação | fixo no celular/tablet com o botão principal e, no máximo, um secundário |
@@ -36,12 +36,12 @@ Operador de chão de fábrica (Marcelo no RJ, Fabiano e Matheus em Itu), muitas 
 ## 4. Navegação
 
 - Menu lateral **só com o que o perfil usa** (§4 da especificação). Itens sem permissão não aparecem; não ficam cinza.
-- Grupos do menu iguais aos da especificação (v3.12, 2026-11-17): Estoque, Pedidos de corte, Rio de Janeiro, Itu, Ferramentas, Administração. Grupo sem item para o perfil não aparece. Texto de botão, aviso e mensagem usa o **nome do menu** ("Cortes a fazer no RJ", "Receber material do RJ", "Entradas do Mega sem lote", "Conferir estoque com o Mega", "Pedir corte de material"), nunca o código da tela nem o nome antigo.
+- Grupos do menu iguais aos da especificação (v3.17, 2026-11-19, layout A "Bancada"): Hoje, Corte, Envio RJ → Itu, Estoque, Ferramentas, Administração. Grupo sem item para o perfil não aparece. O menu mostra o **nome curto** ("Receber em Itu"); o título da tela, botões, avisos e mensagens usam o **nome completo da tela** ("Receber material do RJ", "Pedir corte de material", "Conferir estoque com o Mega"), nunca o código da tela nem o nome antigo. A trilha acima do título mostra "grupo › nome curto".
 - **Telas sem item no menu (spec §4, 2026-11-17):**
   - **T17 Reservas e restrições** e **T18 Ajuste / estorno**: abrem do **detalhe do lote (T05)**, que se abre clicando no lote em "Consultar estoque" (T04), na árvore de origem ou nos links dos outros cards. Botões no T05: "Adicionar reserva ou restrição" e "Encerrar" (T17, Estoque Itu, Análise, Admin), "Ajustar saldo" (T18, Estoque Itu, Admin) e "Estornar" em cada movimento estornável (T18). A reserva vencendo também chega pelo card do Painel (Análise).
   - **T24 Auditoria**: ainda **não tem tela** (só a API grava). Quando existir, entra em **Administração** (Admin), sem item novo no menu principal.
   - T10 Registrar corte abre de "Cortes a fazer no RJ"; T05 de "Consultar estoque".
-- **Painel = "o que eu tenho para fazer agora"**: as pendências do perfil (T03) vêm primeiro, como cartões grandes com contador ("3 COPs para receber"). A barra de estoque fica abaixo.
+- **Painel = "Para fazer agora"** (layout A): à esquerda, as pendências do perfil (T03) como lista de tarefas (ícone, título, itens com link, quantidade e um botão com verbo), a de alerta primeiro; à direita, o saldo por estoque. Abaixo de 1280 px, uma coluna só.
 - **Busca global** no topo de todas as telas (§4). Um resultado: abre direto. Mais de um (ex.: número que é OP e COP ao mesmo tempo): lista curta com o tipo de cada um.
 - Sino de notificações no topo (§6); clicar no aviso abre o item.
 - Toda lista abre o item em tela própria com endereço próprio (`/corte/123`), para poder mandar o link.

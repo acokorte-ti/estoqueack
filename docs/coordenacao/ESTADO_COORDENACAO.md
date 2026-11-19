@@ -60,6 +60,7 @@ Entra: T03–T14, T15 mínima e aba RETO por origem (v3.4, 06/11), T16 mínima, 
 
 ## 6. Rodadas
 
+- **R11 (19/11):** layout A "Bancada" escolhido pelo Eduardo entre 3 protótipos (`../layouts/`) e aplicado pela COORDENAÇÃO direto no frontend (tema, menu pelo caminho do material com contadores, Painel em lista de tarefas, Cadastro de SA com ação na coluna do dado). Spec v3.17 §4, `docs/ux/02_tema_visual.md`. Sem mudança de regra nem de API.
 - **R10 (18/11):** revisão de código completa (4 revisores + análise estática, achados conferidos): travas antes de validar, disponível ≥ 0, N+1 do painel, índice 0011, frontend (corridas, erros, janelas, formatação). Detalhe em `00_RETOMAR_COORDENACAO.md` §3.
 - **R9 (18/11):** ajustes do teste manual de 18/11 feitos pela COORDENAÇÃO direto (sessão sem os subagentes): spec v3.16, contrato §4/§7, backend (trava da NF por SA confirmado + R$/kg, `PRECIFICADOR_PENDENTE`, precificador no item do COP), testes (`test_v316_precificador_nf.py`), T14 por COP, T11 com precificador, largura toda e menu recolhível.
 - **R8 (17–18/11):** ajustes do teste manual (DECISOES 2026-11-17), spec v3.14–v3.15, unificação de "Pedir corte", vários lotes na OP, deploy esperando sequência de commits (não estava travado). Documento de retomada `00_RETOMAR_COORDENACAO.md` e histórico exportado em `../historico_claude/`.

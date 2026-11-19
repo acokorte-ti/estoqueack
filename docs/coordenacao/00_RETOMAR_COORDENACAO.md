@@ -13,7 +13,7 @@ Escrito pela COORDENAÇÃO em 2026-11-18, antes de o Eduardo trocar o Claude Des
 ## 2. Onde estamos (2026-11-18)
 
 - **Fase:** teste manual do Eduardo na homologação, com ajustes pedidos por ele entrando quase todo dia. Depois: aceite com os usuários → go/no-go → implantação.
-- **Homologação no ar** (https://estoque.acokorte.com.br), código até a revisão de 2026-11-18 (CI verde), spec **v3.16**, migração mais recente **0011** (próxima: 0012).
+- **Homologação no ar** (https://estoque.acokorte.com.br), código até o layout A de 2026-11-19, spec **v3.17**, migração mais recente **0011** (próxima: 0012). Visual: layout A "Bancada" (`docs/ux/02_tema_visual.md`).
 - **Carga:** recarga do zero em 2026-11-17 com as planilhas de `../planilhas/2026-11-17/` e `../carga/correcoes_carga.json`. Conferida duas vezes (TÉCNICO e BANCO E TESTES, leitor independente): Estoque Mega = saldo do Mega (0 código com diferença > 5 kg); RJ no Rio = ESTOQUE 2026; RJ em Itu e RETO batem; 0 lote do RJ com código do Mega; saldo = soma dos movimentos em 100 % dos lotes.
 - **Ponta a ponta:** 5 de 5 caminhos OK em 2026-11-17 (cópia do banco, Mega real).
 - **Modo de teste ligado na homologação** (`MODO_TESTE=true`): botão "Confirmar SA (teste)" na T14 e faixa "Ambiente de teste". **Desligar na implantação** (`docs/tecnico/06_implantacao.md` §2.3).

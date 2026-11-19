@@ -123,7 +123,7 @@ def _validar_liga(db: Session, liga_pedida: str | None, lote: Lote) -> Resultado
     # (mesma linha): sem "estou ciente"
     if mesma_liga(mapa_mesma_linha(db), alvo.codigo, lote.item.liga.codigo):
         return r
-    # spec v3.20 [proposta, pendências 19/11]: variação MOD só avisa (sem "estou ciente")
+    # spec v3.20 (Eduardo, 2026-11-19, pendências item 6): variação MOD só avisa (sem "estou ciente")
     if variacao_mod(alvo.codigo, lote.item.liga.codigo):
         return r.adicionar("LIGA_VARIACAO_MOD", Nivel.ALERTA,
                            f"O lote é de {lote.item.liga.codigo}, variação de {alvo.codigo} (liga pedida). Confira "

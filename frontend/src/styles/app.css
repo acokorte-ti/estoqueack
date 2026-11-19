@@ -443,6 +443,22 @@ tr.linha-aviso .validacao { margin: 0 0 var(--esp-2); font-size: var(--t-pequeno
 .saldos .numero { font-size: 1.625rem; }
 .lista-simples { list-style: none; margin: 0 0 var(--esp-3); padding: 0; display: flex; flex-direction: column; gap: var(--esp-2); }
 .lista-simples li { background: var(--branco); border: 1px solid var(--aco-linha); border-radius: var(--raio); padding: var(--esp-2) var(--esp-3); }
+
+/* Documentos anexos (T05, T06, T15; contrato §16.4) */
+.anexos { display: flex; flex-direction: column; gap: var(--esp-3); }
+.lista-anexos { margin: 0; }
+.lista-anexos li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--esp-2) var(--esp-4); }
+.anexo-info { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1) var(--esp-3); min-width: 0; }
+.anexo-nome { overflow-wrap: anywhere; }
+.form-anexo { display: flex; flex-direction: column; gap: var(--esp-2); }
+.form-anexo .linha-form { align-items: flex-end; }
+.form-anexo .linha-form > label:first-child { flex: 0 1 15rem; }
+label.secundario { cursor: pointer; position: relative; }
+label.secundario.desabilitado { background: #eceef0; border-color: #d4d7db; color: #6b7177; cursor: not-allowed; }
+label.secundario:focus-within { outline: 2px solid var(--aco-preto); outline-offset: 2px; }
+.secao-entrada .dados { margin-bottom: var(--esp-4); }
+.secao-entrada h3 { font-size: var(--t-pequeno); text-transform: uppercase; letter-spacing: 0.04em; color: var(--aco-medio); margin: var(--esp-4) 0 var(--esp-2); }
+.clipe { color: var(--aco-medio); vertical-align: middle; }
 .arvore, .arvore ul { list-style: none; margin: 0; padding-left: var(--esp-5); }
 .arvore { padding-left: 0; }
 .arvore li { margin: var(--esp-1) 0; }

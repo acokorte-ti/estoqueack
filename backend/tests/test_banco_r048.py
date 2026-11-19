@@ -164,7 +164,8 @@ def test_lote_rj_sem_codigo_do_mega_na_entrada_nf_e_na_sugestao(amb):
     client, u, ids, _ = amb
     from datetime import date
     h = entrar(client, u["rj"])
-    corpo = {"numero": "880011", "data": date.today().isoformat(), "fornecedor": "FORNECEDOR TESTE",
+    corpo = {"numero": "880011", "data": date.today().isoformat(), "data_emissao": date.today().isoformat(),
+             "fornecedor": "FORNECEDOR TESTE",
              "conteiner": "CT90TS", "itens": [{"liga": "H13", "formato": "RETANGULAR", "espessura": 24, "largura": 62,
                                                "pecas": 2, "peso_kg": 300}]}
     r = client.post("/api/entradas-nf", json=corpo, headers=h)

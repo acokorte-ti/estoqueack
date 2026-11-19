@@ -12,6 +12,8 @@ dom 04h00  testar_restauracao_externa.sh   (baixa o mais recente DO BUCKET, conf
                                             PostgreSQL temporário; não toca no banco em uso)
 ```
 
+**Documentos anexos (2026-11-19, spec v3.15, migração 0012):** NF, packing list e precificador ficam **dentro do banco** (tabelas `anexo` e `anexo_arquivo`, `bytea`). Por isso o `pg_dump` diário e a cópia externa já levam os anexos, e a restauração os traz de volta, sem volume nem script novo. O `testar_restauracao.sh` compara a contagem de linhas de **todas** as tabelas, então também confere `anexo` e `anexo_arquivo`. O backup cresce com os anexos (até 10 MB cada, `ANEXO_MAX_MB`).
+
 | Decisão | Por quê |
 |---|---|
 | **OCI Object Storage**, mesma região do servidor (`sa-vinhedo-1`), bucket **privado** | O servidor já está na OCI; 2 MB/dia cabem com folga no gratuito (20 GB) |

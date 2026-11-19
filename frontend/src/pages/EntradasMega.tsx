@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api, data, kg, num, qs, validacaoDoErro, type Validacao } from "../api/cliente";
 import { useSessao } from "../api/sessao";
+import { enviarPendentes, type AnexoPendente } from "../api/anexos";
+import { AnexosPendentes } from "../components/Anexos";
 import Janela, { fecharJanela } from "../components/Janela";
 import PainelValidacao, { confirmacoesValidas, JUSTIFICATIVA_MIN, podeGravar, type Confirmacoes } from "../components/PainelValidacao";
 import SyncMega from "../components/SyncMega";
@@ -41,6 +43,7 @@ export default function EntradasMega() {
   const [lista, setLista] = useState<Lista | null>(null);
   const [erro, setErro] = useState("");
   const [ok, setOk] = useState("");
+  const [aviso, setAviso] = useState("");
   const [acao, setAcao] = useState<{ tipo: "criar" | "nao" | "reabrir"; p: Pendencia } | null>(null);
 
   const carregar = useCallback(() => {
@@ -52,7 +55,7 @@ export default function EntradasMega() {
     return () => window.clearTimeout(t);
   }, [carregar]);
 
-  const feito = (msg: string) => { setAcao(null); setOk(msg); void carregar(); };
+  const feito = (msg: string, alerta = "") => { setAcao(null); setOk(msg); setAviso(alerta); void carregar(); };
 
   return (
     <>
@@ -63,6 +66,7 @@ export default function EntradasMega() {
       <SyncMega />
       {erro && <p className="erro" role="alert">{erro}</p>}
       {ok && <p className="validacao ok" role="status">{ok}</p>}
+      {aviso && <p className="validacao alerta" role="alert">{aviso}</p>}
       {lista?.mega_indisponivel && <p className="validacao alerta">{lista.aviso ?? "Não foi possível ler as entradas no Mega agora. A lista usa o último saldo sincronizado."}</p>}
 
       <div className="barra-filtros">
@@ -119,8 +123,10 @@ export default function EntradasMega() {
   );
 }
 
-function JanelaCriarLote({ p, aoFechar, aoGravar }: { p: Pendencia; aoFechar: () => void; aoGravar: (msg: string) => void }) {
-  const [f, setF] = useState({ peso: String(p.diferenca_kg).replace(".", ","), conteiner: "", sem: false, pecas: "", data: "", nf: "", obs: "" });
+function JanelaCriarLote({ p, aoFechar, aoGravar }: { p: Pendencia; aoFechar: () => void; aoGravar: (msg: string, alerta?: string) => void }) {
+  const [f, setF] = useState({ peso: String(p.diferenca_kg).replace(".", ","), conteiner: "", sem: false, pecas: "", data: "", nf: "", obs: "",
+    fornecedor: "", serie: "", ncm: "", packing: "", di: "", custo: "" });
+  const [pendentes, setPendentes] = useState<AnexoPendente[]>([]);
   const [v, setV] = useState<Validacao<Previa> | null>(null);
   const [conf, setConf] = useState<Confirmacoes>({});
   const [erro, setErro] = useState("");
@@ -129,7 +135,10 @@ function JanelaCriarLote({ p, aoFechar, aoGravar }: { p: Pendencia; aoFechar: ()
 
   const corpo = (c: Confirmacoes) => ({
     peso_kg: num(f.peso) ?? 0, conteiner: f.sem ? undefined : f.conteiner.trim().toUpperCase() || undefined, sem_conteiner: f.sem || undefined,
-    pecas: num(f.pecas), data_entrada: f.data || undefined, nf: f.nf.trim() || undefined, observacao: f.obs.trim() || undefined, confirmacoes: c,
+    pecas: num(f.pecas), data_entrada: f.data || undefined, nf: f.nf.trim() || undefined, observacao: f.obs.trim() || undefined,
+    // contrato §16.4 (v3.15 T15): dados da NF e R$/kg do precificador, todos opcionais
+    fornecedor: f.fornecedor.trim() || undefined, serie: f.serie.trim() || undefined, ncm: f.ncm.trim() || undefined,
+    packing_list: f.packing.trim() || undefined, di_duimp: f.di.trim() || undefined, custo_kg: num(f.custo), confirmacoes: c,
   });
   const completo = (num(f.peso) ?? 0) > 0 && (f.sem || f.conteiner.trim().length >= 2);
   const item = p.item ?? (p.item_sugerido?.legivel ? p.item_sugerido : null);
@@ -144,13 +153,20 @@ function JanelaCriarLote({ p, aoFechar, aoGravar }: { p: Pendencia; aoFechar: ()
   async function gravar() {
     if (!v) return;
     setErro(""); setOcupado(true);
+    let r: { mensagem?: string; lote?: { id?: number; codigo: string; peso_kg: number } };
     try {
-      const r = await api.post<{ mensagem?: string; lote?: { codigo: string; peso_kg: number } }>(`/entradas-mega/${p.id}/criar-lote`, corpo(confirmacoesValidas(v.ocorrencias, conf)));
-      aoGravar(r.mensagem ?? `Lote ${r.lote?.codigo ?? ""} criado.`);
+      r = await api.post<typeof r>(`/entradas-mega/${p.id}/criar-lote`, corpo(confirmacoesValidas(v.ocorrencias, conf)));
     } catch (e) {
       const x = validacaoDoErro<Previa>(e);
       if (x) setV(x); else setErro(e instanceof Error ? e.message : "Não foi possível criar o lote.");
-    } finally { setOcupado(false); }
+      setOcupado(false);
+      return;
+    }
+    // o lote já foi criado: documento que falhar vira aviso (anexa depois no detalhe do lote)
+    const falhas = pendentes.length && r.lote?.id ? await enviarPendentes(`/lotes/${r.lote.id}/anexos`, pendentes) : [];
+    setOcupado(false);
+    aoGravar(r.mensagem ?? `Lote ${r.lote?.codigo ?? ""} criado.`,
+      falhas.length ? `O lote foi criado, mas ${falhas.length === 1 ? "um documento não foi anexado" : `${falhas.length} documentos não foram anexados`} (${falhas.join("; ")}). Anexe de novo no detalhe do lote, em "Entrada e documentos".` : "");
   }
   const r = v?.resultado;
   const bloqueado = v ? !podeGravar(v.ocorrencias, conf) : true;
@@ -174,7 +190,24 @@ function JanelaCriarLote({ p, aoFechar, aoGravar }: { p: Pendencia; aoFechar: ()
           <label>Data de entrada<input type="date" max={hojeIso()} value={f.data} onChange={(e) => mudar({ data: e.target.value })} /><small className="dica">Vazio: data da NF no Mega.</small></label>
           <label>NF (opcional)<input value={f.nf} onChange={(e) => mudar({ nf: e.target.value })} placeholder={p.ultima_entrada?.nf ?? ""} /></label>
         </div>
+        <details className="avancado">
+          <summary>Dados da NF e R$/kg do precificador (opcional)</summary>
+          <div className="grade-form">
+            <label>Emitente / fornecedor<input value={f.fornecedor} onChange={(e) => mudar({ fornecedor: e.target.value })} /></label>
+            <label>Série da NF<input value={f.serie} onChange={(e) => mudar({ serie: e.target.value })} /></label>
+            <label>NCM<input inputMode="numeric" value={f.ncm} onChange={(e) => mudar({ ncm: e.target.value })} placeholder="7228.30.00" /></label>
+            <label>Nº do packing list<input value={f.packing} onChange={(e) => mudar({ packing: e.target.value })} /></label>
+            <label>Nº da DI/DUIMP<input value={f.di} onChange={(e) => mudar({ di: e.target.value })} /></label>
+            <label>R$/kg (precificador)<input inputMode="decimal" value={f.custo} onChange={(e) => mudar({ custo: e.target.value })} /></label>
+          </div>
+          <small className="dica">O que faltar pode ser completado depois, no detalhe do lote.</small>
+        </details>
         <label>Observação (opcional)<textarea rows={2} value={f.obs} onChange={(e) => mudar({ obs: e.target.value })} /></label>
+        <div>
+          <h3 style={{ fontSize: "var(--t-base)", marginBottom: "var(--esp-2)" }}>Documentos anexos</h3>
+          <p className="desc" style={{ marginBottom: "var(--esp-2)" }}>NF, packing list e precificador do contêiner. Vão junto ao criar o lote.</p>
+          <AnexosPendentes pendentes={pendentes} aoMudar={setPendentes} ocupado={ocupado} />
+        </div>
 
         {v && (
           <>

@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.domain import peso as dpeso
@@ -15,8 +15,8 @@ from app.domain.validacao import Nivel
 from app.models import (Conteiner, CopItem, Destinacao, EntradaNf, EntradaNfItem, ItemMP, LiberacaoCorte, Liga, Lote,
                         Movimento, SolicitacaoCorte, Usuario)
 
-from . import auditoria, estoque, movimentos
-from .base import ErroNegocio, NaoEncontrado, Previa, exigir_sem_pendencias, so_rj_no_rio
+from . import anexos, auditoria, estoque, movimentos
+from .base import ErroNegocio, NaoEncontrado, Previa, exigir_sem_pendencias, hoje, so_rj_no_rio
 from .fluxo import recalcular_solicitacao
 
 # ---------------- T06 ----------------
@@ -34,16 +34,37 @@ class ItemNf:
     pecas: int | None = None
     comprimento: str | None = None
     custo_kg: float | None = None
+    # spec v3.15 (contrato §16.4)
+    ncm: str | None = None
+    peso_bruto_kg: float | None = None
+    observacao: str | None = None
 
 
 @dataclass
 class EntradaNfDados:
     numero: str
-    data: date
+    data: date                       # data de entrada (chegada no RJ)
     fornecedor: str
     conteiner: str
     itens: list[ItemNf]
     confirmacoes: dict[str, str] = field(default_factory=dict)
+    # spec v3.15 (contrato §16.4): cabeçalho enriquecido, opcionais [proposta, P42]
+    data_emissao: date | None = None
+    serie: str | None = None
+    cnpj: str | None = None
+    chave_nfe: str | None = None
+    packing_list: str | None = None
+    di_duimp: str | None = None
+    observacao: str | None = None
+
+
+def nf_duplicada(db: Session, numero: str, fornecedor: str, serie: str | None) -> bool:
+    """NF_DUPLICADA (spec v3.15 T06): número + fornecedor (+ série, quando as duas têm série)."""
+    series = db.scalars(select(EntradaNf.serie).where(
+        EntradaNf.origem == "T06", EntradaNf.numero == numero.strip(),
+        func.upper(EntradaNf.fornecedor) == fornecedor.strip().upper()))
+    s = (serie or "").strip()
+    return any(not (x or "").strip() or not s or (x or "").strip() == s for x in series)
 
 
 def _comprimento_medio(txt: str | None) -> float | None:
@@ -85,14 +106,30 @@ def _item(db: Session, i: ItemNf, *, criar: bool) -> tuple[ItemMP | None, Liga |
 def validar_entrada(db: Session, e: EntradaNfDados) -> Previa:
     p = Previa()
     r = p.resultado
-    if db.scalar(select(EntradaNf.id).where(EntradaNf.numero == e.numero.strip(),
-                                            EntradaNf.fornecedor == e.fornecedor.strip())):
-        r.adicionar("NF_DUPLICADA", Nivel.ERRO, f"A NF {e.numero} de {e.fornecedor} já foi lançada.")
+    if nf_duplicada(db, e.numero, e.fornecedor, e.serie):
+        serie = f" série {e.serie.strip()}" if (e.serie or "").strip() else ""
+        r.adicionar("NF_DUPLICADA", Nivel.ERRO, f"A NF {e.numero}{serie} de {e.fornecedor} já foi lançada.")
+    hj = hoje()
+    if e.data_emissao and e.data_emissao > hj:
+        r.adicionar("EMISSAO_FUTURA", Nivel.ERRO, "A data de emissão da NF não pode ser futura.")
+    if e.data > hj:
+        r.adicionar("DATA_FUTURA", Nivel.ERRO, "A data de entrada não pode ser futura.")
+    if e.data_emissao and e.data < e.data_emissao:
+        r.adicionar("ENTRADA_ANTES_DA_EMISSAO", Nivel.ALERTA,
+                    "A data de entrada é anterior à emissão da NF. Confira as datas.")
+    chave = anexos.digitos(e.chave_nfe)
+    if chave and len(chave) != 44:
+        r.adicionar("CHAVE_NFE_INVALIDA", Nivel.ALERTA,
+                    f"A chave de acesso da NF-e tem {len(chave)} dígitos; o normal são 44. Confira.")
     if not e.itens:
         r.adicionar("SEM_ITENS", Nivel.ERRO, "Adicione pelo menos um item.")
     total = 0.0
     for n, i in enumerate(e.itens, start=1):
-        _, liga = _item(db, i, criar=False)
+        if not anexos.ncm_valido(i.ncm):
+            r.adicionar(f"NCM_INVALIDO#{n}", Nivel.ERRO, f"Item {n}: informe o NCM com 8 dígitos (ex.: 7228.30.00) "
+                                                         "ou deixe em branco.")
+        # só a liga: _item() formata a bitola e quebraria (500) com a bitola incompleta, avisada logo abaixo
+        liga = db.scalar(select(Liga).where(Liga.codigo == i.liga.strip().upper()))
         if liga is None:
             r.adicionar(f"LIGA_DESCONHECIDA#{n}", Nivel.ERRO, f"Item {n}: liga {i.liga} não está no catálogo.")
             continue
@@ -121,8 +158,12 @@ def registrar_entrada(db: Session, e: EntradaNfDados, *, usuario: Usuario, ip: s
         ct = Conteiner(codigo=cod, data_entrada=e.data)
         db.add(ct)
         db.flush()
-    nf = EntradaNf(numero=e.numero.strip(), fornecedor=e.fornecedor.strip(), data=e.data, conteiner_id=ct.id,
-                   usuario_id=usuario.id)
+    cnpj = anexos.digitos(e.cnpj)[:14] or None
+    nf = EntradaNf(origem="T06", numero=e.numero.strip(), serie=anexos.texto(e.serie, 5),
+                   fornecedor=e.fornecedor.strip(), cnpj=cnpj, data=e.data, data_emissao=e.data_emissao,
+                   chave_nfe=anexos.digitos(e.chave_nfe)[:60] or None, packing_list=anexos.texto(e.packing_list, 60),
+                   di_duimp=anexos.texto(e.di_duimp, 30), observacao=anexos.texto(e.observacao, 500),
+                   conteiner_id=ct.id, usuario_id=usuario.id)
     db.add(nf)
     db.flush()
     for i in e.itens:
@@ -133,7 +174,9 @@ def registrar_entrada(db: Session, e: EntradaNfDados, *, usuario: Usuario, ip: s
         movimentos.lancar(db, lote, "ENTRADA", i.peso_kg, usuario_id=usuario.id, pecas=i.pecas,
                           documento=f"NF {nf.numero} {nf.fornecedor}", data_referencia=e.data)
         db.add(EntradaNfItem(entrada_id=nf.id, lote_id=lote.id, descricao_nf=i.descricao_nf, pecas=i.pecas,
-                             peso_kg=i.peso_kg, comprimento=i.comprimento, custo_kg=i.custo_kg))
+                             peso_kg=i.peso_kg, comprimento=i.comprimento, custo_kg=i.custo_kg,
+                             ncm=anexos.ncm_ou_erro(i.ncm), peso_bruto_kg=i.peso_bruto_kg,
+                             observacao=anexos.texto(i.observacao, 500)))
     db.flush()
     auditoria.registrar(db, "ENTRADA_NF", usuario_id=usuario.id, entidade="entrada_nf", entidade_id=nf.id,
                         depois={"nf": nf.numero, "fornecedor": nf.fornecedor, "conteiner": cod,
@@ -143,11 +186,43 @@ def registrar_entrada(db: Session, e: EntradaNfDados, *, usuario: Usuario, ip: s
 
 
 def entrada_dict(db: Session, nf: EntradaNf) -> dict:
-    ct = db.get(Conteiner, nf.conteiner_id)
-    return {"id": nf.id, "numero": nf.numero, "fornecedor": nf.fornecedor, "data": nf.data.isoformat(),
-            "conteiner": ct.codigo if ct else None,
-            "itens": [{"lote_id": i.lote_id, "descricao_nf": i.descricao_nf, "pecas": i.pecas, "peso_kg": i.peso_kg,
-                       "comprimento": i.comprimento} for i in nf.itens]}
+    ct = db.get(Conteiner, nf.conteiner_id) if nf.conteiner_id else None
+    return {"id": nf.id, "numero": nf.numero, "serie": nf.serie, "fornecedor": nf.fornecedor, "cnpj": nf.cnpj,
+            "data": nf.data.isoformat(), "data_emissao": nf.data_emissao.isoformat() if nf.data_emissao else None,
+            "chave_nfe": nf.chave_nfe, "packing_list": nf.packing_list, "di_duimp": nf.di_duimp,
+            "observacao": nf.observacao, "conteiner": ct.codigo if ct else None,
+            "itens": [{"lote_id": i.lote_id, **_lote_e_material(db, i.lote_id), **anexos.item_dict(i)}
+                      for i in nf.itens]}
+
+
+def _lote_e_material(db: Session, lote_id: int) -> dict:
+    """Código do lote e material ("H13 50X610") para o link "Ver lote" depois de salvar."""
+    l = db.get(Lote, lote_id)
+    return {"lote": l.codigo, "material": f"{l.item.liga.codigo} {estoque.bitola(l.item)}"} if l else {}
+
+
+def fornecedores(db: Session) -> list[dict]:
+    """Fornecedores já usados na T06 (lista do campo), com o último CNPJ informado de cada um."""
+    vistos: dict[str, dict] = {}
+    for nome, cnpj in db.execute(select(EntradaNf.fornecedor, EntradaNf.cnpj)
+                                 .where(EntradaNf.origem == "T06", EntradaNf.fornecedor.is_not(None))
+                                 .order_by(EntradaNf.id.desc())):
+        k = nome.strip().upper()
+        if k not in vistos:
+            vistos[k] = {"fornecedor": nome, "cnpj": cnpj}
+        elif not vistos[k]["cnpj"] and cnpj:
+            vistos[k]["cnpj"] = cnpj
+    return sorted(vistos.values(), key=lambda x: x["fornecedor"].upper())
+
+
+def ultimo_ncm(db: Session, i: ItemNf) -> str | None:
+    """[SUGERIDO] NCM da última entrada do mesmo material (liga × bitola, §1.4), spec v3.15 T06."""
+    item, _ = _item(db, i, criar=False)
+    if item is None:
+        return None
+    return db.scalar(select(EntradaNfItem.ncm).join(Lote, EntradaNfItem.lote_id == Lote.id)
+                     .where(Lote.item_mp_id == item.id, EntradaNfItem.ncm.is_not(None))
+                     .order_by(EntradaNfItem.id.desc()).limit(1))
 
 
 # ---------------- T17 ----------------

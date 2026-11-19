@@ -400,7 +400,8 @@ def caminho_d(c: Cliente, u: dict, liga: str) -> dict:
     c.entrar(u["rj"])
     numero = f"E2E{int(time.time()) % 100000}"
     d = gravar(c, "/api/entradas-nf/validar", "/api/entradas-nf",
-               {"numero": numero, "data": date.today().isoformat(), "fornecedor": "TESTE E2E", "conteiner": "E2ETESTE",
+               {"numero": numero, "data": date.today().isoformat(), "data_emissao": date.today().isoformat(),
+                "fornecedor": "TESTE E2E", "conteiner": "E2ETESTE",
                 "itens": [{"liga": liga, "formato": "RETANGULAR", "espessura": 50, "largura": 610, "pecas": 1,
                            "peso_kg": 100, "descricao_nf": "TESTE E2E caminho D"}]})
     esperar(len(d["itens"]) == 1, "D: entrada deveria criar 1 lote")
@@ -408,6 +409,7 @@ def caminho_d(c: Cliente, u: dict, liga: str) -> dict:
     esperar(st == 200 and lote["estoque"] == "RJ_NO_RIO" and lote["codigo_mega"] is None,
             f"D: lote do RJ deveria ficar sem código do Mega ({st} {lote})")
     st, v = c.req("POST", "/api/entradas-nf/validar", {"numero": numero, "data": date.today().isoformat(),
+                                                       "data_emissao": date.today().isoformat(),
                                                        "fornecedor": "TESTE E2E", "conteiner": "E2ETESTE",
                                                        "itens": [{"liga": liga, "formato": "RETANGULAR",
                                                                   "espessura": 50, "largura": 610, "peso_kg": 1}]})

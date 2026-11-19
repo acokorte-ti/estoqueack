@@ -212,17 +212,21 @@ def chave_lote(item: ItemMP, mapa: dict[str, str] | None = None) -> ChaveMateria
 
 
 def lote_resumo(db: Session, lotes: list[Lote]) -> list[dict]:
+    from .anexos import MapaAnexos   # import tardio: anexos usa raiz() deste módulo
     ids = [l.id for l in lotes]
     res, dest, notas = mov.reservado(db, ids), _com_destinacao(db, ids), _com_nota(db, ids)
     mapa = mapa_mesma_linha(db)
+    anexos = MapaAnexos(db)
     saida = []
     for l in lotes:
         reservado = round(min(res.get(l.id, 0.0), l.saldo_kg), 3)
-        origem = None
+        origem, r = None, None
         if l.lote_pai_id is not None:
             r = raiz(db, l)
             origem = {"lote": r.codigo, "conteiner": r.conteiner.codigo if r.conteiner else None,
                       "bitola": bitola(r.item)}
+        # R$/kg que vale (contrato §16.4): o do lote, senão o da origem (lote filho herda, [proposta, P41(e)])
+        custo = l.custo_kg if l.custo_kg is not None else (r.custo_kg if r is not None else None)
         saida.append({
             "id": l.id, "codigo": l.codigo, "conteiner": l.conteiner.codigo if l.conteiner else None,
             "liga": l.item.liga.codigo, "formato": l.item.formato, "bitola": bitola(l.item),
@@ -236,8 +240,10 @@ def lote_resumo(db: Session, lotes: list[Lote]) -> list[dict]:
             "estoque": BALDE.get((l.planta_fiscal, l.local_fisico)), "tipo": l.tipo,
             "saldo_kg": round(l.saldo_kg, 3), "reservado_kg": reservado,
             "disponivel_kg": round(l.saldo_kg - reservado, 3), "origem": origem,
+            "custo_kg": float(custo) if custo is not None else None,
             "indicadores": {"destinacao": l.id in dest, "nota": l.id in notas,
-                            "origem_nao_identificada": not l.origem_identificada},
+                            "origem_nao_identificada": not l.origem_identificada,
+                            "anexo": anexos.tem(l, r), "precificador": anexos.tem(l, r, "PRECIFICADOR")},
         })
     return saida
 

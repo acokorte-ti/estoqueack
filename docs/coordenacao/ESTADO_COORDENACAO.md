@@ -21,7 +21,7 @@ Chat COORDENAÇÃO (Claude Code). Atualizado 2026-11-18. **Para retomar (troca d
 | 10 | Regras novas (spec v3.5–v3.13): paridade liga × bitola, 8 % RJ, consumo misto, peso real com bloqueio, regra do RETO, menu renomeado | TÉCNICO + FRONTEND | ✅ no ar (até `b0cf389`) |
 | 10b | Paridade conferida pelo Fabiano (3 exceções) e respostas de 17/11 aplicadas | Eduardo + Fabiano | ✅ (restam dúvidas menores em `../carga/PENDENCIAS_USUARIOS_2026-11-18.txt`) |
 | 11 | Recarga do zero (planilhas 2026-11-17) + conferência + ponta a ponta 5 caminhos | TÉCNICO + BANCO E TESTES | ✅ 2026-11-17: Estoque Mega = Mega; RJ no Rio = ESTOQUE 2026; 5 caminhos OK |
-| 12 | Teste manual do Eduardo (roteiro `../carga/ROTEIRO_TESTE_MANUAL_2026-11-17.md`) com ajustes pedidos por ele (17/11: filtro "contém", Fila RJ, vários lotes na OP, lote estritamente maior, menu, impressão) → aceite com os usuários | Eduardo + todas | ⏳ em andamento; falta programar anexos/NF enriquecida (R074–R076) e o fechamento mensal (espera a Inês) |
+| 12 | Teste manual do Eduardo (roteiro `../carga/ROTEIRO_TESTE_MANUAL_2026-11-17.md`) com ajustes pedidos por ele (17/11: filtro "contém", Fila RJ, vários lotes na OP, lote estritamente maior, menu, impressão) → aceite com os usuários | Eduardo + todas | ⏳ em andamento; anexos/NF enriquecida no ar (19/11); falta a marca "OP dividida" e a parte de Itu na soma do consumo misto (R074(1)/R075(1)) e o fechamento mensal (espera a Inês) |
 | 13 | Go/no-go → implantação pelo roteiro | Eduardo + COORDENAÇÃO | depois do 12 |
 
 ## 2. Escopo da F1 (validado 2026-11-04)
@@ -60,6 +60,7 @@ Entra: T03–T14, T15 mínima e aba RETO por origem (v3.4, 06/11), T16 mínima, 
 
 ## 6. Rodadas
 
+- **R12 (19/11):** anexos e entrada enriquecida (R074(2)(3), R075(2)(3), R076(1)(2)) feitos pela COORDENAÇÃO (backend) + fork (frontend), com as propostas P41/P42: migração 0012, contrato §16.4, arquivo no banco (entra no backup). Conferido no navegador com SQLite local e dados fictícios.
 - **R11 (19/11):** layout A "Bancada" escolhido pelo Eduardo entre 3 protótipos (`../layouts/`) e aplicado pela COORDENAÇÃO direto no frontend (tema, menu pelo caminho do material com contadores, Painel em lista de tarefas, Cadastro de SA com ação na coluna do dado). Spec v3.17 §4, `docs/ux/02_tema_visual.md`. Sem mudança de regra nem de API.
 - **R10 (18/11):** revisão de código completa (4 revisores + análise estática, achados conferidos): travas antes de validar, disponível ≥ 0, N+1 do painel, índice 0011, frontend (corridas, erros, janelas, formatação). Detalhe em `00_RETOMAR_COORDENACAO.md` §3.
 - **R9 (18/11):** ajustes do teste manual de 18/11 feitos pela COORDENAÇÃO direto (sessão sem os subagentes): spec v3.16, contrato §4/§7, backend (trava da NF por SA confirmado + R$/kg, `PRECIFICADOR_PENDENTE`, precificador no item do COP), testes (`test_v316_precificador_nf.py`), T14 por COP, T11 com precificador, largura toda e menu recolhível.

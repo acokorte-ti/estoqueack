@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, data, ESTOQUE_NOME, kg, num, qs, rsKg, validacaoDoErro, type Validacao } from "../api/cliente";
 import { useSessao } from "../api/sessao";
-import { TIPO_LOTE, type Destinacao, type LoteDetalhe as TLote, type Movimento, type NoArvore, type Nota } from "../api/lote";
+import { ORIGEM_ENTRADA, TIPO_LOTE, type Destinacao, type EntradaLote, type LoteDetalhe as TLote, type Movimento, type NoArvore, type Nota } from "../api/lote";
+import Anexos from "../components/Anexos";
 import Janela, { fecharJanela } from "../components/Janela";
 import PainelValidacao, { confirmacoesValidas, JUSTIFICATIVA_MIN, podeGravar, type Confirmacoes } from "../components/PainelValidacao";
 
 interface Pagina<T> { itens: T[]; total: number; pagina: number; por_pagina: number }
-type Acao = null | "reserva" | "ajuste" | "origem" | { estornar: Movimento };
+type Acao = null | "reserva" | "ajuste" | "origem" | "completar" | { estornar: Movimento };
 
 /** T05 Detalhe do lote: cabeçalho, origem, movimentos, reservas/restrições, notas. Ações T17, T18 e atribuir origem. */
 export default function LoteDetalhe() {
@@ -31,6 +32,16 @@ export default function LoteDetalhe() {
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
   const [acao, setAcao] = useState<Acao>(null);
+  const [ent, setEnt] = useState<EntradaLote | null>(null);
+  const [erroEnt, setErroEnt] = useState("");
+
+  // "Entrada e documentos" (contrato §16.4): carga própria, para um erro aqui não esconder o resto do lote
+  const carregarEntrada = useCallback(() => {
+    setErroEnt("");
+    return api.get<EntradaLote>(`/lotes/${id}/entrada`).then(setEnt)
+      .catch((e: Error) => setErroEnt(`Não foi possível carregar a entrada e os documentos (${e.message}).`));
+  }, [id]);
+  useEffect(() => { void carregarEntrada(); }, [carregarEntrada]);
 
   const carregar = useCallback(async () => {
     setErro("");
@@ -114,7 +125,7 @@ export default function LoteDetalhe() {
           <div><dt>Peças iniciais</dt><dd>{l.pecas_iniciais ?? "—"}</dd></div>
           <div><dt>NF de entrada</dt><dd>{l.documento_entrada ?? "—"}</dd></div>
           <div><dt>Data de entrada</dt><dd>{data(l.data_entrada)}</dd></div>
-          {l.custo_kg !== null && <div><dt>R$/kg</dt><dd>{rsKg(l.custo_kg)}</dd></div>}
+          {(ent?.custo_kg ?? l.custo_kg) !== null && <div><dt>R$/kg</dt><dd>{rsKg((ent?.custo_kg ?? l.custo_kg) as number)}</dd></div>}
           {l.origem && <div className="largo"><dt>Origem</dt><dd>{l.origem.lote} · {l.origem.conteiner ?? "—"} · {l.origem.bitola}</dd></div>}
         </dl>
         <div className="botoes" style={{ marginTop: "var(--esp-4)" }}>
@@ -122,6 +133,15 @@ export default function LoteDetalhe() {
           {pode.reserva && <button className="secundario" onClick={() => setAcao("reserva")}>Adicionar reserva ou restrição</button>}
           {pode.origem && l.indicadores.origem_nao_identificada && <button className="secundario" onClick={() => setAcao("origem")}>Atribuir origem</button>}
         </div>
+      </section>
+
+      <section className="secao secao-entrada" aria-label="Entrada e documentos">
+        <div className="linha-titulo">
+          <h2>Entrada e documentos</h2>
+          {ent?.pode_completar && <button className="secundario" onClick={() => { setAviso(""); setAcao("completar"); }}>Completar dados da entrada</button>}
+        </div>
+        {erroEnt && <p className="erro" role="alert">{erroEnt}</p>}
+        {!ent ? (!erroEnt && <p className="carregando">Carregando…</p>) : <EntradaDoLote ent={ent} aoMudar={() => void carregarEntrada()} />}
       </section>
 
       {arv && (arv.raiz.filhos.length > 0 || arv.raiz.id !== l.id) && (
@@ -198,7 +218,141 @@ export default function LoteDetalhe() {
       {acao === "ajuste" && <JanelaAjuste lote={l} aoFechar={() => setAcao(null)} aoGravar={feito} />}
       {acao === "origem" && <JanelaOrigem lote={l} aoFechar={() => setAcao(null)} aoGravar={feito} />}
       {acao && typeof acao === "object" && <JanelaEstorno mov={acao.estornar} aoFechar={() => setAcao(null)} aoGravar={feito} />}
+      {acao === "completar" && ent && (
+        <JanelaCompletar lote={l} ent={ent} aoFechar={() => setAcao(null)}
+          aoGravar={(r) => { setAcao(null); setEnt(r); setAviso(["Dados da entrada atualizados.", ...(r.avisos ?? [])].join(" ")); void carregar(); }} />
+      )}
     </>
+  );
+}
+
+const ou = (v: string | number | null | undefined) => (v === null || v === undefined || v === "" ? "—" : String(v));
+const kgOu = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `${kg(v)} kg`);
+/** NCM com pontos (7228.30.00) quando vier só com os 8 dígitos. */
+const ncmTexto = (v: string | null | undefined) => (v && /^\d{8}$/.test(v) ? `${v.slice(0, 4)}.${v.slice(4, 6)}.${v.slice(6)}` : ou(v));
+
+/** T05 seção 6: dados da entrada (T06/T15/completados) ou da carga, item da NF, R$/kg e documentos anexos. */
+function EntradaDoLote({ ent, aoMudar }: { ent: EntradaLote; aoMudar: () => void }) {
+  const e = ent.entrada;
+  const it = ent.item;
+  return (
+    <div className="ficha">
+      {ent.da_origem && (
+        <p className="desc" style={{ marginBottom: "var(--esp-3)" }}>
+          <span className="etiqueta info">da origem {ent.da_origem}</span> Dados e documentos do lote de origem.
+          {!ent.pode_completar && ` Para completar, abra o lote de origem ${ent.da_origem}.`}
+        </p>
+      )}
+      {ent.origem && <p className="desc" style={{ marginBottom: "var(--esp-3)" }}>{ORIGEM_ENTRADA[ent.origem] ?? ent.origem}</p>}
+      {e ? (
+        <dl className="dados">
+          <div><dt>NF</dt><dd>{ou(e.numero)}{e.serie ? ` · série ${e.serie}` : ""}</dd></div>
+          <div><dt>Emissão</dt><dd>{data(e.data_emissao)}</dd></div>
+          <div><dt>Data de entrada</dt><dd>{data(e.data_entrada)}</dd></div>
+          <div><dt>Emitente / fornecedor</dt><dd>{ou(e.fornecedor)}</dd></div>
+          <div><dt>CNPJ</dt><dd>{ou(e.cnpj)}</dd></div>
+          <div><dt>Contêiner</dt><dd>{ou(e.conteiner)}</dd></div>
+          <div><dt>Packing list</dt><dd>{ou(e.packing_list)}</dd></div>
+          <div><dt>DI/DUIMP</dt><dd>{ou(e.di_duimp)}</dd></div>
+          {e.chave_nfe && <div className="largo"><dt>Chave de acesso da NF-e</dt><dd className="num">{e.chave_nfe}</dd></div>}
+          {e.observacao && <div className="largo"><dt>Observação da entrada</dt><dd>{e.observacao}</dd></div>}
+        </dl>
+      ) : ent.carga ? (
+        <dl className="dados">
+          <div><dt>Documento</dt><dd>{ou(ent.carga.documento)}</dd></div>
+          <div><dt>Data de entrada</dt><dd>{data(ent.carga.data_entrada)}</dd></div>
+          <div><dt>Peças</dt><dd>{ou(ent.carga.pecas)}</dd></div>
+          <div><dt>Peso de entrada</dt><dd>{kgOu(ent.carga.peso_kg)}</dd></div>
+          <div className="largo"><dt>Planilha</dt><dd>{[ent.carga.arquivo, ent.carga.aba, ent.carga.linha && `linha ${ent.carga.linha}`].filter(Boolean).join(" · ") || "—"}</dd></div>
+        </dl>
+      ) : <p className="desc">Sem dados de entrada registrados.</p>}
+
+      {it && (
+        <>
+          <h3>Item da NF</h3>
+          <dl className="dados">
+            <div className="largo"><dt>Descrição como na NF</dt><dd>{ou(it.descricao_nf)}</dd></div>
+            <div><dt>NCM</dt><dd>{ncmTexto(it.ncm)}</dd></div>
+            <div><dt>Peças</dt><dd>{ou(it.pecas)}</dd></div>
+            <div><dt>Peso líquido</dt><dd>{kgOu(it.peso_kg)}</dd></div>
+            <div><dt>Peso bruto</dt><dd>{kgOu(it.peso_bruto_kg)}</dd></div>
+            <div><dt>Comprimento</dt><dd>{ou(it.comprimento)}</dd></div>
+            {it.observacao && <div className="largo"><dt>Observação do item</dt><dd>{it.observacao}</dd></div>}
+          </dl>
+        </>
+      )}
+      <dl className="dados" style={{ marginTop: "var(--esp-3)" }}>
+        <div><dt>R$/kg (precificador)</dt><dd>{ent.custo_kg !== null ? rsKg(ent.custo_kg) : <span className="desc">não informado</span>}</dd></div>
+      </dl>
+
+      <h3>Documentos anexos</h3>
+      <Anexos anexos={ent.anexos} enviarPara={`/lotes/${ent.lote_id}/anexos`} aoMudar={aoMudar} />
+    </div>
+  );
+}
+
+/** "Completar dados da entrada" (P42(d)): só o que não mexe no saldo; manda só os campos que mudaram. */
+function JanelaCompletar({ lote, ent, aoFechar, aoGravar }: { lote: TLote; ent: EntradaLote; aoFechar: () => void; aoGravar: (r: EntradaLote) => void }) {
+  const e = ent.entrada;
+  const it = ent.item;
+  const n = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v).replace(".", ","));
+  const inicial = {
+    numero: e?.numero ?? "", serie: e?.serie ?? "", data_emissao: e?.data_emissao ?? "", data_entrada: e?.data_entrada ?? "",
+    fornecedor: e?.fornecedor ?? "", cnpj: e?.cnpj ?? "", chave_nfe: e?.chave_nfe ?? "", packing_list: e?.packing_list ?? "",
+    di_duimp: e?.di_duimp ?? "", observacao: e?.observacao ?? "", descricao_nf: it?.descricao_nf ?? "", ncm: it?.ncm ?? "",
+    peso_bruto_kg: n(it?.peso_bruto_kg), custo_kg: n(it?.custo_kg ?? ent.custo_kg), observacao_item: it?.observacao ?? "",
+  };
+  type Campo = keyof typeof inicial;
+  const [f, setF] = useState(inicial);
+  const [erro, setErro] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  const numericos: Campo[] = ["peso_bruto_kg", "custo_kg"];
+  const mudados = (Object.keys(inicial) as Campo[]).filter((k) => f[k].trim() !== inicial[k].trim());
+  const campo = (k: Campo, rotulo: string, extra: Record<string, string> = {}) => (
+    <label>{rotulo}<input value={f[k]} onChange={(ev) => setF({ ...f, [k]: ev.target.value })} {...extra} /></label>
+  );
+
+  async function ok(ev: FormEvent) {
+    ev.preventDefault();
+    const corpo: Record<string, string | number | null> = {};
+    for (const k of mudados) {
+      const v = f[k].trim();
+      corpo[k] = !v ? null : numericos.includes(k) ? (num(v) ?? null) : v;
+    }
+    setErro(""); setOcupado(true);
+    try { aoGravar(await api.patch<EntradaLote>(`/lotes/${lote.id}/entrada`, corpo)); }
+    catch (err) { setErro(err instanceof Error ? err.message : "Não foi possível salvar."); }
+    finally { setOcupado(false); }
+  }
+
+  return (
+    <Janela titulo={`Completar dados da entrada · ${lote.codigo}`} aoFechar={aoFechar} larga>
+      <form onSubmit={(ev) => void ok(ev)} className="bloco-passo" style={{ gap: "var(--esp-4)" }}>
+        <p className="desc">Só o que não mexe no saldo. Contêiner, liga, bitola, peso líquido, peças e comprimento se corrigem por estorno. A mudança fica na auditoria.</p>
+        <div className="grade-form">
+          {campo("numero", "Nº da NF")}
+          {campo("serie", "Série")}
+          {campo("data_emissao", "Data de emissão", { type: "date" })}
+          {campo("data_entrada", "Data de entrada", { type: "date" })}
+          {campo("fornecedor", "Emitente / fornecedor")}
+          {campo("cnpj", "CNPJ", { inputMode: "numeric" })}
+          {campo("packing_list", "Nº do packing list")}
+          {campo("di_duimp", "Nº da DI/DUIMP")}
+          {campo("ncm", "NCM", { inputMode: "numeric", placeholder: "7228.30.00" })}
+          {campo("peso_bruto_kg", "Peso bruto (kg)", { inputMode: "decimal" })}
+          {campo("custo_kg", "R$/kg (precificador)", { inputMode: "decimal" })}
+        </div>
+        {campo("chave_nfe", "Chave de acesso da NF-e", { inputMode: "numeric", placeholder: "44 dígitos" })}
+        {campo("descricao_nf", "Descrição como na NF")}
+        <label>Observação da entrada<textarea rows={2} value={f.observacao} onChange={(ev) => setF({ ...f, observacao: ev.target.value })} /></label>
+        {campo("observacao_item", "Observação do item")}
+        {erro && <p className="erro" role="alert">{erro}</p>}
+        <div className="botoes">
+          <button className="primario" disabled={!mudados.length || ocupado}>{ocupado ? "Salvando…" : "Salvar dados"}</button>
+          <button type="button" className="secundario" onClick={(ev) => fecharJanela(ev.currentTarget)}>Voltar</button>
+        </div>
+      </form>
+    </Janela>
   );
 }
 

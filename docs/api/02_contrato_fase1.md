@@ -390,6 +390,74 @@ A pendência "Informar o peso real" = solicitação **`AGUARDANDO_CORTE_ITU`** (
 - `item_mp.restricao_uso` (carga, B09): todo **lote novo** do item (T06, T13 sobra/recebimento, T15) já nasce com a destinação `RESTRICAO` com esse texto (pede "estou ciente" na baixa, como as outras). Nada muda na API: a destinação aparece em `GET /api/lotes/{id}` como as criadas na T17.
 - `item_mp.paridade_item_id` (carga, paridade manual, §1.4 item 8): o lote RJ mantém a própria descrição e medida, mas `chave_material` (T04 agrupado e sugestão da T07) é a do item de Itu indicado. Os itens de `GET /api/lotes` ganham `paridade_manual` (bool) e a linha de `GET /api/lotes/agrupado` também (true quando algum lote da linha está nela por exceção: "mesma linha por exceção", R060). Os itens de `/api/lotes` ganham `codigo_paridade` (código de Itu indicado) e `codigos_itu` da linha agrupada passa a incluí-lo, também quando o código não tem lote com saldo no Estoque Mega (2026-11-17, R065(4)).
 
+## 16.4 Entrada enriquecida e documentos anexos (2026-11-19, R074–R076, spec v3.15 T05, T06, T15, "Documentos anexos"; migração 0012)
+
+Segue as propostas padrão P41 e P42 (pendências itens 7 e 8) até o Eduardo responder.
+
+**Banco (0012).** `entrada_nf` ganha `origem` (`T06` | `T15` | `T05`), `serie`, `data_emissao`, `cnpj`, `chave_nfe`, `packing_list`, `di_duimp`, `observacao`; `numero`, `fornecedor` e `conteiner_id` passam a aceitar vazio (T15 sem NF, lote da carga completado no T05); sai a chave única (numero, fornecedor): o `NF_DUPLICADA` é conferido pelo serviço, com a série. `entrada_nf_item` ganha `ncm`, `peso_bruto_kg`, `observacao` (o R$/kg é o `custo_kg` que já existia). Tabelas novas `anexo` (metadados, ligado a **uma** de: entrada, contêiner ou lote; apagar = esconder) e `anexo_arquivo` (o conteúdo, `bytea`). O arquivo fica **no banco**: o backup diário (`pg_dump`) e o externo levam os anexos e a restauração os traz de volta, sem volume novo. Parâmetro T23 `ANEXO_MAX_MB` (NUMERO, 10).
+
+### T06 (`POST /api/entradas-nf/validar` e `POST /api/entradas-nf`)
+
+Campos novos no corpo (todos opcionais, menos `data_emissao`); `data` continua sendo a **data de entrada** (chegada no RJ):
+
+```json
+{ "numero": "12345", "serie": "1", "data_emissao": "2026-11-10", "data": "2026-11-12", "fornecedor": "EASON",
+  "cnpj": "12.345.678/0001-90", "chave_nfe": "3526 1112 …(44 dígitos)", "conteiner": "CH50XY", "packing_list": "PL-889",
+  "di_duimp": "26/1234567-8", "observacao": "texto livre",
+  "itens": [ { "liga": "H13", "formato": "RETANGULAR", "espessura": 50, "largura": 610, "diametro": null,
+               "descricao_nf": "...", "ncm": "7228.30.00", "pecas": 4, "peso_kg": 9000, "peso_bruto_kg": 9120,
+               "comprimento": "2800-6000", "custo_kg": 42.5, "observacao": null } ],
+  "confirmacoes": {} }
+```
+
+Ocorrências novas: `EMISSAO_FUTURA` (ERRO), `DATA_FUTURA` (ERRO, entrada futura), `ENTRADA_ANTES_DA_EMISSAO` (ALERTA), `CHAVE_NFE_INVALIDA` (ALERTA, chave sem 44 dígitos), `NCM_INVALIDO#n` (ERRO, NCM sem 8 dígitos; pontos opcionais; vazio é aceito). `NF_DUPLICADA` agora olha número + fornecedor + série (se uma das duas não tiver série, conta como a mesma NF). NCM e CNPJ são gravados só com os dígitos. `GET /api/entradas-nf` (só as da T06) e o 201 devolvem os campos novos do cabeçalho e dos itens; cada item traz também `lote` (código) e `material` ("H13 50X610") para o link "Ver lote".
+
+- `GET /api/entradas-nf/fornecedores` → `[{ "fornecedor": "EASON", "cnpj": "12345678000190" | null }]` (os já usados, para a lista do campo).
+- `GET /api/entradas-nf/ultimo-ncm?liga=H13&formato=RETANGULAR&espessura=50&largura=610` (ou `diametro=`) → `{ "ncm": "72283000" | null }`: NCM da última entrada do mesmo material, para o campo [SUGERIDO].
+
+### T15 (`POST /api/entradas-mega/{pid}/criar-lote/validar` e `…/criar-lote`)
+
+Campos novos opcionais: `fornecedor`, `serie`, `ncm`, `packing_list`, `di_duimp`, `custo_kg` (R$/kg). Ocorrência nova `NCM_INVALIDO` (ERRO). Os dados ficam numa `entrada_nf` com `origem: "T15"` ligada ao lote criado (aparecem no T05). O NCM é [DIGITADO] (leitura do NCM do produto no Mega fica para depois). Anexos: depois do 201, enviar para `POST /api/lotes/{lote.id}/anexos`.
+
+### T05 "Entrada e documentos"
+
+`GET /api/lotes/{id}/entrada` (quem vê o lote):
+
+```json
+{ "lote_id": 41, "da_origem": "L-000123",
+  "origem": "T06",
+  "entrada": { "id": 3, "numero": "12345", "serie": "1", "data_emissao": "2026-11-10", "data_entrada": "2026-11-12",
+               "fornecedor": "EASON", "cnpj": "12345678000190", "chave_nfe": "…", "conteiner": "CH50XY",
+               "packing_list": "PL-889", "di_duimp": "26/1234567-8", "observacao": null },
+  "item": { "descricao_nf": "...", "ncm": "72283000", "pecas": 4, "peso_kg": 9000, "peso_bruto_kg": 9120,
+            "comprimento": "2800-6000", "custo_kg": 42.5, "observacao": null },
+  "carga": null,
+  "custo_kg": 42.5,
+  "pode_completar": true,
+  "anexos": [ { "id": 7, "tipo": "NF", "descricao": null, "nome_arquivo": "nf_12345.pdf", "content_type": "application/pdf",
+                "tamanho_bytes": 482133, "ligado_a": "ENTRADA", "da_origem": "L-000123", "usuario": "Marcelo Teixeira",
+                "criado_em": "…", "apagado": false, "apagado_por": null, "apagado_em": null, "justificativa": null } ] }
+```
+
+- `da_origem`: código do lote de origem quando o lote é filho (sobra, RETO, peça inteira em Itu): entrada, item, R$/kg e anexos vêm da origem; `null` no lote original.
+- `origem`: `T06` | `T15` | `T05` (completado depois) | `CARGA` | `null`. No lote da carga sem entrada, `entrada` e `item` vêm `null` e `carga` traz `{ "documento", "data_entrada", "custo_kg", "pecas", "peso_kg", "arquivo", "aba", "linha" }`.
+- `custo_kg`: R$/kg que vale para o lote (o do item da entrada, senão o do lote, senão o da origem).
+- `pode_completar`: `false` no lote filho (completar no lote de origem).
+- `anexos`: os da entrada (NF, packing list e o "outro" anexado na T06), os do contêiner (precificador) e os do lote e da origem; o mais novo primeiro. `ligado_a`: `ENTRADA` | `CONTEINER` | `LOTE`. Apagados só aparecem para o Admin (`apagado: true`, com quem, quando e a justificativa).
+
+`PATCH /api/lotes/{id}/entrada` "Completar dados da entrada" (quem vê o lote; só no lote original). Corpo com **só os campos que mudam**: `numero`, `serie`, `data_emissao`, `data_entrada`, `fornecedor`, `cnpj`, `chave_nfe`, `packing_list`, `di_duimp`, `observacao`, `descricao_nf`, `ncm`, `peso_bruto_kg`, `custo_kg`, `observacao_item`. Contêiner, liga, bitola, peso líquido, peças e comprimento **não** entram (estorno, T18). Sem entrada (lote da carga, T15 antigo), cria uma com `origem: "T05"`. Grava auditoria `ENTRADA_COMPLETADA` (antes e depois). Responde o mesmo corpo do GET com `avisos: ["…"]` (ex.: chave sem 44 dígitos). 400: NCM sem 8 dígitos, data futura, lote filho, nada para mudar.
+
+### Anexos
+
+- **Enviar:** `POST /api/lotes/{id}/anexos?tipo=NF&nome=nf_12345.pdf&descricao=` ou `POST /api/entradas-nf/{id}/anexos?…`, com o **arquivo puro no corpo** (`Content-Type` do arquivo; sem multipart) e o header CSRF. `tipo`: `NF` | `PACKING_LIST` | `PRECIFICADOR` | `OUTRO` (`descricao` obrigatória no `OUTRO`, até 120). Onde fica ligado: pelo lote, NF e packing list vão para a entrada do lote de origem (se não houver, para o lote de origem), precificador para o contêiner (sem contêiner, para o lote de origem) e outro para o próprio lote; pela entrada, precificador vai para o contêiner da entrada e o resto para a entrada. 201 com o anexo (formato acima). 400 com a mensagem: `ANEXO_TIPO_NAO_ACEITO` ("Envie PDF, JPG ou PNG (no precificador, também XLS ou XLSX)."; confere extensão **e** conteúdo), `ANEXO_GRANDE` ("O arquivo tem X MB; o limite é 10 MB. Escaneie com resolução menor ou divida o PDF."), arquivo vazio, descrição faltando.
+- **Abrir / baixar:** `GET /api/anexos/{id}/arquivo` (abre no navegador) e `GET /api/anexos/{id}/arquivo?baixar=true` (baixa). Só com sessão (cookie); Operação RJ só abre anexo de lote do RJ no Rio. Apagado: 404, menos para o Admin.
+- **Apagar:** `POST /api/anexos/{id}/apagar` `{ "justificativa": "…" }` (quem vê o lote; justificativa não vazia): sai da lista, fica no banco, no backup e na auditoria (`ANEXO_APAGADO`). **Restaurar:** `POST /api/anexos/{id}/restaurar` (Admin; auditoria `ANEXO_RESTAURADO`). Ambos respondem o anexo.
+
+### T04 e Excel
+
+- Itens de `GET /api/lotes` (e `GET /api/lotes/{id}`): `custo_kg` (o R$/kg que vale: o do lote, senão o da origem), `indicadores.anexo` (bool: o lote, a entrada, o contêiner ou a origem têm anexo) e `indicadores.precificador` (bool: tem precificador).
+- `GET /api/exportar/lotes.xlsx`: colunas novas "R$/kg", "Valor R$" (saldo × R$/kg), "Tem precificador" e "Anexos".
+
 ## 17. Ainda não implementado
 
 📋 F1.1: tratamento da T16 (ver movimentos, ajustar, marcar como explicada), T19 Relatórios, T26, exportação para o Renato com marca, PDFs (romaneio do COP, ficha do lote). A **impressão da Fila RJ (T09)** usa `GET /api/fila-rj`; se faltar campo, o FUNCIONAL indica e eu acrescento.

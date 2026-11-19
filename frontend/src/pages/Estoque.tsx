@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { api, ESTOQUE_NOME, kg, num, qs } from "../api/cliente";
+import { api, ESTOQUE_NOME, kg, num, qs, rsKg } from "../api/cliente";
 import { useSessao } from "../api/sessao";
+import Icone from "../components/Icone";
 import RetoPorOrigem from "./RetoPorOrigem";
 import { chaveAgrupado, filtrosDaLinha, TIPO_LOTE, type Agrupado, type Lote } from "../api/lote";
 
@@ -127,7 +128,7 @@ export default function Estoque() {
       {visao === "lote" && lotes && (lotes.itens.length ? (
         <div className="tabela-rolagem">
           <table className="tabela tabela-clicavel">
-            <thead><tr><th>Lote</th><th>Material</th><th>Contêiner</th><th>Estoque</th><th className="num">Saldo</th><th className="num">Reservado</th><th className="num">Disponível</th><th>Origem</th><th><span className="sr-only">Indicadores</span></th></tr></thead>
+            <thead><tr><th>Lote</th><th>Material</th><th>Contêiner</th><th>Estoque</th><th className="num">Saldo</th><th className="num">Reservado</th><th className="num">Disponível</th><th className="num">R$/kg</th><th>Origem</th><th><span className="sr-only">Indicadores</span></th></tr></thead>
             <tbody>
               {lotes.itens.map((l) => (
                 <tr key={l.id} onClick={() => nav(`/estoque/${l.id}`)}>
@@ -138,10 +139,12 @@ export default function Estoque() {
                   <td className="num">{kg(l.saldo_kg)}</td>
                   <td className="num">{l.reservado_kg ? kg(l.reservado_kg) : "—"}</td>
                   <td className="num"><strong>{kg(l.disponivel_kg)}</strong></td>
+                  <td className="num">{l.custo_kg !== null && l.custo_kg !== undefined ? rsKg(l.custo_kg) : "—"}</td>
                   <td>{l.origem ? <span className="desc">{l.origem.conteiner ?? "—"} · {l.origem.bitola}</span> : l.indicadores.origem_nao_identificada ? <span className="etiqueta atencao">não identificada</span> : "—"}</td>
                   <td>
                     {l.indicadores.destinacao && <span className="etiqueta atencao" title="Reserva ou restrição">reserva</span>}
                     {l.indicadores.nota && <span className="etiqueta info" title="Tem nota">nota</span>}
+                    {l.indicadores.anexo && <span className="clipe" title="Tem documento anexo (NF, packing list ou precificador)"><Icone nome="clipe" /><span className="sr-only">tem documento anexo</span></span>}
                   </td>
                 </tr>
               ))}

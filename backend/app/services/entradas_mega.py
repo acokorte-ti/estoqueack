@@ -28,9 +28,10 @@ from sqlalchemy.orm import Session
 
 from app.domain.formato import kg_br
 from app.domain.validacao import Nivel
-from app.models import (Conteiner, ItemMP, Liga, Lote, MegaMovimento, MegaSaldo, PendenciaMega, Usuario)
+from app.models import (Conteiner, EntradaNf, EntradaNfItem, ItemMP, Liga, Lote, MegaMovimento, MegaSaldo,
+                        PendenciaMega, Usuario)
 
-from . import auditoria
+from . import anexos, auditoria
 from . import movimentos as mov
 from .base import (ErroNegocio, NaoEncontrado, Previa, agora, exigir_sem_pendencias, hoje, parametro)
 
@@ -259,9 +260,14 @@ class LoteDados:
 
     def __init__(self, peso_kg: float, conteiner: str | None = None, sem_conteiner: bool = False,
                  pecas: int | None = None, data_entrada: date | None = None, nf: str | None = None,
-                 observacao: str | None = None, confirmacoes: dict[str, str] | None = None):
+                 observacao: str | None = None, confirmacoes: dict[str, str] | None = None, *,
+                 fornecedor: str | None = None, serie: str | None = None, ncm: str | None = None,
+                 packing_list: str | None = None, di_duimp: str | None = None, custo_kg: float | None = None):
         self.peso_kg, self.conteiner, self.sem_conteiner, self.pecas = peso_kg, conteiner, sem_conteiner, pecas
         self.data_entrada, self.nf, self.observacao, self.confirmacoes = data_entrada, nf, observacao, confirmacoes
+        # spec v3.15 T15 (contrato §16.4): dados da entrada, opcionais [proposta, P42(e)]
+        self.fornecedor, self.serie, self.ncm, self.packing_list = fornecedor, serie, ncm, packing_list
+        self.di_duimp, self.custo_kg = di_duimp, custo_kg
 
 
 def _atual(db: Session, p: PendenciaMega) -> dict[str, Any]:
@@ -317,6 +323,8 @@ def validar_criar_lote(db: Session, pid: int, e: LoteDados) -> Previa:
                             "Confirma que é outra entrada?", lote=dup.codigo)
     if e.data_entrada and e.data_entrada > hoje():
         r.adicionar("DATA_FUTURA", Nivel.ERRO, "A data de entrada não pode ser futura.")
+    if not anexos.ncm_valido(e.ncm):
+        r.adicionar("NCM_INVALIDO", Nivel.ERRO, "Informe o NCM com 8 dígitos (ex.: 7228.30.00) ou deixe em branco.")
     depois = round(cur["diferenca"] - (e.peso_kg or 0), 3)
     pv.frase = (f"Cria 1 lote ITU/ITU de {kg_br(e.peso_kg or 0)} (código {p.codigo}). "
                 f"Diferença restante: {kg_br(max(depois, 0))}.")
@@ -353,7 +361,17 @@ def criar_lote(db: Session, pid: int, e: LoteDados, *, usuario: Usuario, ip: str
     lote = mov.criar_lote(db, item=item, planta_fiscal="ITU", local_fisico="ITU",
                           tipo="RETO" if item.formato == "RETO" else "ORIGINAL", conteiner_id=ct_id,
                           peso_inicial_kg=e.peso_kg, pecas=e.pecas, documento=nf, origem_identificada=bool(cont),
-                          usuario_id=usuario.id, origem_ref={"origem": "T15", "pendencia_id": p.id})
+                          custo_kg=e.custo_kg, usuario_id=usuario.id,
+                          origem_ref={"origem": "T15", "pendencia_id": p.id})
+    # spec v3.15 T15: os dados da entrada ficam numa entrada_nf "T15" ligada ao lote (aparecem no T05)
+    ent = EntradaNf(origem="T15", numero=(nf or "")[:20] or None, serie=anexos.texto(e.serie, 5),
+                    fornecedor=anexos.texto(e.fornecedor, 120), data=data, conteiner_id=ct_id,
+                    packing_list=anexos.texto(e.packing_list, 60), di_duimp=anexos.texto(e.di_duimp, 30),
+                    usuario_id=usuario.id)
+    db.add(ent)
+    db.flush()
+    db.add(EntradaNfItem(entrada_id=ent.id, lote_id=lote.id, descricao_nf=(item.descricao or "")[:200] or None,
+                         ncm=anexos.ncm_ou_erro(e.ncm), pecas=e.pecas, peso_kg=e.peso_kg, custo_kg=e.custo_kg))
     mov.lancar(db, lote, "ENTRADA", e.peso_kg, usuario_id=usuario.id, pecas=e.pecas, documento=nf,
                data_referencia=data, justificativa=(f"Entrada Mega classificada na T15 (pendência {p.id})"
                                                     + (f". {e.observacao.strip()}" if e.observacao else ""))[:500],

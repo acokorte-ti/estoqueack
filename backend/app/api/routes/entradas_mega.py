@@ -28,10 +28,19 @@ class CriarLote(BaseModel):
     nf: str | None = Field(None, max_length=60)
     observacao: str | None = Field(None, max_length=500)
     confirmacoes: dict[str, str] = Field(default_factory=dict)
+    # spec v3.15 T15 (contrato §16.4): os mesmos campos da T06, opcionais [proposta, P42(e)]
+    fornecedor: str | None = Field(None, max_length=120)
+    serie: str | None = Field(None, max_length=5)
+    ncm: str | None = Field(None, max_length=15)
+    packing_list: str | None = Field(None, max_length=60)
+    di_duimp: str | None = Field(None, max_length=30)
+    custo_kg: float | None = Field(None, ge=0, le=100_000)
 
     def dados(self) -> svc.LoteDados:
         return svc.LoteDados(self.peso_kg, self.conteiner, self.sem_conteiner, self.pecas, self.data_entrada,
-                             self.nf, self.observacao, self.confirmacoes)
+                             self.nf, self.observacao, self.confirmacoes, fornecedor=self.fornecedor,
+                             serie=self.serie, ncm=self.ncm, packing_list=self.packing_list, di_duimp=self.di_duimp,
+                             custo_kg=self.custo_kg)
 
 
 class NaoEntrada(BaseModel):

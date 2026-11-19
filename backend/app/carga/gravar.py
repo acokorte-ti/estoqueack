@@ -19,7 +19,9 @@ from app.services import auditoria
 from .plano import LibP, Plano
 
 # ordem de dependência (filhos primeiro)
-TABELAS_OPERACIONAIS = ("notificacao", "divergencia_recebimento", "cadastro_sa", "cop_item", "cop",
+# anexo_arquivo/anexo (0012) primeiro: apontam para lote, entrada_nf e conteiner
+TABELAS_OPERACIONAIS = ("anexo_arquivo", "anexo",
+                        "notificacao", "divergencia_recebimento", "cadastro_sa", "cop_item", "cop",
                         "nf_transferencia", "corte_itu", "liberacao_corte", "solicitacao_corte", "entrada_nf_item",
                         "entrada_nf", "movimento", "destinacao", "nota", "pendencia_mega", "paridade_rj",
                         "pedido_a_chegar", "lote", "conteiner", "item_mp")

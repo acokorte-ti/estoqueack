@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.core.db import get_db
 from app.models import Destinacao, Lote, Nota, Usuario
-from app.services import auditoria, estoque
+from app.services import anexos, auditoria, estoque
 from app.services import movimentos as mov
 from app.domain import regras
 from app.domain.medidas import chave_multiplo
@@ -163,8 +163,40 @@ def detalhe(lote_id: int, db: Session = Depends(get_db), u: Usuario = Depends(de
     base.update({"peso_inicial_kg": round(l.peso_inicial_kg, 3), "pecas_iniciais": l.pecas_iniciais,
                  "documento_entrada": l.documento_entrada,
                  "data_entrada": l.conteiner.data_entrada.isoformat() if l.conteiner and l.conteiner.data_entrada
-                 else None, "custo_kg": l.custo_kg, "status": l.status, "criado_em": l.criado_em.isoformat()})
-    return base
+                 else None, "status": l.status, "criado_em": l.criado_em.isoformat()})
+    return base   # custo_kg vem de lote_resumo: o R$/kg que vale (o do lote ou o da origem, contrato §16.4)
+
+
+@router.get("/{lote_id}/entrada")
+def entrada(lote_id: int, db: Session = Depends(get_db), u: Usuario = Depends(deps.usuario_liberado)) -> dict:
+    """T05 "Entrada e documentos" (contrato §16.4)."""
+    return anexos.dados_da_entrada(db, _lote(db, lote_id, u), u)
+
+
+class CompletarEntrada(BaseModel):
+    """'Completar dados da entrada' [proposta, P42(d)]: só o que não mexe no saldo nem na identidade do lote."""
+    numero: str | None = Field(None, max_length=20)
+    serie: str | None = Field(None, max_length=5)
+    data_emissao: date | None = None
+    data_entrada: date | None = None
+    fornecedor: str | None = Field(None, max_length=120)
+    cnpj: str | None = Field(None, max_length=20)
+    chave_nfe: str | None = Field(None, max_length=60)
+    packing_list: str | None = Field(None, max_length=60)
+    di_duimp: str | None = Field(None, max_length=30)
+    observacao: str | None = Field(None, max_length=500)
+    descricao_nf: str | None = Field(None, max_length=200)
+    ncm: str | None = Field(None, max_length=15)
+    peso_bruto_kg: float | None = Field(None, ge=0, le=1_000_000)
+    custo_kg: float | None = Field(None, ge=0, le=100_000)
+    observacao_item: str | None = Field(None, max_length=500)
+
+
+@router.patch("/{lote_id}/entrada")
+def completar_entrada(lote_id: int, c: CompletarEntrada, request: Request, db: Session = Depends(get_db),
+                      u: Usuario = Depends(deps.usuario_liberado)) -> dict:
+    return anexos.completar_entrada(db, lote_id, c.model_dump(exclude_unset=True), usuario=u,
+                                    ip=deps.ip_cliente(request))
 
 
 @router.get("/{lote_id}/arvore")

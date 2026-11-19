@@ -13,19 +13,33 @@ function lerCookie(nome: string): string | undefined {
     ?.split("=")[1];
 }
 
+function headerCsrf(headers: Record<string, string>) {
+  const csrf = lerCookie("ack_csrf");
+  if (csrf) headers["X-CSRF-Token"] = decodeURIComponent(csrf);
+}
+
 async function requisitar<T>(metodo: string, caminho: string, corpo?: unknown): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (corpo !== undefined) headers["Content-Type"] = "application/json";
-  if (metodo !== "GET") {
-    const csrf = lerCookie("ack_csrf");
-    if (csrf) headers["X-CSRF-Token"] = decodeURIComponent(csrf);
-  }
+  if (metodo !== "GET") headerCsrf(headers);
   const r = await fetch(`/api${caminho}`, {
     method: metodo,
     headers,
     credentials: "same-origin",
     body: corpo === undefined ? undefined : JSON.stringify(corpo),
   });
+  return lerResposta<T>(r);
+}
+
+/** Envia um arquivo puro no corpo (contrato §16.4: sem multipart; metadados na query). */
+async function enviarArquivo<T>(caminho: string, arquivo: Blob): Promise<T> {
+  const headers: Record<string, string> = { Accept: "application/json", "Content-Type": arquivo.type || "application/octet-stream" };
+  headerCsrf(headers);
+  const r = await fetch(`/api${caminho}`, { method: "POST", headers, credentials: "same-origin", body: arquivo });
+  return lerResposta<T>(r);
+}
+
+async function lerResposta<T>(r: Response): Promise<T> {
   if (r.status === 204) return undefined as T;
   const dados = await r.json().catch(() => undefined);
   if (!r.ok) {
@@ -66,6 +80,7 @@ export const api = {
   patch: <T,>(c: string, b: unknown) => requisitar<T>("PATCH", c, b),
   put: <T,>(c: string, b: unknown) => requisitar<T>("PUT", c, b),
   delete: <T,>(c: string) => requisitar<T>("DELETE", c),
+  arquivo: <T,>(c: string, a: Blob) => enviarArquivo<T>(c, a),
 };
 
 /** Resposta do padrão prévia/validação (contrato §1.5). O 409 da gravação traz o mesmo corpo. */

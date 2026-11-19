@@ -1,17 +1,41 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, data, kg, num, validacaoDoErro, type Validacao } from "../api/cliente";
+import { api, data, kg, num, qs, validacaoDoErro, type Validacao } from "../api/cliente";
 import { useSessao } from "../api/sessao";
+import { enviarPendentes, type AnexoPendente } from "../api/anexos";
+import { AnexosPendentes } from "../components/Anexos";
 import PainelValidacao, { confirmacoesValidas, podeGravar, type Confirmacoes } from "../components/PainelValidacao";
 
 interface EntradaItem { lote_id?: number; liga: string; formato: string; espessura: number | null; largura: number | null; diametro: number | null;
-  descricao_nf: string | null; pecas: number | null; peso_kg: number; comprimento: string | null; custo_kg: number | null }
-interface Entrada { id: number; numero: string; fornecedor: string; data: string; conteiner: string; itens?: EntradaItem[] }
+  descricao_nf: string | null; pecas: number | null; peso_kg: number; comprimento: string | null; custo_kg: number | null;
+  /** contrato §16.4 (v3.15): campos novos, opcionais */
+  ncm?: string | null; peso_bruto_kg?: number | null; observacao?: string | null;
+  /** código do lote criado e material ("H13 50X610"), para o link "Ver lote" */
+  lote?: string; material?: string }
+interface Entrada { id: number; numero: string; fornecedor: string; data: string; conteiner: string; itens?: EntradaItem[];
+  /** contrato §16.4 (v3.15): campos novos, opcionais */
+  serie?: string | null; data_emissao?: string | null; cnpj?: string | null; chave_nfe?: string | null; packing_list?: string | null;
+  di_duimp?: string | null; observacao?: string | null }
 interface Liga { codigo: string; ativo: boolean }
-interface Linha { liga: string; formato: "RETANGULAR" | "REDONDO"; espessura: string; largura: string; diametro: string; descricao: string; pecas: string; peso: string; comprimento: string; custo: string }
+interface Fornecedor { fornecedor: string; cnpj: string | null }
+interface Linha { liga: string; formato: "RETANGULAR" | "REDONDO"; espessura: string; largura: string; diametro: string; descricao: string; pecas: string;
+  peso: string; comprimento: string; custo: string; ncm: string; pesoBruto: string; obs: string;
+  /** NCM preenchido pela última entrada do mesmo material ([SUGERIDO]); `ncmChave` = material já consultado */
+  ncmSugerido: boolean; ncmChave: string }
 
-const linhaVazia = (): Linha => ({ liga: "", formato: "RETANGULAR", espessura: "", largura: "", diametro: "", descricao: "", pecas: "", peso: "", comprimento: "", custo: "" });
+const linhaVazia = (): Linha => ({ liga: "", formato: "RETANGULAR", espessura: "", largura: "", diametro: "", descricao: "", pecas: "", peso: "",
+  comprimento: "", custo: "", ncm: "", pesoBruto: "", obs: "", ncmSugerido: false, ncmChave: "" });
 const hojeIso = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+const cabVazio = () => ({ numero: "", serie: "", data_emissao: "", data: hojeIso(), fornecedor: "", cnpj: "", chave_nfe: "", conteiner: "",
+  packing_list: "", di_duimp: "", observacao: "" });
+const texto = (s: string) => s.trim() || null;
+
+/** Material da linha para a sugestão de NCM (vazio enquanto a bitola não estiver completa). */
+function chaveMaterial(l: Linha): string {
+  if (!l.liga) return "";
+  if (l.formato === "REDONDO") return num(l.diametro) ? `${l.liga}|REDONDO|${num(l.diametro)}` : "";
+  return num(l.espessura) && num(l.largura) ? `${l.liga}|RETANGULAR|${num(l.espessura)}|${num(l.largura)}` : "";
+}
 
 /** T06 Entrada por NF (Barra Mansa): cada linha vira um lote RJ no Rio. Depois de salvar, só se corrige por estorno. */
 export default function EntradasNf() {
@@ -19,13 +43,13 @@ export default function EntradasNf() {
   const lanca = usuario?.perfil === "OPERACAO_RJ" || usuario?.perfil === "ADMIN";
   const [lista, setLista] = useState<Entrada[] | null>(null);
   const [nova, setNova] = useState(false);
-  const [gravada, setGravada] = useState<Entrada | null>(null);
+  const [gravada, setGravada] = useState<{ e: Entrada; falhas: string[] } | null>(null);
   const [erro, setErro] = useState("");
 
   const carregar = () => api.get<Entrada[]>("/entradas-nf").then(setLista).catch((e: Error) => setErro(e.message));
   useEffect(() => { void carregar(); }, []);
 
-  if (nova) return <NovaEntrada aoSair={(g) => { setNova(false); if (g) { setGravada(g); void carregar(); } }} />;
+  if (nova) return <NovaEntrada aoSair={(g, falhas) => { setNova(false); if (g) { setGravada({ e: g, falhas }); void carregar(); } }} />;
 
   return (
     <>
@@ -39,18 +63,25 @@ export default function EntradasNf() {
       {erro && <p className="erro" role="alert">{erro}</p>}
       {gravada && (
         <div className="validacao ok" role="status">
-          <span>NF {gravada.numero} lançada: {gravada.itens?.length ?? 0} lote(s) criado(s) no contêiner {gravada.conteiner}.</span>
-          {gravada.itens?.map((i) => i.lote_id && <span key={i.lote_id}><Link to={`/estoque/${i.lote_id}`}>Ver lote {i.liga} {i.espessura ? `${i.espessura}×${i.largura}` : `Ø${i.diametro}`}</Link></span>)}
+          <span>NF {gravada.e.numero} lançada: {gravada.e.itens?.length ?? 0} lote(s) criado(s) no contêiner {gravada.e.conteiner}.</span>
+          {gravada.e.itens?.map((i) => i.lote_id && <span key={i.lote_id}><Link to={`/estoque/${i.lote_id}`}>Ver lote {i.lote ?? i.lote_id}{i.material ? ` · ${i.material}` : ""}</Link></span>)}
+        </div>
+      )}
+      {gravada && gravada.falhas.length > 0 && (
+        <div className="validacao alerta" role="alert">
+          <span>A entrada foi salva, mas {gravada.falhas.length === 1 ? "um documento não foi anexado" : `${gravada.falhas.length} documentos não foram anexados`}. Anexe de novo no detalhe do lote, em "Entrada e documentos".</span>
+          {gravada.falhas.map((f) => <span key={f}>{f}</span>)}
         </div>
       )}
       {lista && !lista.length ? <div className="estado-vazio"><strong>Nenhuma entrada lançada no sistema ainda</strong>As entradas antigas vieram pela carga da ESTOQUE 2026.</div> : (
         <div className="tabela-rolagem">
           <table className="tabela">
-            <thead><tr><th>NF</th><th>Data</th><th>Fornecedor</th><th>Contêiner</th><th className="num">Itens</th><th className="num">Peso</th></tr></thead>
+            <thead><tr><th>NF</th><th>Emissão</th><th>Entrada</th><th>Fornecedor</th><th>Contêiner</th><th className="num">Itens</th><th className="num">Peso</th></tr></thead>
             <tbody>
               {lista?.map((e) => (
                 <tr key={e.id}>
-                  <td><strong>{e.numero}</strong></td><td>{data(e.data)}</td><td>{e.fornecedor}</td><td>{e.conteiner}</td>
+                  <td><strong>{e.numero}</strong>{e.serie && <span className="desc"> série {e.serie}</span>}</td>
+                  <td>{data(e.data_emissao)}</td><td>{data(e.data)}</td><td>{e.fornecedor}</td><td>{e.conteiner}</td>
                   <td className="num">{e.itens?.length ?? "—"}</td>
                   <td className="num">{e.itens ? `${kg(e.itens.reduce((a, i) => a + i.peso_kg, 0))} kg` : "—"}</td>
                 </tr>
@@ -63,10 +94,12 @@ export default function EntradasNf() {
   );
 }
 
-function NovaEntrada({ aoSair }: { aoSair: (gravada: Entrada | null) => void }) {
-  const [cab, setCab] = useState({ numero: "", data: hojeIso(), fornecedor: "", conteiner: "" });
+function NovaEntrada({ aoSair }: { aoSair: (gravada: Entrada | null, falhas: string[]) => void }) {
+  const [cab, setCab] = useState(cabVazio);
   const [linhas, setLinhas] = useState<Linha[]>([linhaVazia()]);
+  const [pendentes, setPendentes] = useState<AnexoPendente[]>([]);
   const [ligas, setLigas] = useState<string[]>([]);
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [conts, setConts] = useState<{ id: number; codigo: string }[]>([]);
   const [v, setV] = useState<Validacao<{ frase?: string }> | null>(null);
   const [conf, setConf] = useState<Confirmacoes>({});
@@ -76,6 +109,8 @@ function NovaEntrada({ aoSair }: { aoSair: (gravada: Entrada | null) => void }) 
   useEffect(() => {
     api.get<Liga[]>("/ligas").then((l) => setLigas(l.filter((x) => x.ativo).map((x) => x.codigo)))
       .catch((e: Error) => setErro(`Não foi possível carregar as ligas (${e.message}). Recarregue a página.`));
+    // só a lista de sugestões do campo: se falhar, o fornecedor continua aceitando digitação livre
+    api.get<Fornecedor[]>("/entradas-nf/fornecedores").then(setFornecedores).catch(() => setFornecedores([]));
   }, []);
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -86,16 +121,41 @@ function NovaEntrada({ aoSair }: { aoSair: (gravada: Entrada | null) => void }) 
     return () => window.clearTimeout(t);
   }, [cab.conteiner]);
 
+  // NCM [SUGERIDO]: o da última entrada do mesmo material, quando a linha tem liga + bitola e o NCM está vazio
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      linhas.forEach((l, i) => {
+        const chave = chaveMaterial(l);
+        if (!chave || l.ncm.trim() || chave === l.ncmChave) return;
+        setLinhas((ls) => ls.map((x, k) => (k === i ? { ...x, ncmChave: chave } : x)));
+        const q = l.formato === "REDONDO" ? { liga: l.liga, formato: l.formato, diametro: num(l.diametro) }
+          : { liga: l.liga, formato: l.formato, espessura: num(l.espessura), largura: num(l.largura) };
+        api.get<{ ncm: string | null }>(`/entradas-nf/ultimo-ncm${qs(q)}`).then((r) => {
+          if (!r.ncm) return;
+          setLinhas((ls) => ls.map((x, k) => (k === i && !x.ncm.trim() && chaveMaterial(x) === chave ? { ...x, ncm: r.ncm as string, ncmSugerido: true } : x)));
+          setV(null);
+        }).catch(() => undefined);   // sem sugestão, o campo continua livre
+      });
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [linhas]);
+
   const mudarCab = (p: Partial<typeof cab>) => { setCab({ ...cab, ...p }); setV(null); };
+  const mudarFornecedor = (nome: string) => {
+    const f = fornecedores.find((x) => x.fornecedor.toUpperCase() === nome.trim().toUpperCase());
+    mudarCab({ fornecedor: nome, ...(f?.cnpj && !cab.cnpj.trim() ? { cnpj: f.cnpj } : {}) });
+  };
   const mudar = (i: number, p: Partial<Linha>) => { setLinhas(linhas.map((l, k) => (k === i ? { ...l, ...p } : l))); setV(null); };
   const corpo = (c: Confirmacoes) => ({
-    numero: cab.numero.trim(), data: cab.data, fornecedor: cab.fornecedor.trim(), conteiner: cab.conteiner.trim().toUpperCase(),
+    numero: cab.numero.trim(), serie: texto(cab.serie), data_emissao: cab.data_emissao, data: cab.data, fornecedor: cab.fornecedor.trim(),
+    cnpj: texto(cab.cnpj), chave_nfe: texto(cab.chave_nfe), conteiner: cab.conteiner.trim().toUpperCase(), packing_list: texto(cab.packing_list),
+    di_duimp: texto(cab.di_duimp), observacao: texto(cab.observacao),
     itens: linhas.map((l) => ({ liga: l.liga, formato: l.formato, espessura: num(l.espessura) ?? null, largura: num(l.largura) ?? null,
-      diametro: num(l.diametro) ?? null, descricao_nf: l.descricao.trim() || null, pecas: num(l.pecas) ?? null, peso_kg: num(l.peso) ?? 0,
-      comprimento: l.comprimento.trim() || null, custo_kg: num(l.custo) ?? null })),
+      diametro: num(l.diametro) ?? null, descricao_nf: texto(l.descricao), ncm: texto(l.ncm), pecas: num(l.pecas) ?? null, peso_kg: num(l.peso) ?? 0,
+      peso_bruto_kg: num(l.pesoBruto) ?? null, comprimento: texto(l.comprimento), custo_kg: num(l.custo) ?? null, observacao: texto(l.obs) })),
     confirmacoes: c,
   });
-  const completo = cab.numero.trim() && cab.fornecedor.trim().length >= 2 && cab.conteiner.trim().length >= 2 &&
+  const completo = cab.numero.trim() && cab.data_emissao && cab.fornecedor.trim().length >= 2 && cab.conteiner.trim().length >= 2 &&
     linhas.every((l) => l.liga && (num(l.peso) ?? 0) > 0 && (l.formato === "REDONDO" ? num(l.diametro) : num(l.espessura) && num(l.largura)));
   const total = linhas.reduce((a, l) => a + (num(l.peso) ?? 0), 0);
 
@@ -110,27 +170,48 @@ function NovaEntrada({ aoSair }: { aoSair: (gravada: Entrada | null) => void }) 
     if (!v) return;
     setErro("");
     setOcupado(true);
-    try { aoSair(await api.post<Entrada>("/entradas-nf", corpo(confirmacoesValidas(v.ocorrencias, conf)))); }
+    let g: Entrada;
+    try { g = await api.post<Entrada>("/entradas-nf", corpo(confirmacoesValidas(v.ocorrencias, conf))); }
     catch (e) {
       const x = validacaoDoErro<{ frase?: string }>(e);
       if (x) setV(x); else setErro(e instanceof Error ? e.message : "Não foi possível salvar.");
-    } finally { setOcupado(false); }
+      setOcupado(false);
+      return;
+    }
+    // a entrada já está salva: se um documento falhar, avisa e deixa anexar depois no T05
+    const falhas = pendentes.length ? await enviarPendentes(`/entradas-nf/${g.id}/anexos`, pendentes) : [];
+    setOcupado(false);
+    aoSair(g, falhas);
   }
 
   return (
     <>
-      <p><button className="link" onClick={() => aoSair(null)}>← Entradas por NF</button></p>
+      <p><button className="link" onClick={() => aoSair(null, [])}>← Entradas por NF</button></p>
       <header className="cabecalho"><h1>Nova entrada por NF</h1></header>
 
       <section className="painel-form">
         <div className="grade-form">
           <label>Nº da NF<input autoFocus value={cab.numero} onChange={(e) => mudarCab({ numero: e.target.value })} /></label>
-          <label>Data<input type="date" value={cab.data} max={hojeIso()} onChange={(e) => mudarCab({ data: e.target.value })} /></label>
-          <label>Fornecedor<input value={cab.fornecedor} onChange={(e) => mudarCab({ fornecedor: e.target.value })} placeholder="EASON" /></label>
+          <label>Série (opcional)<input value={cab.serie} onChange={(e) => mudarCab({ serie: e.target.value })} placeholder="1" /></label>
+          <label>Data de emissão da NF<input type="date" value={cab.data_emissao} max={hojeIso()} onChange={(e) => mudarCab({ data_emissao: e.target.value })} /></label>
+          <label>Data de entrada (chegada no RJ)<input type="date" value={cab.data} max={hojeIso()} onChange={(e) => mudarCab({ data: e.target.value })} /></label>
+          <label>Emitente / fornecedor<input list="fornecedores-nf" value={cab.fornecedor} onChange={(e) => mudarFornecedor(e.target.value)} placeholder="EASON" />
+            <datalist id="fornecedores-nf">{fornecedores.map((f) => <option key={f.fornecedor} value={f.fornecedor} />)}</datalist></label>
           <label>Contêiner<input list="conteineres-nf" value={cab.conteiner} onChange={(e) => mudarCab({ conteiner: e.target.value.toUpperCase() })} placeholder="CH50XY" />
             <datalist id="conteineres-nf">{conts.map((c) => <option key={c.id} value={c.codigo} />)}</datalist>
             <small className="dica">Se não existir, o contêiner é criado.</small></label>
         </div>
+        <details className="avancado" style={{ marginTop: "var(--esp-4)" }}>
+          <summary>Mais dados da NF (CNPJ, chave, packing list, DI, observação)</summary>
+          <div className="grade-form">
+            <label>CNPJ do emitente (opcional)<input inputMode="numeric" value={cab.cnpj} onChange={(e) => mudarCab({ cnpj: e.target.value })} placeholder="00.000.000/0000-00" /></label>
+            <label>Chave de acesso da NF-e (opcional)<input inputMode="numeric" value={cab.chave_nfe} onChange={(e) => mudarCab({ chave_nfe: e.target.value })} placeholder="44 dígitos" /></label>
+            <label>Nº do packing list (opcional)<input value={cab.packing_list} onChange={(e) => mudarCab({ packing_list: e.target.value })} /></label>
+            <label>Nº da DI/DUIMP (opcional)<input value={cab.di_duimp} onChange={(e) => mudarCab({ di_duimp: e.target.value })} /></label>
+          </div>
+          <label style={{ marginTop: "var(--esp-4)" }}>Observação da entrada (opcional)<textarea rows={2} value={cab.observacao} onChange={(e) => mudarCab({ observacao: e.target.value })} />
+            <small className="dica">Aparece no detalhe de cada lote desta entrada.</small></label>
+        </details>
       </section>
 
       {linhas.map((l, i) => (
@@ -147,6 +228,8 @@ function NovaEntrada({ aoSair }: { aoSair: (gravada: Entrada | null) => void }) 
               </select>
             </label>
             <label>Descrição como na NF<input value={l.descricao} onChange={(e) => mudar(i, { descricao: e.target.value })} placeholder="H13 50x610x2800-6000" /></label>
+            <label><span className="rotulo">NCM (opcional) {l.ncmSugerido && <span className="sugerido">da última entrada</span>}</span>
+              <input inputMode="numeric" value={l.ncm} onChange={(e) => mudar(i, { ncm: e.target.value, ncmSugerido: false })} placeholder="7228.30.00" /></label>
           </div>
           <fieldset className="formatos">
             <legend>Formato</legend>
@@ -164,15 +247,23 @@ function NovaEntrada({ aoSair }: { aoSair: (gravada: Entrada | null) => void }) 
               </>
             ) : <label>Diâmetro (mm)<input inputMode="decimal" value={l.diametro} onChange={(e) => mudar(i, { diametro: e.target.value })} /></label>}
             <label>Barras / chapas<input inputMode="numeric" value={l.pecas} onChange={(e) => mudar(i, { pecas: e.target.value })} /></label>
-            <label>Peso (kg)<input inputMode="decimal" className="campo-grande" value={l.peso} onChange={(e) => mudar(i, { peso: e.target.value })} /></label>
+            <label>Peso líquido (kg)<input inputMode="decimal" className="campo-grande" value={l.peso} onChange={(e) => mudar(i, { peso: e.target.value })} /></label>
+            <label>Peso bruto (kg, opcional)<input inputMode="decimal" value={l.pesoBruto} onChange={(e) => mudar(i, { pesoBruto: e.target.value })} /></label>
             <label>Comprimento (opcional)<input value={l.comprimento} onChange={(e) => mudar(i, { comprimento: e.target.value })} placeholder="2800-6000" /></label>
-            <label>R$/kg (opcional)<input inputMode="decimal" value={l.custo} onChange={(e) => mudar(i, { custo: e.target.value })} /></label>
+            <label>R$/kg (precificador, opcional)<input inputMode="decimal" value={l.custo} onChange={(e) => mudar(i, { custo: e.target.value })} /></label>
           </div>
+          <label style={{ marginTop: "var(--esp-4)" }}>Observação do item (opcional)<input value={l.obs} onChange={(e) => mudar(i, { obs: e.target.value })} /></label>
         </section>
       ))}
       <div className="botoes" style={{ marginTop: "var(--esp-3)" }}>
         <button className="secundario" onClick={() => { setLinhas([...linhas, { ...linhaVazia(), liga: linhas[linhas.length - 1].liga }]); setV(null); }}>Adicionar item</button>
       </div>
+
+      <section className="painel-form" style={{ marginTop: "var(--esp-3)" }} aria-label="Documentos anexos">
+        <h2>Documentos anexos</h2>
+        <p className="desc">NF e packing list escaneados (ou foto) e o precificador do contêiner. Vão junto ao salvar e aparecem em todos os lotes desta entrada. Também dá para anexar depois, no detalhe do lote.</p>
+        <AnexosPendentes pendentes={pendentes} aoMudar={setPendentes} ocupado={ocupado} />
+      </section>
 
       {v && (
         <div className="bloco-passo" style={{ marginTop: "var(--esp-4)" }}>
@@ -183,8 +274,8 @@ function NovaEntrada({ aoSair }: { aoSair: (gravada: Entrada | null) => void }) 
       {erro && <p className="erro" role="alert">{erro}</p>}
 
       <div className="rodape-acao">
-        <span className="resultado-frase">{linhas.length} item(ns) · {kg(total)} kg</span>
-        <button className="secundario" onClick={() => aoSair(null)}>Cancelar</button>
+        <span className="resultado-frase">{linhas.length} item(ns) · {kg(total)} kg{pendentes.length ? ` · ${pendentes.length} documento(s)` : ""}</span>
+        <button className="secundario" onClick={() => aoSair(null, [])}>Cancelar</button>
         {!v ? <button className="primario" disabled={!completo || ocupado} onClick={() => void conferir()}>{ocupado ? "Conferindo…" : "Conferir entrada"}</button>
           : <button className="primario" disabled={ocupado || !podeGravar(v.ocorrencias, conf)} onClick={() => void salvar()}>{ocupado ? "Salvando…" : "Salvar entrada"}</button>}
       </div>

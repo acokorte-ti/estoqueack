@@ -94,20 +94,34 @@ class ItemNf(BaseModel):
     peso_kg: float = Field(gt=0)
     comprimento: str | None = Field(None, max_length=40)
     custo_kg: float | None = Field(None, ge=0)
+    # spec v3.15 (contrato §16.4)
+    ncm: str | None = Field(None, max_length=15)
+    peso_bruto_kg: float | None = Field(None, ge=0, le=1_000_000)
+    observacao: str | None = Field(None, max_length=500)
 
 
 class EntradaCorpo(BaseModel):
     numero: str = Field(min_length=1, max_length=20)
-    data: date
+    data: date                                     # data de entrada (chegada no RJ)
     fornecedor: str = Field(min_length=2, max_length=120)
     conteiner: str = Field(min_length=2, max_length=30)
     itens: list[ItemNf] = Field(min_length=1, max_length=100)
     confirmacoes: dict[str, str] = Field(default_factory=dict)
+    # spec v3.15 (contrato §16.4): emissão obrigatória, o resto opcional [proposta, P42]
+    data_emissao: date
+    serie: str | None = Field(None, max_length=5)
+    cnpj: str | None = Field(None, max_length=20)
+    chave_nfe: str | None = Field(None, max_length=60)
+    packing_list: str | None = Field(None, max_length=60)
+    di_duimp: str | None = Field(None, max_length=30)
+    observacao: str | None = Field(None, max_length=500)
 
 
 def _en(c: EntradaCorpo) -> operacoes.EntradaNfDados:
-    return operacoes.EntradaNfDados(c.numero, c.data, c.fornecedor, c.conteiner,
-                                    [operacoes.ItemNf(**i.model_dump()) for i in c.itens], c.confirmacoes)
+    return operacoes.EntradaNfDados(
+        c.numero, c.data, c.fornecedor, c.conteiner, [operacoes.ItemNf(**i.model_dump()) for i in c.itens],
+        c.confirmacoes, data_emissao=c.data_emissao, serie=c.serie, cnpj=c.cnpj, chave_nfe=c.chave_nfe,
+        packing_list=c.packing_list, di_duimp=c.di_duimp, observacao=c.observacao)
 
 
 @router.get("/conteineres")
@@ -122,8 +136,25 @@ def conteineres(busca: str | None = Query(None, max_length=30), db: Session = De
 
 @router.get("/entradas-nf")
 def listar_entradas(db: Session = Depends(get_db), _: Usuario = Depends(deps.usuario_liberado)) -> list[dict]:
-    return [operacoes.entrada_dict(db, n) for n in db.scalars(select(EntradaNf).order_by(EntradaNf.id.desc())
-                                                                   .limit(200))]
+    q = select(EntradaNf).where(EntradaNf.origem == "T06").order_by(EntradaNf.id.desc()).limit(200)
+    return [operacoes.entrada_dict(db, n) for n in db.scalars(q)]
+
+
+@router.get("/entradas-nf/fornecedores")
+def fornecedores(db: Session = Depends(get_db), _: Usuario = Depends(deps.usuario_liberado)) -> list[dict]:
+    return operacoes.fornecedores(db)
+
+
+@router.get("/entradas-nf/ultimo-ncm")
+def ultimo_ncm(liga: str = Query(min_length=1, max_length=30), formato: Literal["RETANGULAR", "REDONDO"] = "RETANGULAR",
+               espessura: float | None = Query(None, gt=0), largura: float | None = Query(None, gt=0),
+               diametro: float | None = Query(None, gt=0), comprimento: str | None = Query(None, max_length=40),
+               db: Session = Depends(get_db), _: Usuario = Depends(deps.usuario_liberado)) -> dict:
+    if not (diametro if formato == "REDONDO" else espessura and largura):
+        return {"ncm": None}
+    i = operacoes.ItemNf(liga=liga, formato=formato, peso_kg=0, espessura=espessura, largura=largura,
+                         diametro=diametro, comprimento=comprimento)
+    return {"ncm": operacoes.ultimo_ncm(db, i)}
 
 
 @router.post("/entradas-nf/validar")

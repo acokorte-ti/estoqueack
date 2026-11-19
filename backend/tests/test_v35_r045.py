@@ -312,7 +312,8 @@ def test_r053_entrada_nf_com_comprimento_em_linha_separada(amb):
         if compr:
             it["comprimento"] = compr
         r = client.post("/api/entradas-nf", headers=h, json={
-            "numero": numero, "data": date.today().isoformat(), "fornecedor": "FORNECEDOR TESTE",
+            "numero": numero, "data": date.today().isoformat(), "data_emissao": date.today().isoformat(),
+            "fornecedor": "FORNECEDOR TESTE",
             "conteiner": "CT91TS", "itens": [it]})
         assert r.status_code == 201, r.text
         return client.get(f"/api/lotes/{r.json()['itens'][0]['lote_id']}", headers=h).json()

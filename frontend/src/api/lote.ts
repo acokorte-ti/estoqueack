@@ -1,14 +1,46 @@
 /** Tipos do lote (contrato v1 §3 e §4, F1 §9). */
+import type { Anexo } from "./anexos";
 
 export interface Lote {
   id: number; codigo: string; conteiner: string | null; liga: string; formato: string; bitola: string; descricao: string | null;
   codigo_mega: number | null; estoque: "ESTOQUE_MEGA" | "RJ_NO_RIO" | "RJ_EM_ITU"; tipo: "ORIGINAL" | "SOBRA" | "RETO";
   saldo_kg: number; reservado_kg: number; disponivel_kg: number;
   origem: { lote: string; conteiner: string | null; bitola: string } | null;
-  indicadores: { destinacao: boolean; nota: boolean; origem_nao_identificada: boolean };
+  indicadores: { destinacao: boolean; nota: boolean; origem_nao_identificada: boolean;
+    /** contrato §16.4: o lote, a entrada, o contêiner ou a origem têm documento anexo (opcional) */
+    anexo?: boolean };
   /** spec v3.7 §1.4 / P28: identidade liga × bitola (× comprimento × múltiplo). Campo novo, opcional. */
   chave_material?: string | null;
+  /** contrato §16.4: R$/kg que vale para o lote (da entrada, do lote ou da origem). Opcional. */
+  custo_kg?: number | null;
 }
+
+/** T05 "Entrada e documentos" (contrato §16.4, `GET /api/lotes/{id}/entrada`). */
+export interface EntradaLote {
+  lote_id: number;
+  da_origem: string | null;
+  origem: "T06" | "T15" | "T05" | "CARGA" | null;
+  entrada: {
+    id: number; numero: string | null; serie: string | null; data_emissao: string | null; data_entrada: string | null;
+    fornecedor: string | null; cnpj: string | null; chave_nfe: string | null; conteiner: string | null;
+    packing_list: string | null; di_duimp: string | null; observacao: string | null;
+  } | null;
+  item: {
+    descricao_nf: string | null; ncm: string | null; pecas: number | null; peso_kg: number | null; peso_bruto_kg: number | null;
+    comprimento: string | null; custo_kg: number | null; observacao: string | null;
+  } | null;
+  carga: { documento: string | null; data_entrada: string | null; custo_kg: number | null; pecas: number | null; peso_kg: number | null;
+    arquivo: string | null; aba: string | null; linha: number | null } | null;
+  custo_kg: number | null;
+  pode_completar: boolean;
+  anexos: Anexo[];
+  /** só na resposta do PATCH "Completar dados da entrada" */
+  avisos?: string[];
+}
+
+export const ORIGEM_ENTRADA: Record<string, string> = {
+  T06: "Entrada por NF no RJ", T15: "Entrada do Mega classificada", T05: "Dados completados no detalhe do lote", CARGA: "Carga das planilhas",
+};
 
 export interface LoteDetalhe extends Lote {
   peso_inicial_kg: number | null; pecas_iniciais: number | null; documento_entrada: string | null; data_entrada: string | null;

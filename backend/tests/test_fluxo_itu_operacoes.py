@@ -130,7 +130,8 @@ def test_peca_inteira_corte_itu_conclui_e_sobra_vira_b2(amb):
 def test_entrada_nf_cria_lotes_e_bloqueia_duplicada(amb):
     client, u, ids, _ = amb
     h = entrar(client, u["rj"])
-    corpo = {"numero": "12345", "data": date.today().isoformat(), "fornecedor": "EASON", "conteiner": "ch50xy",
+    corpo = {"numero": "12345", "data": date.today().isoformat(), "data_emissao": date.today().isoformat(),
+             "fornecedor": "EASON", "conteiner": "ch50xy",
              "itens": [{"liga": "H13", "formato": "RETANGULAR", "espessura": 50, "largura": 610, "pecas": 4,
                         "peso_kg": 9000, "comprimento": "2800-6000"},
                        {"liga": "H13", "formato": "RETANGULAR", "espessura": 33, "largura": 105, "pecas": 10,

@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Index, Integer, LargeBinary, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -289,16 +289,33 @@ class CadastroSa(Base):
     cop_item: Mapped[CopItem | None] = relationship()
 
 
+ORIGENS_ENTRADA = ("T06", "T15", "T05")
+
+
 class EntradaNf(Base):
-    """T06: NF de entrada no RJ. Cada item vira um lote RJ/RJ."""
+    """Dados da entrada do lote (spec v3.15 T05, T06, T15; migração 0012).
+
+    T06: NF de entrada no RJ, cada item vira um lote RJ/RJ. T15: dados da entrada do lote criado a partir do Mega.
+    T05: dados completados depois num lote que não tinha entrada (carga, T15 antigo). `data` = data de entrada.
+    NF duplicada (número + fornecedor + série) é conferida pelo serviço, não por chave única.
+    """
     __tablename__ = "entrada_nf"
-    __table_args__ = (UniqueConstraint("numero", "fornecedor", name="uq_entrada_nf"),)
+    __table_args__ = (Index("ix_entrada_nf_numero_fornecedor", "numero", "fornecedor"),
+                      CheckConstraint(_in("origem", ORIGENS_ENTRADA), name="ck_entrada_nf_origem"))
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    numero: Mapped[str] = mapped_column(String(20))
-    fornecedor: Mapped[str] = mapped_column(String(120))
+    origem: Mapped[str] = mapped_column(String(3), default="T06", server_default="T06")
+    numero: Mapped[str | None] = mapped_column(String(20))
+    serie: Mapped[str | None] = mapped_column(String(5))
+    fornecedor: Mapped[str | None] = mapped_column(String(120))
+    cnpj: Mapped[str | None] = mapped_column(String(14))
     data: Mapped[date] = mapped_column(Date)
-    conteiner_id: Mapped[int] = mapped_column(ForeignKey("conteiner.id"), index=True)
+    data_emissao: Mapped[date | None] = mapped_column(Date)
+    chave_nfe: Mapped[str | None] = mapped_column(String(60))
+    packing_list: Mapped[str | None] = mapped_column(String(60))
+    di_duimp: Mapped[str | None] = mapped_column(String(30))
+    observacao: Mapped[str | None] = mapped_column(String(500))
+    conteiner_id: Mapped[int | None] = mapped_column(ForeignKey("conteiner.id"), index=True)
     usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
     criado_em: Mapped[datetime] = mapped_column(DataHora, default=agora)
 
@@ -312,9 +329,51 @@ class EntradaNfItem(Base):
     entrada_id: Mapped[int] = mapped_column(ForeignKey("entrada_nf.id"), index=True)
     lote_id: Mapped[int] = mapped_column(ForeignKey("lote.id"), unique=True)
     descricao_nf: Mapped[str | None] = mapped_column(String(200))
+    ncm: Mapped[str | None] = mapped_column(String(10))
     pecas: Mapped[int | None] = mapped_column(Integer)
     peso_kg: Mapped[float] = mapped_column(Kg)
+    peso_bruto_kg: Mapped[float | None] = mapped_column(Kg)
     comprimento: Mapped[str | None] = mapped_column(String(40))
     custo_kg: Mapped[float | None] = mapped_column(Kg)
+    observacao: Mapped[str | None] = mapped_column(String(500))
 
     entrada: Mapped[EntradaNf] = relationship(back_populates="itens")
+
+
+TIPOS_ANEXO = ("NF", "PACKING_LIST", "PRECIFICADOR", "OUTRO")
+
+
+class Anexo(Base):
+    """Documento anexo (spec v3.15 "Documentos anexos"): ligado a uma entrada (NF, packing list), a um contêiner
+    (precificador) ou a um lote (outro). Apagar só esconde (apagado_em + justificativa); o Admin restaura."""
+    __tablename__ = "anexo"
+    __table_args__ = (
+        CheckConstraint(_in("tipo", TIPOS_ANEXO), name="ck_anexo_tipo"),
+        CheckConstraint("(CASE WHEN entrada_id IS NULL THEN 0 ELSE 1 END) + (CASE WHEN conteiner_id IS NULL THEN 0 "
+                        "ELSE 1 END) + (CASE WHEN lote_id IS NULL THEN 0 ELSE 1 END) = 1", name="ck_anexo_um_alvo"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tipo: Mapped[str] = mapped_column(String(12))
+    descricao: Mapped[str | None] = mapped_column(String(120))
+    nome_arquivo: Mapped[str] = mapped_column(String(200))
+    content_type: Mapped[str] = mapped_column(String(100))
+    tamanho_bytes: Mapped[int] = mapped_column(Integer)
+    sha256: Mapped[str] = mapped_column(String(64))
+    entrada_id: Mapped[int | None] = mapped_column(ForeignKey("entrada_nf.id"), index=True)
+    conteiner_id: Mapped[int | None] = mapped_column(ForeignKey("conteiner.id"), index=True)
+    lote_id: Mapped[int | None] = mapped_column(ForeignKey("lote.id"), index=True)
+    usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    criado_em: Mapped[datetime] = mapped_column(DataHora, default=agora)
+    apagado_em: Mapped[datetime | None] = mapped_column(DataHora)
+    apagado_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    justificativa_apagar: Mapped[str | None] = mapped_column(String(500))
+
+
+class AnexoArquivo(Base):
+    """Conteúdo do anexo, em tabela separada para a lista não carregar os bytes. Fica no banco para o backup
+    (pg_dump) e a restauração levarem os anexos junto (Eduardo, 2026-11-17)."""
+    __tablename__ = "anexo_arquivo"
+
+    anexo_id: Mapped[int] = mapped_column(ForeignKey("anexo.id", ondelete="CASCADE"), primary_key=True)
+    conteudo: Mapped[bytes] = mapped_column(LargeBinary)

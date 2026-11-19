@@ -17,7 +17,7 @@ from app.services import movimentos as mov
 from app.domain import regras
 from app.domain.medidas import chave_multiplo
 from app.services.base import lote_visivel, so_rj_no_rio
-from app.services.solicitacoes import comprimento_do_item, ligas_equivalentes
+from app.services.solicitacoes import comprimento_do_item, ligas_equivalentes, ligas_variacao_mod, variacao_mod
 
 router = APIRouter(prefix="/lotes", tags=["estoque"])
 
@@ -104,15 +104,15 @@ def compativeis(liga: str, formato: Literal["RETANGULAR", "REDONDO"] = "RETANGUL
                 quantidade: int = Query(1, ge=1), estoque_: Estoque | None = Query(None, alias="estoque"),
                 peso_necessario_kg: float | None = Query(None, gt=0),
                 db: Session = Depends(get_db), u: Usuario = Depends(deps.usuario_liberado)) -> dict:
-    """T07 passo 2: mesma liga (ou equivalente, com selo), bitola que comporta a peça e saldo disponível.
-    Ordem: menor sobremetal, depois o lote mais antigo. `grupos` (spec v3.5): por liga × bitola exatas (e múltiplo),
-    com Itu e RJ no Rio lado a lado e "necessário × disponível"."""
+    """T07 passo 2: mesma liga, a variação MOD (A8 ↔ A8MOD, spec v3.20) e as equivalentes (com selo), bitola que
+    comporta a peça e saldo disponível. Ordem: menor sobremetal, depois o lote mais antigo. `grupos` (spec v3.5): por
+    liga × bitola exatas (e múltiplo), com Itu e RJ no Rio lado a lado e "necessário × disponível"."""
     from app.domain import corte as calc
     from app.models import Liga
     alvo = db.scalar(select(Liga).where(Liga.codigo == liga.strip().upper()))
     if alvo is None:
         return {"itens": [], "total": 0}
-    ligas = {alvo.id} | ligas_equivalentes(db, alvo.id)
+    ligas = {alvo.id} | ligas_equivalentes(db, alvo.id) | ligas_variacao_mod(db, alvo.id)
     f = _visivel({"estoque": estoque_, "com_saldo": True}, u)
     lotes = [l for l in estoque.consulta_lotes(db, f) if l.item.liga_id in ligas and l.status == "ATIVO"]
     res = mov.reservado(db, [l.id for l in lotes])
@@ -145,9 +145,11 @@ def compativeis(liga: str, formato: Literal["RETANGULAR", "REDONDO"] = "RETANGUL
         bitola = None if it.formato == "RETO" else calc.Dimensoes(it.formato, it.espessura, it.largura, it.diametro)
         c = calc.calcular(bitola=bitola, acabada=acabada, quantidade=quantidade, densidade=float(it.liga.densidade),
                           sobremetal_comprimento_mm=5, sobremetal_largura_mm=None)
-        # P28(1): equivalência sem MOD (1.2344 = H13, 1.2379 = D2, outras da T22) é a mesma liga: sem selo
-        saida.append({**base, "disponivel_kg": disponivel, "aviso_medida": aviso,
-                      "liga_equivalente": not estoque.mesma_liga(mapa, it.liga.codigo, alvo.codigo),
+        # P28(1): equivalência sem MOD (1.2344 = H13, 1.2379 = D2, outras da T22) é a mesma liga: sem selo.
+        # Variação MOD (spec v3.20): selo próprio, não é "liga equivalente"
+        mod = variacao_mod(alvo.codigo, it.liga.codigo)
+        saida.append({**base, "disponivel_kg": disponivel, "aviso_medida": aviso, "variacao_mod": mod,
+                      "liga_equivalente": not mod and not estoque.mesma_liga(mapa, it.liga.codigo, alvo.codigo),
                       "multiplo": chave_multiplo(it.descricao, it.comprimento_fixado),
                       "peso_previsto_kg": c.peso_previsto_kg, "peso_peca_kg": c.peso_peca_kg,
                       "sobremetal_pct": c.sobremetal_pct, "substituido_por_id": it.substituido_por_id,

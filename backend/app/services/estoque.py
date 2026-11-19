@@ -293,12 +293,14 @@ def sugestao_por_bitola(itens: list[dict], peso_necessario_kg: float | None = No
         g = grupos.setdefault(k, {
             "chave": k, "liga": k.split(" ", 1)[0], "formato": i["formato"], "bitola": i["bitola"],
             "multiplo": i.get("multiplo"), "liga_equivalente": i["liga_equivalente"],
+            "variacao_mod": bool(i.get("variacao_mod")),   # spec v3.20: A8MOD na busca do A8 (e o contrário)
             "peso_previsto_kg": i["peso_previsto_kg"],
             "sobremetal_pct": i["sobremetal_pct"], "criado_em": i["criado_em"],
             "estoques": {LADO_ITU: {"disponivel_kg": 0.0, "lotes": []}, LADO_RJ: {"disponivel_kg": 0.0, "lotes": []}}})
         lado = LADO_RJ if i["estoque"] == "RJ_NO_RIO" else LADO_ITU
         g["estoques"][lado]["lotes"].append({k2: i[k2] for k2 in ("id", "codigo", "estoque", "conteiner", "codigo_mega",
                                                                   "liga", "liga_equivalente", "descricao", "tipo",
+                                                                  "variacao_mod",
                                                                   "saldo_kg", "reservado_kg", "disponivel_kg",
                                                                   "indicadores")})
         g["liga_equivalente"] = g["liga_equivalente"] and i["liga_equivalente"]

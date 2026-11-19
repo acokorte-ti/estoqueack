@@ -24,17 +24,21 @@ interface LoteCompativel {
   estoque: string; tipo: string; saldo_kg: number; reservado_kg: number; disponivel_kg: number;
   peso_previsto_kg: number | null; peso_peca_kg: number | null; sobremetal_pct: number | null;
   liga_equivalente?: boolean; substituido_por_id?: number | null; codigo_mega?: number | null;
+  /** contrato F1 §1 (spec v3.20): lote da variação MOD da liga pedida (A8MOD na busca do A8, e o contrário) */
+  variacao_mod?: boolean;
   indicadores?: { destinacao?: boolean; nota?: boolean; origem_nao_identificada?: boolean };
 }
 /** Sugestão por liga × bitola (contrato F1 §1, spec v3.5–v3.9 T07, §1.4). Tudo opcional: a API antiga não manda `grupos`. */
 interface LoteGrupo {
   id: number; codigo: string; estoque: string; conteiner: string | null; codigo_mega?: number | null; tipo: string;
   saldo_kg: number; reservado_kg: number; disponivel_kg: number; liga?: string; liga_equivalente?: boolean; descricao?: string | null;
+  variacao_mod?: boolean;
   indicadores?: LoteCompativel["indicadores"];
 }
 interface EstoqueGrupo { disponivel_kg: number; lotes: LoteGrupo[] }
 interface Grupo {
   chave?: string; liga: string; formato: string; bitola: string; multiplo?: string | null; liga_equivalente?: boolean;
+  variacao_mod?: boolean;
   peso_previsto_kg?: number | null; sobremetal_pct?: number | null; peso_necessario_kg?: number | null;
   total_disponivel_kg: number; falta_kg?: number; sobra_kg?: number; so_um_estoque?: boolean; frase?: string;
   estoques: { ITU?: EstoqueGrupo; RJ_NO_RIO?: EstoqueGrupo };
@@ -216,7 +220,7 @@ export default function NovaSolicitacao() {
     return { id: gl.id, codigo: gl.codigo, conteiner: gl.conteiner, liga: gl.liga ?? g.liga, formato: g.formato, bitola: g.bitola,
       descricao: gl.descricao ?? "", estoque: gl.estoque, tipo: gl.tipo, saldo_kg: gl.saldo_kg, reservado_kg: gl.reservado_kg,
       disponivel_kg: gl.disponivel_kg, codigo_mega: gl.codigo_mega ?? null, peso_previsto_kg: g.peso_previsto_kg ?? null, peso_peca_kg: null, sobremetal_pct: g.sobremetal_pct ?? null,
-      liga_equivalente: gl.liga_equivalente, indicadores: gl.indicadores };
+      liga_equivalente: gl.liga_equivalente, variacao_mod: gl.variacao_mod, indicadores: gl.indicadores };
   }
 
   /** kg a usar que acompanha as peças: peças × previsto por peça, sem passar do disponível (lote inteiro). */
@@ -515,7 +519,7 @@ export default function NovaSolicitacao() {
           {grupos ? (
             <>
               <p className="dica">
-                Material de {liga} que comporta {medida.formato === "RETANGULAR" ? `${medida.espessura} × ${medida.largura}` : `Ø ${medida.diametro}`} × {medida.comprimento} mm,
+                Material de {liga} (e da variação MOD) que comporta {medida.formato === "RETANGULAR" ? `${medida.espessura} × ${medida.largura}` : `Ø ${medida.diametro}`} × {medida.comprimento} mm,
                 agrupado por liga × bitola exatas, com Itu e RJ lado a lado. Marque um ou mais lotes e diga quantos kg de cada.
                 Lotes do RJ formam o pedido ao RJ; o lote de Itu (um por vez) tem o corte lançado no passo seguinte.
               </p>
@@ -536,7 +540,7 @@ export default function NovaSolicitacao() {
           ) : (
           <>
           <p className="dica">
-            Lotes de {liga} (e ligas equivalentes) que comportam {medida.formato === "RETANGULAR" ? `${medida.espessura} × ${medida.largura}` : `Ø ${medida.diametro}`} × {medida.comprimento} mm,
+            Lotes de {liga} (com a variação MOD e as ligas equivalentes) que comportam {medida.formato === "RETANGULAR" ? `${medida.espessura} × ${medida.largura}` : `Ø ${medida.diametro}`} × {medida.comprimento} mm,
             do menor sobremetal para o maior. Para usar mais de um lote do RJ na mesma OP, marque os dois. Lote em Itu vai sozinho.
           </p>
           {!lotes.length ? (
@@ -557,6 +561,7 @@ export default function NovaSolicitacao() {
                           {l.liga} {l.bitola} · {l.conteiner ?? "sem contêiner"}
                           <span className={`estoque-tag ${l.estoque}`}>{ESTOQUE_NOME[l.estoque] ?? l.estoque}</span>
                           {l.liga_equivalente && <span className="etiqueta atencao">liga equivalente</span>}
+                          {l.variacao_mod && <span className="etiqueta info">variação de {liga}</span>}
                           {l.indicadores?.destinacao && <span className="etiqueta atencao">reserva/restrição</span>}
                           {l.substituido_por_id && <span className="etiqueta info">item substituído</span>}
                           {l.tipo !== "ORIGINAL" && <span className="etiqueta">{l.tipo}</span>}
@@ -893,6 +898,7 @@ function QuadroGrupo({ g, itens, aoMarcar, aoMudarKg, aoMudarPecas }: {
           {g.chave ?? `${g.liga} ${g.bitola}`}
           {g.multiplo && <> <span className="etiqueta info">múltiplo {g.multiplo}</span></>}
           {g.liga_equivalente && <> <span className="etiqueta atencao">liga equivalente</span></>}
+          {g.variacao_mod && <> <span className="etiqueta info">variação MOD</span></>}
         </h2>
         <span className="desc">
           {g.sobremetal_pct !== null && g.sobremetal_pct !== undefined && `sobremetal ${pct(g.sobremetal_pct)}`}

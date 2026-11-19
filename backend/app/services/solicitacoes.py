@@ -93,6 +93,25 @@ def ligas_equivalentes(db: Session, liga_id: int) -> set[int]:
     return {a if b == liga_id else b for a, b in pares}
 
 
+def sem_mod(codigo: str) -> str:
+    """Liga sem o "MOD" e sem espaços: A8MOD → A8, "CR8 MOD" → CR8 (a liga normal da variação)."""
+    return "".join(codigo.split()).upper().replace("MOD", "")
+
+
+def variacao_mod(a: str, b: str) -> bool:
+    """Uma liga é a variação MOD da outra (A8 × A8MOD, CR8 × CR8MOD), nos dois sentidos."""
+    return a != b and sem_mod(a) == sem_mod(b) and ("MOD" in a.upper() or "MOD" in b.upper())
+
+
+def ligas_variacao_mod(db: Session, liga_id: int) -> set[int]:
+    """Spec v3.20 T07 (Eduardo, 2026-11-19): a sugestão de lotes do A8 traz também o A8 MOD (e o do A8 MOD traz o
+    A8), porque é só uma variação. A distinção continua: cada liga na sua linha, com o selo da variação."""
+    alvo = db.get(Liga, liga_id)
+    if alvo is None:
+        return set()
+    return {l.id for l in db.scalars(select(Liga)) if variacao_mod(alvo.codigo, l.codigo)}
+
+
 def _validar_liga(db: Session, liga_pedida: str | None, lote: Lote) -> Resultado:
     r = Resultado()
     if not liga_pedida:
@@ -104,6 +123,11 @@ def _validar_liga(db: Session, liga_pedida: str | None, lote: Lote) -> Resultado
     # (mesma linha): sem "estou ciente"
     if mesma_liga(mapa_mesma_linha(db), alvo.codigo, lote.item.liga.codigo):
         return r
+    # spec v3.20 [proposta, pendências 19/11]: variação MOD só avisa (sem "estou ciente")
+    if variacao_mod(alvo.codigo, lote.item.liga.codigo):
+        return r.adicionar("LIGA_VARIACAO_MOD", Nivel.ALERTA,
+                           f"O lote é de {lote.item.liga.codigo}, variação de {alvo.codigo} (liga pedida). Confira "
+                           "se a OP aceita.", liga_lote=lote.item.liga.codigo, liga_pedida=alvo.codigo)
     if lote.item.liga_id in ligas_equivalentes(db, alvo.id):
         r.adicionar("LIGA_EQUIVALENTE", Nivel.CIENCIA,
                     f"O lote é de {lote.item.liga.codigo}, equivalente a {alvo.codigo}. Confirme que pode ser usado "
@@ -595,8 +619,8 @@ def validar_corte(db: Session, cfg: Config, sol: SolicitacaoCorte, e: CorteEntra
             if b is not None:
                 ri.juntar(regras.validar_bitola(b.espessura, b.largura, b.diametro, *acabada,
                                                 comprimento_do_item(lote.item), sol.acabada_comprimento))
-            if lote.item.liga_id != original.item.liga_id and \
-                    lote.item.liga_id not in ligas_equivalentes(db, original.item.liga_id):
+            if lote.item.liga_id != original.item.liga_id and lote.item.liga_id not in (
+                    ligas_equivalentes(db, original.item.liga_id) | ligas_variacao_mod(db, original.item.liga_id)):
                 ri.adicionar("LIGA_DIFERENTE", Nivel.ERRO,
                              f"O lote {lote.codigo} é de outra liga ({lote.item.liga.codigo}).")
             ri.adicionar("LOTE_TROCADO", Nivel.CIENCIA,

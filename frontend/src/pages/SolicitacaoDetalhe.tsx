@@ -253,7 +253,7 @@ function JanelaEnviar({ s, aoFechar, aoGravar }: { s: SolicDetalhe; aoFechar: ()
   );
 }
 
-interface LoteOpcao { id: number; codigo: string; liga: string; bitola: string; conteiner: string | null; estoque: string; disponivel_kg: number; sobremetal_pct: number | null; liga_equivalente?: boolean }
+interface LoteOpcao { id: number; codigo: string; liga: string; bitola: string; conteiner: string | null; estoque: string; disponivel_kg: number; sobremetal_pct: number | null; liga_equivalente?: boolean; variacao_mod?: boolean }
 
 /** Material insuficiente → escolher outro lote do RJ (R003). Volta para Enviada com nova reserva. */
 function JanelaTrocarLote({ s, aoFechar, aoGravar }: { s: SolicDetalhe; aoFechar: () => void; aoGravar: () => void }) {
@@ -307,7 +307,7 @@ function JanelaTrocarLote({ s, aoFechar, aoGravar }: { s: SolicDetalhe; aoFechar
             <li key={l.id}>
               <label className={lote === l.id ? "escolha-lote marcada" : "escolha-lote"}>
                 <input type="radio" name="novo-lote" checked={lote === l.id} onChange={() => void escolher(l.id)} />
-                <span><span className="titulo">{l.liga} {l.bitola} · {l.conteiner ?? "—"}{l.liga_equivalente && <span className="etiqueta atencao">liga equivalente</span>}</span>
+                <span><span className="titulo">{l.liga} {l.bitola} · {l.conteiner ?? "—"}{l.liga_equivalente && <span className="etiqueta atencao">liga equivalente</span>}{l.variacao_mod && <span className="etiqueta info">variação MOD</span>}</span>
                   <span className="linha2">{l.codigo} · sobremetal {pct(l.sobremetal_pct)}</span></span>
                 <span className="kg"><strong>{kg(l.disponivel_kg)} kg</strong><span className="desc">disponível</span></span>
               </label>

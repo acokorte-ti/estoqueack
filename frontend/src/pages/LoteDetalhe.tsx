@@ -282,7 +282,7 @@ function EntradaDoLote({ ent, aoMudar }: { ent: EntradaLote; aoMudar: () => void
         </>
       )}
       <dl className="dados" style={{ marginTop: "var(--esp-3)" }}>
-        <div><dt>R$/kg (precificador)</dt><dd>{ent.custo_kg !== null ? rsKg(ent.custo_kg) : <span className="desc">não informado</span>}</dd></div>
+        <div><dt>R$/kg (valor unitário)</dt><dd>{ent.custo_kg !== null ? rsKg(ent.custo_kg) : <span className="desc">não informado</span>}</dd></div>
       </dl>
 
       <h3>Documentos anexos</h3>
@@ -340,7 +340,7 @@ function JanelaCompletar({ lote, ent, aoFechar, aoGravar }: { lote: TLote; ent: 
           {campo("di_duimp", "Nº da DI/DUIMP")}
           {campo("ncm", "NCM", { inputMode: "numeric", placeholder: "7228.30.00" })}
           {campo("peso_bruto_kg", "Peso bruto (kg)", { inputMode: "decimal" })}
-          {campo("custo_kg", "R$/kg (precificador)", { inputMode: "decimal" })}
+          {campo("custo_kg", "R$/kg (valor unitário)", { inputMode: "decimal" })}
         </div>
         {campo("chave_nfe", "Chave de acesso da NF-e", { inputMode: "numeric", placeholder: "44 dígitos" })}
         {campo("descricao_nf", "Descrição como na NF")}

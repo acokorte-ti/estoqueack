@@ -19,7 +19,7 @@ Chat COORDENAÇÃO (Claude Code). Atualizado 2026-11-18. **Para retomar (troca d
 | 9 | Spec atualizada com as decisões de 04/11 + R037 + R024 (perda até 6 %) | FUNCIONAL | ✅ feito (v3.3) |
 | 9b | Correção da auditoria de 06/11 (RETO do RJ em Itu em sub-lotes + RETO, leitor Ø/RED/ROUND, solicitação parcial; T15 mínima, RETO por origem; telas; testes) | todas | ✅ feito (até `d339372`) |
 | 10 | Regras novas (spec v3.5–v3.13): paridade liga × bitola, 8 % RJ, consumo misto, peso real com bloqueio, regra do RETO, menu renomeado | TÉCNICO + FRONTEND | ✅ no ar (até `b0cf389`) |
-| 10b | Paridade conferida pelo Fabiano (3 exceções) e respostas de 17/11 aplicadas | Eduardo + Fabiano | ✅ (restam dúvidas menores em `../carga/PENDENCIAS_USUARIOS_2026-11-18.txt`) |
+| 10b | Paridade conferida pelo Fabiano (3 exceções) e respostas de 17/11 aplicadas | Eduardo + Fabiano | ✅ (respostas de 18/11 aplicadas em 19/11, spec v3.18; restam 5 itens em `../carga/PENDENCIAS_USUARIOS_2026-11-19.txt`, entre eles a recarga) |
 | 11 | Recarga do zero (planilhas 2026-11-17) + conferência + ponta a ponta 5 caminhos | TÉCNICO + BANCO E TESTES | ✅ 2026-11-17: Estoque Mega = Mega; RJ no Rio = ESTOQUE 2026; 5 caminhos OK |
 | 12 | Teste manual do Eduardo (roteiro `../carga/ROTEIRO_TESTE_MANUAL_2026-11-17.md`) com ajustes pedidos por ele (17/11: filtro "contém", Fila RJ, vários lotes na OP, lote estritamente maior, menu, impressão) → aceite com os usuários | Eduardo + todas | ⏳ em andamento; anexos/NF enriquecida no ar (19/11); falta a marca "OP dividida" e a parte de Itu na soma do consumo misto (R074(1)/R075(1)) e o fechamento mensal (espera a Inês) |
 | 13 | Go/no-go → implantação pelo roteiro | Eduardo + COORDENAÇÃO | depois do 12 |

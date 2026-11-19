@@ -149,14 +149,15 @@ def test_anexos_ligacao_tipo_tamanho_apagar_e_restaurar(amb):
     assert r.status_code == 201, r.text
     nf = r.json()
     assert nf["ligado_a"] == "ENTRADA" and nf["tamanho_bytes"] == len(PDF) and nf["usuario"]
-    r = _enviar(client, h, f"/api/lotes/{lote}/anexos", "precificador.xlsx", XLSX, tipo="PRECIFICADOR",
-                ctype="application/octet-stream")
-    assert r.status_code == 201 and r.json()["ligado_a"] == "CONTEINER"
+    r = _enviar(client, h, f"/api/lotes/{lote}/anexos", "packing list.pdf", PDF, tipo="PACKING_LIST")
+    assert r.status_code == 201 and r.json()["ligado_a"] == "ENTRADA"
     prec = r.json()
     r = _enviar(client, h, f"/api/lotes/{lote}/anexos", "foto.png", PDF, tipo="OUTRO", descricao="Foto da barra")
     assert r.status_code == 400 and "PDF, JPG ou PNG" in r.json()["detail"]      # conteúdo não é PNG
     r = _enviar(client, h, f"/api/lotes/{lote}/anexos", "nf.xlsx", XLSX, tipo="NF")
-    assert r.status_code == 400 and "XLS" in r.json()["detail"]                  # planilha só no precificador
+    assert r.status_code == 400 and "PDF, JPG ou PNG" in r.json()["detail"]      # planilha não é aceita
+    # precificador não é anexo (Eduardo, 2026-11-19): o tipo é recusado
+    assert _enviar(client, h, f"/api/lotes/{lote}/anexos", "p.pdf", PDF, tipo="PRECIFICADOR").status_code == 422
     assert _enviar(client, h, f"/api/lotes/{lote}/anexos", "x.pdf", PDF, tipo="OUTRO").status_code == 400
     assert _enviar(client, h, f"/api/lotes/{lote}/anexos", "vazio.pdf", b"").status_code == 400
     r = _enviar(client, h, f"/api/lotes/{lote}/anexos", "nota.exe", b"MZ\x90\x00")
@@ -190,7 +191,6 @@ def test_anexos_ligacao_tipo_tamanho_apagar_e_restaurar(amb):
     assert client.patch(f"/api/lotes/{filho}/entrada", headers=hi, json={"ncm": "72283000"}).status_code == 400
     sob = next(i for i in client.get("/api/lotes", headers=hi).json()["itens"] if i["id"] == filho)
     assert sob["custo_kg"] == 42.5 and sob["indicadores"]["anexo"] is True
-    assert sob["indicadores"]["precificador"] is True
 
     # apagar esconde (justificativa obrigatória); só o Admin vê e restaura
     h = entrar(client, u["rj"])
@@ -239,13 +239,13 @@ def test_excel_por_lote_tem_rs_kg_valor_e_anexos(amb):
     client, u, _ = amb
     h = entrar(client, u["rj"])
     eid, lote = _entrada(client, h)
-    _enviar(client, h, f"/api/lotes/{lote}/anexos", "prec.xlsx", XLSX, tipo="PRECIFICADOR")
+    _enviar(client, h, f"/api/entradas-nf/{eid}/anexos", "nf.pdf", PDF)
     ws = openpyxl.load_workbook(io.BytesIO(client.get("/api/exportar/lotes.xlsx", headers=h).content)).active
     cab = [c.value for c in ws[1]]
-    assert {"R$/kg", "Valor R$", "Tem precificador", "Anexos"} <= set(cab)
+    assert {"R$/kg", "Valor R$", "Anexos"} <= set(cab) and "Tem precificador" not in cab
     linha = next(r for r in ws.iter_rows(min_row=2, values_only=True) if r[2] == "CH81TS")
     assert linha[cab.index("R$/kg")] == 42.5 and linha[cab.index("Valor R$")] == 382500
-    assert linha[cab.index("Tem precificador")] == "Sim" and linha[cab.index("Anexos")] == "Sim"
+    assert linha[cab.index("Anexos")] == "Sim"
 
 
 def test_t15_criar_lote_grava_dados_da_entrada(client):

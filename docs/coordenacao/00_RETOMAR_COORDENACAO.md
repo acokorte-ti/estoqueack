@@ -48,7 +48,7 @@ Detalhes em `DECISOES.md` (mais recente em cima) e na spec.
 1. **Anexos e entrada por NF enriquecida: no ar (2026-11-19, migração 0012, contrato §16.4)** com as propostas P41/P42 (pendências itens 7–8); se o Eduardo responder diferente, ajustar. Arquivos ficam no banco (`anexo_arquivo`) e entram no backup. **Falta do R074/R075 (1):** parte de Itu na soma do consumo misto e marca "OP dividida" na T08/T09/impressão [P40(b)]; do R076: testes do uso parcial e caso no roteiro de aceite. NCM do Mega na T15 ficou só digitado.
 2. **Fechamento mensal do material do RJ para a Inês**: modelo na spec (T19 item 10, "[proposta, a validar com a Inês]"), item 9 do arquivo de pendências. **Só programar depois que a Inês validar.**
 3. **Melhoria do deploy** (pergunta aberta ao Eduardo): quando a ponta da `main` estiver com CI rodando, publicar o último commit já verde (`deploy/auto/auto_deploy.sh`). Hoje, commits seguidos atrasam a publicação até a sequência parar.
-4. **Arquivo único de pendências dos usuários**: `../carga/PENDENCIAS_USUARIOS_2026-11-18.txt` (17 itens, cada um com proposta padrão; o sistema já funciona com as propostas). Quando as respostas chegarem: registrar em `DECISOES.md`, mandar FUNCIONAL atualizar a spec e TÉCNICO/FRONTEND ajustarem; se mudar a carga, recarregar.
+4. **Arquivo único de pendências dos usuários**: `../carga/PENDENCIAS_USUARIOS_2026-11-19.txt` (5 itens: recarga, usuária da Bruna, campos da NF, Inês, backup; as respostas de 18/11 estão em DECISOES 2026-11-19 e na spec v3.18). **Recarga pendente** para aplicar Cr8 13x610 e OP 100062 (regras já no código e em `correcoes_carga.json`): só quando o Eduardo disser "pode recarregar". Quando as respostas chegarem: registrar em `DECISOES.md`, mandar FUNCIONAL atualizar a spec e TÉCNICO/FRONTEND ajustarem; se mudar a carga, recarregar.
 5. **Pedidos menores abertos:** R066 (BANCO E TESTES revisar a 0010), R068 (FUNCIONAL registrar leituras do TÉCNICO), R069 (pontos menores da 0009: fuso do dia da pendência, ciclo na paridade, prazo no rollback), R071/R073 (formato da API para o FRONTEND; provavelmente já atendidos, conferir e fechar).
 6. **Limpeza do `PEDIDOS.md`:** vários pedidos antigos estão "ABERTO" mas já foram atendidos (R023, R025, R033, R039, R046, R047, R049, R050, R051, R052, R053, R054). Fechar com uma linha cada e mover para `PEDIDOS_ARQUIVO.md`.
 7. **Repetir o ponta a ponta** (`deploy/e2e/rodar_e2e.sh`, BANCO E TESTES) depois dos ajustes de tela/regra de 17/11, e uma **recarga final** com as planilhas mais novas antes do aceite.
@@ -71,7 +71,7 @@ Detalhes em `DECISOES.md` (mais recente em cima) e na spec.
 
 | O quê | Onde (`C:\Users\eduardo.macedo\Documents\projeto-controle_mp\`) |
 |---|---|
-| Pendências dos usuários (arquivo único atual) | `carga\PENDENCIAS_USUARIOS_2026-11-18.txt` |
+| Pendências dos usuários (arquivo único atual) | `carga\PENDENCIAS_USUARIOS_2026-11-19.txt` |
 | Roteiro do teste manual e OPs sugeridas | `carga\ROTEIRO_TESTE_MANUAL_2026-11-17.md`, `carga\ops_teste_manual_2026-11-17.txt` |
 | Correções da carga (respostas do Fabiano aplicadas) | `carga\correcoes_carga.json` (vai junto em toda recarga) |
 | Relatórios da carga, paridade e leitura | `carga\relatorios\` (paridade conferida: `paridade_rj_itu_previa_20261112_0904_RESPONDIDO.xlsx`; carga atual: `carga_resultado_20261117_1322.xlsx`) |

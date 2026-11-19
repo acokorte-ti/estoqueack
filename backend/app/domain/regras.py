@@ -27,7 +27,8 @@ def validar_saldo(saldo_kg: float, reservado_outros_kg: float, solicitado_kg: fl
     """Saldo físico do lote menos reservas de outros destinos deve cobrir o solicitado.
 
     Com `peso_peca_kg` (pedido ao RJ, Eduardo 2026-11-17): saldo menor que o previsto, mas que cobre o peso da peça
-    acabada sem sobremetal, vira CIÊNCIA "o lote será consumido por inteiro" e a reserva fica com o saldo todo.
+    acabada sem sobremetal, só AVISA "o lote será consumido por inteiro" (Eduardo, 2026-11-19, pendências item 4:
+    "o sistema deve apenas informar"; antes pedia "estou ciente") e a reserva fica com o saldo todo.
     Continua ERRO se o saldo não cobrir nem a peça acabada [proposta, P39]."""
     r = validar_quantidade_kg(solicitado_kg)
     if r.erros:
@@ -35,7 +36,7 @@ def validar_saldo(saldo_kg: float, reservado_outros_kg: float, solicitado_kg: fl
     # nunca negativo: reserva antiga maior que o saldo (ex.: depois de um ajuste) não "invade" mais que o lote
     disponivel = round(max(saldo_kg - max(reservado_outros_kg, 0), 0.0), 3)
     if solicitado_kg > saldo_kg + EPS and peso_peca_kg is not None and saldo_kg + EPS >= peso_peca_kg:
-        r.adicionar("CONSUMO_LOTE_INTEIRO", Nivel.CIENCIA,
+        r.adicionar("CONSUMO_LOTE_INTEIRO", Nivel.ALERTA,
                     f"O lote {lote or 'escolhido'} será consumido por inteiro ({kg_br(saldo_kg)}); previsto "
                     f"{kg_br(solicitado_kg)}.",
                     saldo_kg=saldo_kg, previsto_kg=solicitado_kg, reserva_kg=saldo_kg)

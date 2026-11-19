@@ -1,7 +1,7 @@
 """R061 (chat BANCO E TESTES, 2026-11-17): o que faltava testar da 0009, do R058 e do §10.9 (spec v3.11).
 
 Complementa `test_r058_peso_real.py` e `test_v311_correcoes_carga.py` (TÉCNICO). Dados fictícios.
-- R058: limite exato (7 dias avisa, 8 bloqueia); prazo vem da T23; "para todos" inclui a Análise; o SA da peça
+- R058: limite exato (14 dias avisa, 15 bloqueia); prazo vem da T23; "para todos" inclui a Análise; o SA da peça
   inteira e a NF ficam com o previsto e só o lote RJ em Itu recebe o consumo real; encerrar fica na auditoria e não
   impede a T13 depois; dois "Encerrar" ao mesmo tempo (PostgreSQL): só um passa.
 - §1.4 item 8 / §10.9 B (paridade manual, coluna da 0009): o item RJ fica na linha do item de Itu na T04, o lote RJ
@@ -55,14 +55,14 @@ def _definir_prazo(dias: int) -> None:
 # ---------------- R058: prazo ----------------
 
 def test_r058_sete_dias_ainda_avisa_oito_bloqueia(amb):
-    """'Mais de 7 dias' (P33(b)): no 7º dia do recebimento ainda é aviso cinza; no 8º bloqueia."""
+    """'Mais de 14 dias' (era 7 até 2026-11-19): no 14º dia do recebimento ainda é aviso cinza; no 15º bloqueia."""
     client, u, ids, fab = amb
     _peca_inteira_recebida(client, u, ids, fab)
     h = entrar(client, u["itu"])
-    _envelhecer(7)
+    _envelhecer(14)
     assert _validar(client, h, ids, 100600).get("PESO_REAL_AGUARDANDO") == "ALERTA"
     assert "PESO_REAL_PENDENTE" not in _validar(client, h, ids, 100600)
-    _envelhecer(8)
+    _envelhecer(15)
     assert _validar(client, h, ids, 100600)["PESO_REAL_PENDENTE"] == "ERRO"
 
 
@@ -88,7 +88,7 @@ def test_r058_rascunho_gravado_antes_tambem_nao_e_enviado(amb):
     r = client.post("/api/solicitacoes", json=corpo_solicitacao(ids["l33"], op=100602, enviar=False), headers=h)
     assert r.status_code == 201, r.text
     rid = r.json()["solicitacoes"][0]["id"]
-    _envelhecer(9)
+    _envelhecer(16)
     r = client.post(f"/api/solicitacoes/{rid}/enviar", json={"confirmacoes": {}}, headers=h)
     assert r.status_code == 409 and _niveis(r)["PESO_REAL_PENDENTE"] == "ERRO", r.text
     assert client.get(f"/api/solicitacoes/{rid}", headers=h).json()["situacao"] == "RASCUNHO"
@@ -130,7 +130,7 @@ def test_r058_encerrar_fica_na_auditoria_e_t13_continua_possivel(amb):
     from app.models import Auditoria
     client, u, ids, fab = amb
     sid, lote_itu, previsto = _peca_inteira_recebida(client, u, ids, fab)
-    _envelhecer(10)
+    _envelhecer(17)
     h = entrar(client, u["itu"])
     r = client.post(f"/api/pendencias-peso-real/{sid}/encerrar", json={"justificativa": "Peça vai para outra OP"},
                     headers=h)
@@ -158,7 +158,7 @@ def test_r058_dois_encerrar_ao_mesmo_tempo_so_um_passa(amb):
     from app.models import Auditoria
     client, u, ids, fab = amb
     sid, _, _ = _peca_inteira_recebida(client, u, ids, fab)
-    _envelhecer(10)
+    _envelhecer(17)
     resultados: list[int] = []
     barreira = threading.Barrier(2)
 

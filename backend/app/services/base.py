@@ -71,7 +71,7 @@ PADROES: dict[str, float] = {
     # 0008 (spec v3.5): P22(a) material inteiro do RJ na T13; P24 janela do SA no Mega
     "TOLERANCIA_EXCESSO_RJ_INTEIRO_PCT": 8, "SA_JANELA_ANTES_DIAS": 7,
     # 0009 (R058, spec v3.11 T07/T23): peça inteira do RJ sem peso real bloqueia "Enviar ao RJ" depois de N dias
-    "PENDENCIA_PESO_REAL_DIAS": 7,
+    "PENDENCIA_PESO_REAL_DIAS": 14,   # 0013: 7 → 14 (Eduardo, 2026-11-19, pendências item 1)
     # 0010 (spec v3.13 T13, Eduardo, 2026-11-17): regra do RETO da sobra de placa/blooming (E × L, em mm)
     "RETO_ESP_LIMITE": 50, "RETO_LARG_MAX_ATE_LIMITE": 200, "RETO_LARG_MAX_ACIMA": 250,
     # 0012 (spec v3.15 "Documentos anexos", [proposta, P41(c)]): tamanho máximo de cada anexo

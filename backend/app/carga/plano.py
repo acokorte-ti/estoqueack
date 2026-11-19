@@ -395,10 +395,12 @@ def _item_rj(pl: Plano, ctx: Contexto, desc: str, origem, comprimento_fixado: st
 
 
 def _nota_faixa(lote: LoteP, desc: str) -> None:
-    """v3.11 §1.4 item 7: faixa na medida da seção vale pelo maior valor; a faixa escrita fica na nota do lote."""
+    """v3.11 §1.4 item 7: faixa ou lista ('/', Eduardo, 2026-11-19) na medida da seção vale pelo maior valor; a escrita
+    da planilha fica na nota do lote."""
     f = faixa_na_secao(desc)
     if f:
-        lote.notas.append(f"Faixa na medida da planilha: {f} (vale o maior valor: {chave_mat(desc).texto}).")
+        lote.notas.append(f"{'Lista de medidas' if '/' in f else 'Faixa na medida'} da planilha: {f} (vale o maior "
+                          f"valor: {chave_mat(desc).texto}).")
 
 
 def _data_consumo(dm: tuple[int, int] | None, hoje: date) -> date | None:
@@ -715,9 +717,7 @@ def _rj_em_itu(pl: Plano, ctx: Contexto, geral: list[P.LinhaGeral]) -> None:
                 if g.obs_itu:
                     lote.notas.append(f"Observação do Estoque Geral (RJ em Itu): {g.obs_itu}")
                 if not desc_origem:
-                    _nota_faixa(lote, g.descricao)
-                if "/" in g.descricao and not reto:
-                    lote.notas.append(f"Medidas na planilha: {g.descricao.strip()} (várias larguras num lote só).")
+                    _nota_faixa(lote, g.descricao)          # lista "13x510/560/610" → nota "Lista de medidas…"
                 pl.lotes.append(lote)
             if parcelas:
                 pl.pend("RETO_EM_ITU_POR_ORIGEM", "INFO", f"{g.descricao}: {g.rj_em_itu:.1f} kg em {len(parcelas)} "

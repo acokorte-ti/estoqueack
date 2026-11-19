@@ -81,6 +81,16 @@ def test_faixa_anotada_no_lote():
     assert any("Faixa na medida da planilha: 26X500~610" in n for n in lote.notas)
 
 
+def test_lista_na_secao_vale_o_maior_e_fica_na_nota():
+    # Eduardo, 2026-11-19 (pendências de 18/11 item 12): lista de larguras com "/" = um lote só, com a MAIOR
+    pl = _montar([], geral=[_g(9, None, "H13 20x400/450/500", itu=150)])
+    lote = next(lp for lp in pl.lotes if lp.estoque == "RJ_EM_ITU")
+    it = pl.itens[lote.item]
+    assert (it.espessura, it.largura, lote.saldo) == (20, 500, 150)
+    assert plano.chave_mat(it.descricao).texto == "H13 20X500"
+    assert lote.notas == ["Lista de medidas da planilha: 20X400/450/500 (vale o maior valor: H13 20X500)."]
+
+
 # ---------------- arquivo de correções ----------------
 
 def test_leitura_troca_liga_e_conteiner_e_bloqueia_se_nao_casar():
@@ -162,6 +172,30 @@ def test_b05_conteiner_do_corte_pelo_da_estoque_2026():
     pl = _montar(est3, corte=corte3, sas=[_sa(40, 71001, "A8", "6X74", "CT37X")])
     assert pl.solicitacoes[0].lote.conteiner == "CT37X"
     assert any(p.tipo == "CONTEINER_DISCORDANTE" for p in pl.pendencias)
+
+
+def test_tres_conteineres_diferentes_resolvido_pela_correcao_de_leitura():
+    # Pendências de 18/11 item 14 (Eduardo, 2026-11-19): Corte, ESTOQUE 2026 e SA dizem três contêineres diferentes;
+    # vale o da ESTOQUE 2026, por correção de leitura (contêiner) na linha do Corte e na do SA
+    est = [_e(5, "CT21X", "CR12MOV Ø70", 100, 96, [(4, 71062, "G5")]), _e(6, "CT04X", "CR12MOV Ø70", 50, 50),
+           _e(7, "CT10X", "CR12MOV Ø70", 50, 50)]
+    corte = [_c(30, 71062, "CR12MOV Ø70", "CT04X", peso2=4)]
+    sas = [_sa(40, 71062, "CR12MOV", "RED70", "CT10X", 4)]
+    pl = _montar(est, corte=corte, sas=sas)
+    assert pl.solicitacoes[0].lote.conteiner == "CT04X"                 # sem resposta: fica o do Corte [P34(d)]
+    assert any(p.tipo == "CONTEINER_DISCORDANTE" for p in pl.pendencias)
+    corr = {"leitura": [
+        {"aba": "CONTROLE DE CORTE", "linhas": [30], "conteiner": "CT04X", "descricao_planilha": "CR12MOV Ø70",
+         "conteiner_correto": "CT21X", "esperado": 1, "fonte": "teste"},
+        {"aba": "SA", "linhas": [40], "conteiner": "CT10X", "contem": r"(Ø|RED)\s*70\b", "conteiner_correto": "CT21X",
+         "esperado": 1, "fonte": "teste"}]}
+    pl = _montar(est, corte=corte, sas=sas, corr=corr)
+    assert not _bloqueios(pl)
+    s = pl.solicitacoes[0]
+    assert s.lote.conteiner == "CT21X" and [(lb.lote.conteiner, lb.peso_kg) for lb in s.liberacoes] == [("CT21X", 4)]
+    assert not any(p.tipo in ("CONTEINER_DISCORDANTE", "CONSUMO_EM_OUTRO_MATERIAL") for p in pl.pendencias)
+    assert pl.sas[0].solicitacao is s and pl.sas[0].lote.conteiner == "CT21X"
+    assert sum(p.tipo == "CORRECAO_APLICADA" for p in pl.pendencias) == 2
 
 
 def test_b07_corte_dividido_como_na_estoque_2026_e_sa_no_contêiner_certo():

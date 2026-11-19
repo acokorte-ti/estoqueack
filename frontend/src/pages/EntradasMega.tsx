@@ -136,7 +136,7 @@ function JanelaCriarLote({ p, aoFechar, aoGravar }: { p: Pendencia; aoFechar: ()
   const corpo = (c: Confirmacoes) => ({
     peso_kg: num(f.peso) ?? 0, conteiner: f.sem ? undefined : f.conteiner.trim().toUpperCase() || undefined, sem_conteiner: f.sem || undefined,
     pecas: num(f.pecas), data_entrada: f.data || undefined, nf: f.nf.trim() || undefined, observacao: f.obs.trim() || undefined,
-    // contrato §16.4 (v3.15 T15): dados da NF e R$/kg do precificador, todos opcionais
+    // contrato §16.4 (v3.15 T15): dados da NF e R$/kg (valor unitário), todos opcionais
     fornecedor: f.fornecedor.trim() || undefined, serie: f.serie.trim() || undefined, ncm: f.ncm.trim() || undefined,
     packing_list: f.packing.trim() || undefined, di_duimp: f.di.trim() || undefined, custo_kg: num(f.custo), confirmacoes: c,
   });
@@ -191,21 +191,21 @@ function JanelaCriarLote({ p, aoFechar, aoGravar }: { p: Pendencia; aoFechar: ()
           <label>NF (opcional)<input value={f.nf} onChange={(e) => mudar({ nf: e.target.value })} placeholder={p.ultima_entrada?.nf ?? ""} /></label>
         </div>
         <details className="avancado">
-          <summary>Dados da NF e R$/kg do precificador (opcional)</summary>
+          <summary>Dados da NF e R$/kg (opcional)</summary>
           <div className="grade-form">
             <label>Emitente / fornecedor<input value={f.fornecedor} onChange={(e) => mudar({ fornecedor: e.target.value })} /></label>
             <label>Série da NF<input value={f.serie} onChange={(e) => mudar({ serie: e.target.value })} /></label>
             <label>NCM<input inputMode="numeric" value={f.ncm} onChange={(e) => mudar({ ncm: e.target.value })} placeholder="7228.30.00" /></label>
             <label>Nº do packing list<input value={f.packing} onChange={(e) => mudar({ packing: e.target.value })} /></label>
             <label>Nº da DI/DUIMP<input value={f.di} onChange={(e) => mudar({ di: e.target.value })} /></label>
-            <label>R$/kg (precificador)<input inputMode="decimal" value={f.custo} onChange={(e) => mudar({ custo: e.target.value })} /></label>
+            <label>R$/kg (valor unitário)<input inputMode="decimal" value={f.custo} onChange={(e) => mudar({ custo: e.target.value })} /></label>
           </div>
           <small className="dica">O que faltar pode ser completado depois, no detalhe do lote.</small>
         </details>
         <label>Observação (opcional)<textarea rows={2} value={f.obs} onChange={(e) => mudar({ obs: e.target.value })} /></label>
         <div>
           <h3 style={{ fontSize: "var(--t-base)", marginBottom: "var(--esp-2)" }}>Documentos anexos</h3>
-          <p className="desc" style={{ marginBottom: "var(--esp-2)" }}>NF, packing list e precificador do contêiner. Vão junto ao criar o lote.</p>
+          <p className="desc" style={{ marginBottom: "var(--esp-2)" }}>NF de recebimento e, se houver, o packing list. Vão junto ao criar o lote.</p>
           <AnexosPendentes pendentes={pendentes} aoMudar={setPendentes} ocupado={ocupado} />
         </div>
 

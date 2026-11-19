@@ -349,6 +349,7 @@ def caminho_b2(c: Cliente, u: dict, lote, op: int, mega: MegaE2E, lote_rj=None) 
     esperar(corte.get("sa_id"), "B2: corte em lote fiscal RJ deveria gerar linha de SA")
     esperar(corte.get("consumo_misto") is True, "B2: o corte deveria voltar marcado como consumo misto")
     _sa_confirmar(c, u, op, mega, sa_id=corte["sa_id"])
+    c.entrar(u["rj"])            # a NF do B2 é informada pelo Marcelo (Eduardo, 2026-11-19, pendências item 17)
     st, d = c.req("POST", "/api/sas/nf", {"ids": [corte["sa_id"]], "numero": "E2EB2", "emitente": "FIO_CERTO"})
     esperar(st == 200, f"B2: NF só fiscal {st} {d}")
     out = {"corte_itu": corte["id"], "sa": corte["sa_id"]}
@@ -389,10 +390,8 @@ def caminho_c(c: Cliente, u: dict, lote, op: int) -> dict:
 
 
 def _sobra_fora(lote, *, reto: bool) -> dict:
-    """Campos da sobra fora da bitola (spec v3.13, regra do RETO): placa 40 × 180 vai para RETO, 40 × 200 não; redondo
-    pela escolha do operador."""
-    if lote.item.formato == "REDONDO":
-        return {"sobra_vai_para_reto": reto, "sobra_diametro_mm": None if reto else 30, "conferi_regra_reto": True}
+    """Campos da sobra fora da bitola (spec v3.13, regra do RETO): placa 40 × 180 vai para RETO, 40 × 200 não. Redondo
+    nunca sai da bitola (spec v3.18): os caminhos que usam isto escolhem lote retangular."""
     return {"sobra_espessura_mm": 40, "sobra_largura_mm": 180 if reto else 200, "conferi_regra_reto": True}
 
 
@@ -496,7 +495,8 @@ def executar(app, sessao, gateway, ops_informadas: list[int] | None = None) -> d
         la = escolher_lote(db, "RJ", "RJ", 300, set())
         lb = escolher_lote(db, "RJ", "RJ", 300, {la.id})
         lb2 = escolher_lote(db, "RJ", "ITU", 30, set(), retangular=False)
-        lc = escolher_lote(db, "ITU", "ITU", 30, set(), retangular=False, codigo_mega=True)
+        # retangular: o caminho C testa a sobra fora da bitola, que o redondo não tem (Eduardo, 2026-11-19)
+        lc = escolher_lote(db, "ITU", "ITU", 30, set(), codigo_mega=True)
         for lote in (la, lb):
             _ = lote.item.liga.codigo
         ops = escolher_ops(db, gateway, 4, ops_informadas or [])

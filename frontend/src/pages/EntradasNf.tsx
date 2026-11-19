@@ -250,7 +250,7 @@ function NovaEntrada({ aoSair }: { aoSair: (gravada: Entrada | null, falhas: str
             <label>Peso líquido (kg)<input inputMode="decimal" className="campo-grande" value={l.peso} onChange={(e) => mudar(i, { peso: e.target.value })} /></label>
             <label>Peso bruto (kg, opcional)<input inputMode="decimal" value={l.pesoBruto} onChange={(e) => mudar(i, { pesoBruto: e.target.value })} /></label>
             <label>Comprimento (opcional)<input value={l.comprimento} onChange={(e) => mudar(i, { comprimento: e.target.value })} placeholder="2800-6000" /></label>
-            <label>R$/kg (precificador, opcional)<input inputMode="decimal" value={l.custo} onChange={(e) => mudar(i, { custo: e.target.value })} /></label>
+            <label>R$/kg (valor unitário, opcional)<input inputMode="decimal" value={l.custo} onChange={(e) => mudar(i, { custo: e.target.value })} /></label>
           </div>
           <label style={{ marginTop: "var(--esp-4)" }}>Observação do item (opcional)<input value={l.obs} onChange={(e) => mudar(i, { obs: e.target.value })} /></label>
         </section>
@@ -261,7 +261,7 @@ function NovaEntrada({ aoSair }: { aoSair: (gravada: Entrada | null, falhas: str
 
       <section className="painel-form" style={{ marginTop: "var(--esp-3)" }} aria-label="Documentos anexos">
         <h2>Documentos anexos</h2>
-        <p className="desc">NF e packing list escaneados (ou foto) e o precificador do contêiner. Vão junto ao salvar e aparecem em todos os lotes desta entrada. Também dá para anexar depois, no detalhe do lote.</p>
+        <p className="desc">NF de recebimento escaneada (ou foto) e, se houver, o packing list. Vão junto ao salvar e aparecem em todos os lotes desta entrada. Também dá para anexar depois, no detalhe do lote.</p>
         <AnexosPendentes pendentes={pendentes} aoMudar={setPendentes} ocupado={ocupado} />
       </section>
 

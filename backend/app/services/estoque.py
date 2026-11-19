@@ -243,7 +243,7 @@ def lote_resumo(db: Session, lotes: list[Lote]) -> list[dict]:
             "custo_kg": float(custo) if custo is not None else None,
             "indicadores": {"destinacao": l.id in dest, "nota": l.id in notas,
                             "origem_nao_identificada": not l.origem_identificada,
-                            "anexo": anexos.tem(l, r), "precificador": anexos.tem(l, r, "PRECIFICADOR")},
+                            "anexo": anexos.tem(l, r)},
         })
     return saida
 

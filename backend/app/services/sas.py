@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.domain.formato import kg_br, pct_br
@@ -382,7 +382,8 @@ def obter_nf(db: Session, numero: str, emitente: str, data=None) -> NfTransferen
 
 def informar_nf_b2(db: Session, ids: list[int], numero: str, emitente: str, data, *, usuario: Usuario,
                    ip: str | None) -> list[CadastroSa]:
-    """Caminho B2: NF só fiscal digitada pelo Fabiano no SA (várias linhas podem usar a mesma NF)."""
+    """Caminho B2: NF só fiscal, emitida no RJ e informada pelo Marcelo (Operação RJ) no SA; o Fabiano só recebe
+    (Eduardo, 2026-11-19, pendências item 17). Várias linhas podem usar a mesma NF."""
     nf = obter_nf(db, numero, emitente, data)
     sas = [obter(db, i, travar=True) for i in ids]
     if any(sa.origem != "CORTE_ITU" for sa in sas):
@@ -403,14 +404,16 @@ def informar_nf_b2(db: Session, ids: list[int], numero: str, emitente: str, data
 
 
 def visivel(sa: CadastroSa, usuario: Usuario | None) -> bool:
-    """[P10] Operação RJ vê só os SAs de itens de COP (RJ no Rio); SA de corte em Itu (B2) e sem item de COP não."""
-    return usuario is None or usuario.perfil != "OPERACAO_RJ" or sa.cop_item_id is not None
+    """[P10] Operação RJ vê os SAs de itens de COP e, desde 2026-11-19, os do corte em Itu (B2), porque é ela que
+    informa a NF do B2 (pendências item 17); os da carga sem item de COP, não."""
+    return (usuario is None or usuario.perfil != "OPERACAO_RJ" or sa.cop_item_id is not None
+            or sa.origem == "CORTE_ITU")
 
 
 def listar(db: Session, f: dict[str, Any], usuario: Usuario | None = None) -> list[CadastroSa]:
     q = select(CadastroSa)
     if usuario is not None and usuario.perfil == "OPERACAO_RJ":
-        q = q.where(CadastroSa.cop_item_id.is_not(None))
+        q = q.where(or_(CadastroSa.cop_item_id.is_not(None), CadastroSa.origem == "CORTE_ITU"))
     if f.get("situacao"):
         q = q.where(CadastroSa.situacao.in_(f["situacao"]))
     if f.get("origem"):

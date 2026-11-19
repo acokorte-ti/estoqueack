@@ -86,38 +86,52 @@ _RE_RET = re.compile(r"(\d+(?:[.,]\d+)?)\s*X\s*(\d+(?:[.,]\d+)?)(?:\s*X\s*(\d+(?
 _RE_MARCA_REDONDO = re.compile(r"Ø|(?<![A-Z])RED(?![A-Z])|(?<![A-Z])ROUND(?![A-Z])")
 _RE_DIAM_COMP = re.compile(r"(\d+(?:[.,]\d+)?)\s*X\s*(\d+(?:[.,]\d+)?)(?!\s*X)")
 
-# Faixa na medida da SEÇÃO (spec v3.11 §1.4 item 7, Eduardo, 2026-11-17; fecha o R057 item 1): espessura, largura ou
-# Ø escritos como faixa valem pelo MAIOR valor, em qualquer escrita: 'X(400-600)', 'X(700-800MM)', '26X500~610',
-# '15X510-620'. Só as duas primeiras medidas (a seção) e o Ø: a faixa do comprimento ('21X203X1110-3347') continua
-# sendo faixa de comprimento (P29(b)).
+# Faixa ou lista na medida da SEÇÃO: espessura, largura ou Ø escritos como faixa (spec v3.11 §1.4 item 7, Eduardo,
+# 2026-11-17; fecha o R057 item 1) ou como lista separada por '/' (Eduardo, 2026-11-19, pendências de 18/11 item 12:
+# "use sempre a maior") valem pelo MAIOR valor, em qualquer escrita: 'X(400-600)', 'X(700-800MM)', '26X500~610',
+# '15X510-620', '13X510/560/610', '13/16X510', 'Ø90/100'. Só as duas primeiras medidas (a seção) e o Ø: faixa ou lista
+# do comprimento ('21X203X1110-3347', '21X203X2810-4035/3070-4330') continua sendo do comprimento (P29(b)). No redondo
+# ('Ø93X2820/2845/2850', 'RED 90X2800-6000') o 'NxM' é Ø × comprimento: só o Ø é seção.
 _F = r"\d+(?:[.,]\d+)?"
+_V = rf"{_F}(?:\s*[-~/]\s*{_F})*"                  # um valor, uma faixa (- ou ~) ou uma lista (/)
+_RE_SEP = re.compile(r"[-~/]")
 _RE_FAIXA_PAR = re.compile(rf"\(\s*({_F})\s*[-~]\s*({_F})\s*(?:MM)?\s*\)")
-_RE_SECAO_FAIXA = re.compile(rf"(?<![\d.,])({_F})(?:\s*[-~]\s*({_F}))?\s*X\s*({_F})(?:\s*[-~]\s*({_F}))?")
-_RE_DIAM_FAIXA = re.compile(rf"((?:Ø|\bRED\b\.?)\s*Ø?\s*)({_F})\s*[-~]\s*({_F})")
+_RE_SECAO_FAIXA = re.compile(rf"(?<![\d.,])({_V})\s*X\s*({_V})")
+_RE_DIAM_FAIXA = re.compile(rf"((?:Ø|\bRED\b\.?)\s*Ø?\s*)({_F}(?:\s*[-~/]\s*{_F})+)")
 
 
-def _maior(a: str, b: str | None) -> str:
-    return a if b is None or _num(a) >= _num(b) else b
+def _maior(v: str) -> str:
+    """Maior valor de uma faixa ou lista ('500~610', '510/560/610' → '610'), na escrita da planilha."""
+    return max(re.findall(_F, v), key=_num)
+
+
+def _secao_com_faixa(t: str) -> re.Match | None:
+    """'NxM' da seção com faixa ou lista em N ou M (não no redondo, onde 'NxM' é Ø × comprimento)."""
+    if _RE_MARCA_REDONDO.search(t):
+        return None
+    m = _RE_SECAO_FAIXA.search(t)
+    return m if m and _RE_SEP.search(m.group(1) + m.group(2)) else None
 
 
 def _secao_pelo_maior(t: str) -> str:
-    """Troca a faixa da seção pelo maior valor (texto já em maiúsculas, com 'X' como separador)."""
-    t = _RE_FAIXA_PAR.sub(lambda m: _maior(m.group(1), m.group(2)), t)
-    m = _RE_SECAO_FAIXA.search(t)
-    if m and (m.group(2) or m.group(4)):
-        t = t[:m.start()] + f"{_maior(m.group(1), m.group(2))}X{_maior(m.group(3), m.group(4))}" + t[m.end():]
-    return _RE_DIAM_FAIXA.sub(lambda x: x.group(1) + _maior(x.group(2), x.group(3)), t)
+    """Troca a faixa ou lista da seção pelo maior valor (texto já em maiúsculas, com 'X' como separador)."""
+    t = _RE_FAIXA_PAR.sub(lambda m: _maior(m.group(0)), t)
+    m = _secao_com_faixa(t)
+    if m:
+        t = t[:m.start()] + f"{_maior(m.group(1))}X{_maior(m.group(2))}" + t[m.end():]
+    return _RE_DIAM_FAIXA.sub(lambda x: x.group(1) + _maior(x.group(2)), t)
 
 
 def faixa_na_secao(descricao: str | None) -> str | None:
-    """A faixa escrita na seção (para anotar no lote), ou None. Ex.: 'IMP-A8 26X500~610MM' → '26X500~610'."""
+    """A faixa ou lista escrita na seção (para anotar no lote), ou None.
+    Ex.: 'IMP-A8 26X500~610MM' → '26X500~610'; 'CR8 13x510/560/610' → '13X510/560/610'."""
     t = (descricao or "").upper().replace("×", "X")
     m = _RE_FAIXA_PAR.search(t)
     if m:
         ini = t.rfind(" ", 0, m.start()) + 1
         return t[ini:m.end()].strip()
-    m = _RE_SECAO_FAIXA.search(t)
-    if m and (m.group(2) or m.group(4)):
+    m = _secao_com_faixa(t)
+    if m:
         return re.sub(r"\s+", "", m.group(0))
     m = _RE_DIAM_FAIXA.search(t)
     return re.sub(r"\s+", "", m.group(0)) if m else None

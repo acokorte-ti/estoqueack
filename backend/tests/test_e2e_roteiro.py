@@ -58,7 +58,7 @@ def test_roteiro_e2e_cinco_caminhos(client):
     assert rel["caminhos"]["D"]["lote"]
     assert rel["ok"] and set(rel["sa_confirmacao_simulada"]) == {60000, 60001, 60002}
     # R058: sem pendência na base; no B o envio bloqueia com o recebimento vencido, a T13 libera, o SA fica previsto
-    assert rel["peso_real_na_copia"] == {"ok": True, "quantidade": 0, "vencidas": 0, "dias_limite": 7,
+    assert rel["peso_real_na_copia"] == {"ok": True, "quantidade": 0, "vencidas": 0, "dias_limite": 14,
                                          "encerradas_na_copia": []}
     pr = rel["caminhos"]["B"]["peso_real"]
     assert pr["bloqueio"] == "OK: envio com ERRO PESO_REAL_PENDENTE; rascunho só com aviso; sai depois da T13"
@@ -66,7 +66,7 @@ def test_roteiro_e2e_cinco_caminhos(client):
 
 
 def test_roteiro_e2e_com_peca_inteira_vencida_na_base(client):
-    """A cópia da homologação pode ter peça inteira sem peso real há mais de 7 dias (carga ou uso). O ponta a ponta
+    """A cópia da homologação pode ter peça inteira sem peso real há mais de 14 dias (carga ou uso). O ponta a ponta
     confere que o envio está bloqueado, encerra a pendência (só na cópia) e segue."""
     from tests.fluxo_util import mega_falso
     from tests.test_fluxo_itu_operacoes import _peca_inteira_recebida
@@ -75,11 +75,11 @@ def test_roteiro_e2e_com_peca_inteira_vencida_na_base(client):
     u, ids = _preparar(client)
     fab = mega_falso()
     _peca_inteira_recebida(client, u, ids, fab)
-    _envelhecer(12)
+    _envelhecer(19)
     rel = _rodar()
     falhas = {k: v.get("erro") for k, v in rel["caminhos"].items() if not v.get("ok")}
     assert not falhas, falhas
     pc = rel["peso_real_na_copia"]
     assert pc["ok"] and pc["quantidade"] == 1 and pc["vencidas"] == 1
-    assert [(x["op"], x["dias"]) for x in pc["encerradas_na_copia"]] == [(100092, 12)]
+    assert [(x["op"], x["dias"]) for x in pc["encerradas_na_copia"]] == [(100092, 19)]
     assert rel["ok"]

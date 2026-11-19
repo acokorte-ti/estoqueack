@@ -458,6 +458,14 @@ Campos novos opcionais: `fornecedor`, `serie`, `ncm`, `packing_list`, `di_duimp`
 - Itens de `GET /api/lotes` (e `GET /api/lotes/{id}`): `custo_kg` (o R$/kg que vale: o do lote, senão o da origem), `indicadores.anexo` (bool: o lote, a entrada, o contêiner ou a origem têm anexo) e `indicadores.precificador` (bool: tem precificador).
 - `GET /api/exportar/lotes.xlsx`: colunas novas "R$/kg", "Valor R$" (saldo × R$/kg), "Tem precificador" e "Anexos".
 
+## 16.5 Respostas das pendências de 18/11 (2026-11-19, spec v3.18; migração 0013)
+
+- **T23:** `PENDENCIA_PESO_REAL_DIAS` passa a 14 (a 0013 só troca se ainda estiver em 7).
+- **T07:** `CONSUMO_LOTE_INTEIRO` passa de CIENCIA para **ALERTA** (só informa; não pede justificativa). A reserva continua com o saldo todo.
+- **T13:** lote **redondo** com sobra fora da bitola → ERRO `SOBRA_REDONDO_NA_BITOLA` (a sobra fica no lote). `sobra_vai_para_reto` e `sobra_diametro_mm` deixam de ser usados.
+- **T14:** `POST /api/sas/nf` (NF só fiscal do B2) passa para a **Operação RJ** (e Admin); o Estoque Itu recebe 403. `GET /api/sas` da Operação RJ passa a trazer também as linhas `origem: CORTE_ITU`.
+- **Anexos (§16.4):** `tipo` aceita só `NF`, `PACKING_LIST`, `OUTRO` (o precificador não é anexo); arquivos só PDF, JPG e PNG. Anexo antigo `PRECIFICADOR` continua aparecendo. Sai `indicadores.precificador` e a coluna "Tem precificador" do Excel.
+
 ## 17. Ainda não implementado
 
 📋 F1.1: tratamento da T16 (ver movimentos, ajustar, marcar como explicada), T19 Relatórios, T26, exportação para o Renato com marca, PDFs (romaneio do COP, ficha do lote). A **impressão da Fila RJ (T09)** usa `GET /api/fila-rj`; se faltar campo, o FUNCIONAL indica e eu acrescento.

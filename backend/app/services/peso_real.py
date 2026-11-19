@@ -3,7 +3,7 @@ T07, §9, T23; R058; contrato §16.2).
 
 A pendência é a solicitação `AGUARDANDO_CORTE_ITU` (peça inteira recebida no COP, T12) que ainda não teve a T13 e
 não foi encerrada. Ela conta do recebimento do COP (`cop_item.recebido_em`) [proposta, P33(b)]. Passou de
-`PENDENCIA_PESO_REAL_DIAS` (T23, 7) → bloqueia "Enviar ao RJ" para todos, sem liberação do Admin [proposta, P33(a)
+`PENDENCIA_PESO_REAL_DIAS` (T23, 14) → bloqueia "Enviar ao RJ" para todos, sem liberação do Admin [proposta, P33(a)
 e (c)]; antes, só aviso. O SA da peça inteira não é corrigido (fica com o previsto, como a NF).
 """
 from __future__ import annotations

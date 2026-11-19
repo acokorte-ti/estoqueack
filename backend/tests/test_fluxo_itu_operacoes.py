@@ -112,18 +112,22 @@ def test_peca_inteira_corte_itu_conclui_e_sobra_vira_b2(amb):
     assert sa["origem"] == "CORTE_ITU" and sa["peso_kg"] == 50 and sa["op"] == 100508
     # v3.16 [proposta, P44(a)]: NF só fiscal do B2 só depois do SA confirmado e do R$/kg
     nf = {"ids": [sa["id"]], "numero": "558", "emitente": "FIO_CERTO"}
-    r = client.post("/api/sas/nf", json=nf, headers=h)
+    # Eduardo, 2026-11-19 (pendências item 17): quem informa a NF do B2 é o Marcelo (Operação RJ); Itu só recebe
+    assert client.post("/api/sas/nf", json=nf, headers=h).status_code == 403
+    hrj = entrar(client, u["rj"])
+    assert any(s["id"] == sa["id"] for s in client.get("/api/sas", headers=hrj).json()["itens"])
+    r = client.post("/api/sas/nf", json=nf, headers=hrj)
     assert r.status_code == 400 and "SA confirmado" in _falta(r) and "R$/kg" in _falta(r)
+    h = entrar(client, u["itu"])
     from app.integrations.mega.gateway import SituacaoSa
     fab.obter().situacoes_sa[70009] = SituacaoSa(70009, True, "SA PECA", True, date.today(), 10)
     v = client.post(f"/api/sas/{sa['id']}/codigo/validar", json={"sa_codigo": 70009}, headers=h).json()
     conf = {o["codigo"]: "Teste" for o in v["ocorrencias"]}
     client.post(f"/api/sas/{sa['id']}/codigo", json={"sa_codigo": 70009, "confirmacoes": conf}, headers=h)
     assert client.get(f"/api/sas/{sa['id']}").json()["situacao"] == "CONFIRMADO"
-    r = client.post("/api/sas/nf", json=nf, headers=h)
-    assert r.status_code == 400 and "SA confirmado" not in _falta(r) and "R$/kg" in _falta(r)
     client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h)   # v3.16: R$/kg antes da NF
-    r = client.post("/api/sas/nf", json=nf, headers=h)
+    hrj = entrar(client, u["rj"])
+    r = client.post("/api/sas/nf", json=nf, headers=hrj)
     assert r.json()[0]["nf"]["numero"] == "558"
 
 

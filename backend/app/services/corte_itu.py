@@ -6,8 +6,8 @@ Sobra (spec v3.13, regra do RETO, Eduardo, 2026-11-17; detalhes pelas propostas 
 - não mantém, placa/blooming (formato RETANGULAR ou RETO) → o operador informa E × L da sobra; E ≤ RETO_ESP_LIMITE e
   L < RETO_LARG_MAX_ATE_LIMITE, ou E > RETO_ESP_LIMITE e L < RETO_LARG_MAX_ACIMA → lote RETO filho (GERA_RETO);
   senão → lote novo (tipo SOBRA) com a medida E × L, filho do de origem (GERA_SOBRA), no mesmo estoque [P35(c)];
-- não mantém, redondo → a regra não se aplica, o operador escolhe RETO ou lote novo com o Ø da sobra [P35(d)];
-- nos dois casos, "Conferi a regra do RETO" é obrigatório [P35(b)].
+- redondo → a sobra sempre fica no lote: o corte é perpendicular e não muda o Ø (Eduardo, 2026-11-19, pendências 2);
+- "Conferi a regra do RETO" é obrigatório na placa [P35(b)].
 No Estoque Mega, o lote novo não tem transferência no "Fazer no Mega": o kg continua no código do lote de origem
 (`estoque.codigo_mega_do_lote`)."""
 from __future__ import annotations
@@ -75,19 +75,12 @@ def _destino_sobra(db: Session, lote: Lote, e: CorteItuEntrada) -> tuple[dict | 
                    "diametro_mm": e.sobra_diametro_mm, "destino": None, "vai_para_reto": None,
                    "texto_regra": None, "texto_resultado": None, "conferida": bool(e.conferi_regra_reto)}
     if redondo:
-        # P35(d) [proposta]: no redondo a regra não se aplica; o operador escolhe. Fora do RETO, o lote novo leva o Ø
-        # da sobra (leitura do TÉCNICO para "medida nova" no redondo; pedido ao FUNCIONAL).
-        bloco["texto_regra"] = "Redondo: a regra do RETO (espessura × largura) não se aplica; escolha o destino."
-        if e.sobra_vai_para_reto is None:
-            r.adicionar("SOBRA_DESTINO_OBRIGATORIO", Nivel.ERRO,
-                        "Sobra de redondo fora da bitola: escolha se vai para RETO ou vira lote novo.")
-        elif e.sobra_vai_para_reto:
-            bloco.update(destino="RETO", vai_para_reto=True, texto_resultado="Escolhido: a sobra vai para RETO.")
-        elif not e.sobra_diametro_mm or e.sobra_diametro_mm <= 0:
-            r.adicionar("MEDIDA_SOBRA_OBRIGATORIA", Nivel.ERRO, "Informe o diâmetro da sobra (mm) para o lote novo.")
-        else:
-            bloco.update(destino="LOTE_NOVO", vai_para_reto=False,
-                         texto_resultado=f"Escolhido: lote novo Ø{e.sobra_diametro_mm:g} mm com a sobra.")
+        # Eduardo, 2026-11-19 (pendências item 2): o redondo é cortado na perpendicular ("como calabresa") e nunca
+        # perde o diâmetro: a sobra continua no lote, nunca vai para RETO nem vira lote novo.
+        bloco["texto_regra"] = "Redondo: a sobra continua no lote (o corte não muda o diâmetro)."
+        r.adicionar("SOBRA_REDONDO_NA_BITOLA", Nivel.ERRO,
+                    "Redondo não muda de medida no corte: a sobra continua no lote. Marque \"Sim, fica no lote\".")
+        return bloco, r
     else:
         esp, larg = e.sobra_espessura_mm, e.sobra_largura_mm
         _, bloco["texto_regra"], _ = regras.regra_reto(1, 1, lim["esp_limite_mm"], lim["larg_max_ate_limite_mm"],

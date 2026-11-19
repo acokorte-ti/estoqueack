@@ -96,6 +96,38 @@ class TestRedondoComComprimento(unittest.TestCase):
         self.assertEqual(r[("D2", "RETO", "")], 73)
 
 
+class TestListaNaSecao(unittest.TestCase):
+    """Eduardo, 2026-11-19 (pendências de 18/11 item 12): seção escrita como lista com "/" (larguras, espessuras ou
+    Ø) vale pelo MAIOR valor, como a faixa; a lista do comprimento continua sendo do comprimento.
+    Exemplos fictícios."""
+
+    def test_lista_na_secao_vale_o_maior(self):
+        from app.domain.medidas import chave_material, faixa_na_secao
+        for texto, bitola, escrita in (("H13 20x400/450/500", "20X500", "20X400/450/500"),
+                                       ("D2 12/16X300", "16X300", "12/16X300"),
+                                       ("S5 25 X 400 / 520MM", "25X520", "25X400/520"),
+                                       ("A8 Ø80/85", "Ø85", "Ø80/85"),
+                                       ("A8 RED 80/85", "Ø85", "RED80/85")):
+            m = interpretar(texto)
+            self.assertEqual((m.bitola, m.comprimento), (bitola, None), texto)
+            self.assertEqual(faixa_na_secao(texto), escrita, texto)
+            self.assertNotIn("/", chave_material(m, texto).texto, texto)
+
+    def test_lista_do_comprimento_continua_lista(self):
+        from app.domain.medidas import comprimento_texto, faixa_na_secao
+        m = interpretar("H13 30X200X2810-4035/3070-4330")
+        self.assertEqual((m.bitola, comprimento_texto("H13 30X200X2810-4035/3070-4330", m.formato)),
+                         ("30X200", "2810-4035/3070-4330"))
+        self.assertIsNone(faixa_na_secao("H13 30X200X2810-4035/3070-4330"))
+        # redondo: 'ØNxM' é Ø × comprimento; lista ou faixa depois do Ø é do comprimento, não da seção
+        for texto, compr in (("D6 Ø70X2820/2845/2850", "2820/2845/2850"), ("D2 RED 75X1690-2600", "1690-2600"),
+                             ("H13 STEEL ROUND BARS 66X3000-4200", "3000-4200")):
+            m = interpretar(texto)
+            self.assertEqual(m.formato, "REDONDO", texto)
+            self.assertEqual(comprimento_texto(texto, m.formato), compr, texto)
+            self.assertIsNone(faixa_na_secao(texto), texto)
+
+
 class TestLeituraConferencia1211(unittest.TestCase):
     """Conferência da leitura de 2026-11-12: escritas comuns que o leitor não entendia (exemplos fictícios)."""
 

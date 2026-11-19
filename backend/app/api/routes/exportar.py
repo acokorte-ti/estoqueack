@@ -57,19 +57,18 @@ def _d(v: str | None) -> date | None:
 def lotes(f: dict = Depends(filtros), db: Session = Depends(get_db),
           u: Usuario = Depends(deps.usuario_liberado)) -> StreamingResponse:
     itens = estoque.lote_resumo(db, estoque.consulta_lotes(db, _visivel(f, u)))
-    # spec v3.15 T04 (contrato §16.4): R$/kg, Valor R$ = saldo × R$/kg (inventário), precificador e anexos
+    # spec v3.15 T04 (contrato §16.4): R$/kg, Valor R$ = saldo × R$/kg (inventário) e anexos
     linhas = [[i["codigo"], ESTOQUES.get(i["estoque"], i["estoque"]), i["conteiner"], i["liga"], i["bitola"],
                i["descricao"], i["codigo_mega"], i["tipo"], i["saldo_kg"], i["reservado_kg"], i["disponivel_kg"],
                i["custo_kg"], round(i["saldo_kg"] * i["custo_kg"], 2) if i["custo_kg"] is not None else None,
-               "Sim" if i["indicadores"]["precificador"] else None, "Sim" if i["indicadores"]["anexo"] else None,
+               "Sim" if i["indicadores"]["anexo"] else None,
                (f"{i['origem']['conteiner'] or '-'} {i['origem']['bitola']}" if i["origem"] else None),
                "Sim" if i["indicadores"]["destinacao"] else None,
                "Não" if i["indicadores"]["origem_nao_identificada"] else None] for i in itens]
     return _planilha("Estoque por lote", ["Lote", "Estoque", "Contêiner", "Liga", "Bitola", "Descrição", "Código Mega",
                                           "Tipo", "Saldo kg", "Reservado kg", "Disponível kg", "R$/kg", "Valor R$",
-                                          "Tem precificador", "Anexos", "Origem", "Reserva/restrição",
-                                          "Origem identificada"],
-                     linhas, [11, 13, 10, 9, 11, 34, 11, 10, 11, 11, 12, 9, 12, 10, 8, 22, 10, 10])
+                                          "Anexos", "Origem", "Reserva/restrição", "Origem identificada"],
+                     linhas, [11, 13, 10, 9, 11, 34, 11, 10, 11, 11, 12, 9, 12, 8, 22, 10, 10])
 
 
 @router.get("/lotes-agrupado.xlsx")

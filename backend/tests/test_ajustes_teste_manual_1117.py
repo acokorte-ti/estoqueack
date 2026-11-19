@@ -227,7 +227,8 @@ def test_lote_menor_que_previsto_e_consumido_por_inteiro(amb_op50):
     corpo = _pedido_op50(ids, [("fim", 4), ("grande", 46)])
     v = client.post("/api/solicitacoes/validar", json=corpo, headers=h).json()
     oc = {o["codigo"]: o for o in v["ocorrencias"]}
-    assert "SALDO_INSUFICIENTE" not in oc and oc["CONSUMO_LOTE_INTEIRO"]["nivel"] == "CIENCIA"
+    # Eduardo, 2026-11-19 (pendências item 4): só informa (era "estou ciente")
+    assert "SALDO_INSUFICIENTE" not in oc and oc["CONSUMO_LOTE_INTEIRO"]["nivel"] == "ALERTA"
     ef = v["resultado"]["efeitos"][0]
     assert ef["peso_previsto_kg"] > 35 > ef["peso_peca_kg"]                  # previsto > saldo > peça acabada
     assert ef["reserva_kg"] == 35 and ef["consome_lote_inteiro"] is True

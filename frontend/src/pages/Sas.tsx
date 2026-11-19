@@ -60,6 +60,9 @@ export default function Sas() {
   const editaRs = altera || usuario?.perfil === "ANALISE";
   // spec v3.13 T14 / contrato §7 [P36]: a Amanda (perfil Análise) também informa o código do SA depois de cadastrar no Mega
   const informaCodigo = altera || usuario?.perfil === "ANALISE";
+  // Eduardo, 2026-11-19 (pendências item 17): a NF do corte em Itu (B2) é emitida no RJ e informada pelo Marcelo
+  const informaNfB2 = usuario?.perfil === "OPERACAO_RJ" || usuario?.perfil === "ADMIN";
+  const seleciona = altera || informaNfB2;
 
   // spec v3.16 T14 (Eduardo, 2026-11-18): a fila é vista e filtrada por COP (um COP tem várias OPs), não por OP;
   // o número do COP fica na URL (?cop=), o mesmo link do aviso "COP fechado: SA a fazer"
@@ -150,7 +153,7 @@ export default function Sas() {
   const selB2 = selecionados.filter((s) => s.origem === "CORTE_ITU");
 
   // spec v3.16 T14: um grupo por COP, na ordem em que aparecem; corte em Itu (B2) num grupo próprio
-  const NCOL = altera ? 9 : 8;
+  const NCOL = seleciona ? 9 : 8;
   const grupos: { chave: string; titulo: string; cop: Sa["cop"]; itens: Sa[] }[] = [];
   for (const s of itens) {
     const chave = s.cop ? `cop-${s.cop.id}` : s.origem === "CORTE_ITU" ? "corte-itu" : "outros";
@@ -279,7 +282,7 @@ export default function Sas() {
             <table className="tabela tabela-sa">
               <thead>
                 <tr>
-                  {altera && <th className="marcar-linha"><span className="sr-only">Selecionar</span></th>}
+                  {seleciona && <th className="marcar-linha"><span className="sr-only">Selecionar</span></th>}
                   <th>OP / cliente</th><th>Item</th><th>Material · contêiner</th><th className="num">Peso · peças</th>
                   <th>Código do SA</th><th>Situação</th><th>NF</th><th className="num">R$/kg</th>
                 </tr>
@@ -296,7 +299,7 @@ export default function Sas() {
                     <td colSpan={NCOL}>
                       <div className="grupo-cab">
                         <span className="grupo-titulo">
-                          {altera && (
+                          {(altera || (informaNfB2 && g.chave === "corte-itu")) && (
                             <input type="checkbox" aria-label={`Selecionar ${g.titulo}`} checked={todosSel}
                               onChange={() => setSel(todosSel ? sel.filter((id) => !g.itens.some((s) => s.id === id)) : [...new Set([...sel, ...g.itens.map((s) => s.id)])])} />
                           )}
@@ -320,8 +323,9 @@ export default function Sas() {
                   {g.itens.map((s) => (
                   <Fragment key={s.id}>
                   <tr className={["linha-sa", s.atrasado ? "atrasado" : "", sel.includes(s.id) ? "selecionada" : "", s.avisos?.length ? "com-aviso" : ""].join(" ")}>
-                    {altera && (
-                      <td className="marcar-linha"><input type="checkbox" aria-label={`Selecionar OP ${s.op}`} checked={sel.includes(s.id)} onChange={() => alternar(s.id)} /></td>
+                    {seleciona && (
+                      <td className="marcar-linha">{(altera || s.origem === "CORTE_ITU") &&
+                        <input type="checkbox" aria-label={`Selecionar OP ${s.op}`} checked={sel.includes(s.id)} onChange={() => alternar(s.id)} />}</td>
                     )}
                     <td className="quebra" data-rotulo="OP / cliente">
                       <strong className="mono">{s.op}</strong>
@@ -377,16 +381,16 @@ export default function Sas() {
         </div>
       )}
 
-      {altera && sel.length > 0 && (
+      {seleciona && sel.length > 0 && (
         <div className="barra-lote" role="region" aria-label="Ações para os pedidos selecionados">
           <span><b>{sel.length}</b> selecionado(s)</span>
-          <button type="button" className="secundario pequeno" disabled={ocupado} onClick={() => void preparar()}>Marcar como preparado</button>
-          <button type="button" className="secundario pequeno" disabled={!selB2.length || ocupado} onClick={() => setNfAberta(true)}
-            title="Só para linhas de corte em Itu (B2)">Informar NF (corte em Itu)</button>
-          <a className="secundario pequeno" href={exportarSelecionados} download><Icone nome="baixar" />Exportar</a>
-          <button type="button" className="primario pequeno" disabled={ocupado} onClick={() => void verificar(sel)}>
+          {altera && <button type="button" className="secundario pequeno" disabled={ocupado} onClick={() => void preparar()}>Marcar como preparado</button>}
+          {informaNfB2 && <button type="button" className={altera ? "secundario pequeno" : "primario pequeno"} disabled={!selB2.length || ocupado} onClick={() => setNfAberta(true)}
+            title="Só para linhas de corte em Itu (B2)">Informar NF (corte em Itu)</button>}
+          {altera && <a className="secundario pequeno" href={exportarSelecionados} download><Icone nome="baixar" />Exportar</a>}
+          {altera && <button type="button" className="primario pequeno" disabled={ocupado} onClick={() => void verificar(sel)}>
             <Icone nome="atualizar" />{ocupado ? "Consultando…" : "Verificar no Mega"}
-          </button>
+          </button>}
           <button type="button" className="fantasma pequeno" onClick={() => setSel([])} aria-label="Desmarcar todos"><Icone nome="x" /></button>
         </div>
       )}

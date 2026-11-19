@@ -86,8 +86,11 @@ export default function LancamentoCorteItu({ op, megaFora, lote, previsto = null
 
   const mudar = (p: Partial<typeof f>) => { setF({ ...f, ...p }); setV(null); setConferiRegra(false); };
   // sobra fora da bitola passa pela regra do RETO (spec v3.13 T13, contrato §6.1)
-  const sobraFora = (num(f.sobra) ?? 0) > 0 && !f.naBitola;
   const redondo = lote?.formato === "REDONDO";
+  // redondo nunca sai da bitola (Eduardo, 2026-11-19): a sobra fica no lote
+  const sobraFora = (num(f.sobra) ?? 0) > 0 && !f.naBitola && !redondo;
+  /** "45X600" → "45": a sobra fora da bitola mantém a espessura da matéria-prima inicial */
+  const espessuraDoLote = /^(\d+(?:[.,]\d+)?)X/i.exec(lote?.bitola ?? "")?.[1] ?? "";
   const medidaOk = !sobraFora || (redondo
     ? f.paraReto === true || (f.paraReto === false && (num(f.diam) ?? 0) > 0)
     : (num(f.esp) ?? 0) > 0 && (num(f.larg) ?? 0) > 0);
@@ -97,7 +100,7 @@ export default function LancamentoCorteItu({ op, megaFora, lote, previsto = null
     && (o.codigo.startsWith("REGRA_RETO_NAO_CONFERIDA") || !!regra))) : [];
   const regraPendente = sobraFora && !conferiRegra;
   const corpo = (c: Confirmacoes, conferi = conferiRegra) => ({
-    op: op?.numero, lote_id: lote?.id, consumo_kg: num(f.consumo), sobra_kg: num(f.sobra) ?? 0, sobra_na_bitola: f.naBitola,
+    op: op?.numero, lote_id: lote?.id, consumo_kg: num(f.consumo), sobra_kg: num(f.sobra) ?? 0, sobra_na_bitola: f.naBitola || redondo,
     pecas: num(f.pecas) ?? null, peso_usado_kg: num(f.usado) ?? null, previsto_kg: previsto ?? null,
     data_corte: f.data || null, observacao: f.obs.trim() || null, op_manual: megaFora ? { item_codigo: null, cliente: null } : null,
     consumo_misto: misto,
@@ -200,11 +203,15 @@ export default function LancamentoCorteItu({ op, megaFora, lote, previsto = null
           <label>Consumo da OP (kg, balança)<input inputMode="decimal" className="campo-grande" value={f.consumo} onChange={(e) => mudar({ consumo: e.target.value })} /></label>
           <label>Sobra (kg, balança)<input inputMode="decimal" className="campo-grande" value={f.sobra} onChange={(e) => mudar({ sobra: e.target.value })} placeholder="0" /></label>
         </div>
-        {(num(f.sobra) ?? 0) > 0 && (
+        {(num(f.sobra) ?? 0) > 0 && redondo && (
+          <p className="dica">Redondo: a sobra continua no lote (o corte não muda o diâmetro).</p>
+        )}
+        {(num(f.sobra) ?? 0) > 0 && !redondo && (
           <fieldset className="formatos">
             <legend>A sobra ainda está na bitola {lote?.bitola ?? ""}?</legend>
             <label className={f.naBitola ? "opcao marcada" : "opcao"}><input type="radio" name="bitola" checked={f.naBitola} onChange={() => mudar({ naBitola: true })} />Sim, fica no lote</label>
-            <label className={!f.naBitola ? "opcao marcada" : "opcao"}><input type="radio" name="bitola" checked={!f.naBitola} onChange={() => mudar({ naBitola: false })} />Não, mudou de medida</label>
+            {/* a espessura da sobra é a da matéria-prima inicial (Eduardo, 2026-11-19): já vem preenchida */}
+            <label className={!f.naBitola ? "opcao marcada" : "opcao"}><input type="radio" name="bitola" checked={!f.naBitola} onChange={() => mudar({ naBitola: false, esp: f.esp || espessuraDoLote })} />Não, mudou de medida</label>
           </fieldset>
         )}
         {sobraFora && (

@@ -1,9 +1,10 @@
-/** Documentos anexos (contrato §16.4, spec v3.15 T06 "Documentos anexos"): NF, packing list, precificador, outro. */
+/** Documentos anexos (contrato §16.4, spec v3.15 T06 "Documentos anexos"): NF de recebimento, packing list, outro.
+ * Precificador não é anexo (Eduardo, 2026-11-19): o tipo fica só para mostrar o que já existir. */
 import { useEffect, useState } from "react";
 import { api, qs } from "./cliente";
 
 export type TipoAnexo = "NF" | "PACKING_LIST" | "PRECIFICADOR" | "OUTRO";
-export const TIPOS_ANEXO: TipoAnexo[] = ["NF", "PACKING_LIST", "PRECIFICADOR", "OUTRO"];
+export const TIPOS_ANEXO: TipoAnexo[] = ["NF", "PACKING_LIST", "OUTRO"];
 export const TIPO_ANEXO: Record<TipoAnexo, string> = {
   NF: "NF", PACKING_LIST: "Packing list", PRECIFICADOR: "Precificador do contêiner", OUTRO: "Outro",
 };
@@ -20,19 +21,17 @@ export interface AnexoPendente { chave: number; tipo: TipoAnexo; descricao: stri
 
 export const MB_PADRAO = 10;
 const EXT_BASE = ["pdf", "jpg", "jpeg", "png"];
-const EXT_PLANILHA = ["xls", "xlsx"];
 
-/** `accept` do input de arquivo para o tipo escolhido. */
-export const aceitos = (tipo: TipoAnexo) =>
-  [...EXT_BASE, ...(tipo === "PRECIFICADOR" ? EXT_PLANILHA : [])].map((e) => `.${e}`).join(",") + ",application/pdf,image/jpeg,image/png";
+/** `accept` do input de arquivo (o tipo não muda mais os formatos). */
+export const aceitos = (_tipo?: TipoAnexo) =>
+  EXT_BASE.map((e) => `.${e}`).join(",") + ",application/pdf,image/jpeg,image/png";
 
 const mbTexto = (bytes: number) => (bytes / 1048576).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
 
 /** Mesmas mensagens do backend (ANEXO_TIPO_NAO_ACEITO, ANEXO_GRANDE), para avisar antes de enviar. */
-export function conferirArquivo(f: File, tipo: TipoAnexo, maxMb: number): string | null {
+export function conferirArquivo(f: File, _tipo: TipoAnexo, maxMb: number): string | null {
   const ext = (f.name.split(".").pop() ?? "").toLowerCase();
-  const ok = EXT_BASE.includes(ext) || (tipo === "PRECIFICADOR" && EXT_PLANILHA.includes(ext));
-  if (!ok) return "Envie PDF, JPG ou PNG (no precificador, também XLS ou XLSX).";
+  if (!EXT_BASE.includes(ext)) return "Envie PDF, JPG ou PNG.";
   if (f.size === 0) return "O arquivo está vazio.";
   if (f.size > maxMb * 1048576) return `O arquivo tem ${mbTexto(f.size)} MB; o limite é ${maxMb.toLocaleString("pt-BR")} MB. Escaneie com resolução menor ou divida o PDF.`;
   return null;

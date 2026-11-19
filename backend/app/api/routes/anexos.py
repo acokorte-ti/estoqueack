@@ -20,7 +20,7 @@ from app.services import anexos as svc
 
 router = APIRouter(tags=["anexos"])
 ADMIN = deps.exigir_perfil()
-Tipo = Literal["NF", "PACKING_LIST", "PRECIFICADOR", "OUTRO"]
+Tipo = Literal["NF", "PACKING_LIST", "OUTRO"]   # precificador não é anexo (Eduardo, 2026-11-19, pendências 7)
 
 
 class Justificativa(BaseModel):

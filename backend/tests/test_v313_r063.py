@@ -116,7 +116,8 @@ def test_t13_limites_vem_da_t23(amb):
     assert "MEDIDA_SOBRA_INVERTIDA" in _codigos(v)
 
 
-def test_t13_redondo_operador_escolhe(amb):
+def test_t13_redondo_sobra_fica_no_lote(amb):
+    """Eduardo, 2026-11-19 (pendências item 2): o redondo nunca sai da bitola; a sobra fica no lote."""
     from app.core.db import SessionLocal
     from app.models import ItemMP, Liga
     from app.services import movimentos as mov
@@ -134,20 +135,14 @@ def test_t13_redondo_operador_escolhe(amb):
     base = {"op": 100508, "lote_id": lid, "consumo_kg": 100, "sobra_kg": 50, "sobra_na_bitola": False,
             "peso_usado_kg": 155, "pecas": 1, "conferi_regra_reto": True}
     v = client.post("/api/cortes-itu/validar", json=base, headers=h).json()
-    assert "SOBRA_DESTINO_OBRIGATORIO" in _codigos(v) and v["resultado"]["regra_reto"]["aplicavel"] is False
-    v = client.post("/api/cortes-itu/validar", json={**base, "sobra_vai_para_reto": False}, headers=h).json()
-    assert "MEDIDA_SOBRA_OBRIGATORIA" in _codigos(v)
-    r = client.post("/api/cortes-itu", json={**base, "sobra_vai_para_reto": False, "sobra_diametro_mm": 60},
-                    headers=h)
+    assert "SOBRA_REDONDO_NA_BITOLA" in _codigos(v) and v["resultado"]["regra_reto"]["aplicavel"] is False
+    r = client.post("/api/cortes-itu", json={**base, "sobra_vai_para_reto": True}, headers=h)
+    assert r.status_code == 409 and "SOBRA_REDONDO_NA_BITOLA" in r.text
+    r = client.post("/api/cortes-itu", json={**base, "sobra_na_bitola": True}, headers=h)
     assert r.status_code == 201, r.text
     c = r.json()
-    assert c["lote_sobra"]["bitola"] == "Ø60" and c["sobra_diametro_mm"] == 60 and c["sa_id"]
-    novo = client.get(f"/api/lotes/{c['lote_sobra']['id']}").json()
-    assert novo["estoque"] == "RJ_EM_ITU" and novo["codigo_mega"] is None
-    r = client.post("/api/cortes-itu", json={**base, "consumo_kg": 50, "sobra_kg": 40, "peso_usado_kg": 90,
-                                             "sobra_vai_para_reto": True}, headers=h)
-    assert r.status_code == 201, r.text
-    assert r.json()["sobra_destino"] == "RETO" and r.json()["lote_reto"]
+    assert not c.get("lote_sobra") and not c.get("lote_reto")
+    assert client.get(f"/api/lotes/{lid}").json()["saldo_kg"] == 195     # 300 − 155 usados + 50 de sobra no lote
 
 
 # ---------------- R065(2) e R065(4) ----------------

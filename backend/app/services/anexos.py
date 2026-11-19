@@ -22,17 +22,18 @@ from .base import ErroNegocio, NaoEncontrado, agora, hoje, lote_visivel, paramet
 
 TIPO_TEXTO = {"NF": "NF", "PACKING_LIST": "Packing list", "PRECIFICADOR": "Precificador do contêiner",
               "OUTRO": "Outro"}
+# Eduardo, 2026-11-19 (pendências item 7): anexo é para a NF de recebimento do contêiner (o Marcelo importa quando a
+# matéria-prima chega); o precificador não é anexo, é a Bruna no SA, quase no fim, antes da NF. PRECIFICADOR fica só
+# para ler o que já existir.
+TIPOS_ENVIO = ("NF", "PACKING_LIST", "OUTRO")
 # extensão → (Content-Type servido, assinaturas aceitas do começo do arquivo)
 FORMATOS: dict[str, tuple[str, tuple[bytes, ...]]] = {
     "pdf": ("application/pdf", (b"%PDF",)),
     "jpg": ("image/jpeg", (b"\xff\xd8\xff",)),
     "jpeg": ("image/jpeg", (b"\xff\xd8\xff",)),
     "png": ("image/png", (b"\x89PNG\r\n\x1a\n",)),
-    "xlsx": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", (b"PK\x03\x04",)),
-    "xls": ("application/vnd.ms-excel", (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",)),
 }
-SO_PRECIFICADOR = {"xls", "xlsx"}    # [proposta, P41(c)]: planilha só no precificador
-MSG_TIPO = "Envie PDF, JPG ou PNG (no precificador, também XLS ou XLSX)."
+MSG_TIPO = "Envie PDF, JPG ou PNG."
 
 
 # ---------------- campos ----------------
@@ -348,8 +349,8 @@ def _nome_limpo(nome: str | None) -> str:
 
 def _novo(db: Session, *, tipo: str, nome: str | None, descricao: str | None, dados: bytes, alvo: dict[str, int],
           usuario: Usuario, ip: str | None, onde: dict[str, Any]) -> dict[str, Any]:
-    if tipo not in TIPO_TEXTO:
-        raise ErroNegocio("Tipo de documento inválido. Use NF, packing list, precificador ou outro.")
+    if tipo not in TIPOS_ENVIO:
+        raise ErroNegocio("Tipo de documento inválido. Use NF, packing list ou outro.")
     desc = texto(descricao, 120)
     if tipo == "OUTRO" and not desc:
         raise ErroNegocio('Descreva o documento do tipo "Outro".')
@@ -360,7 +361,7 @@ def _novo(db: Session, *, tipo: str, nome: str | None, descricao: str | None, da
     m = re.search(r"\.([A-Za-z0-9]{1,5})$", nome_ok)
     ext = m.group(1).lower() if m else ""
     fmt = FORMATOS.get(ext)
-    if fmt is None or (ext in SO_PRECIFICADOR and tipo != "PRECIFICADOR") or not dados.startswith(fmt[1]):
+    if fmt is None or not dados.startswith(fmt[1]):
         raise ErroNegocio(MSG_TIPO)
     a = Anexo(tipo=tipo, descricao=desc, nome_arquivo=nome_ok, content_type=fmt[0], tamanho_bytes=len(dados),
               sha256=hashlib.sha256(dados).hexdigest(), usuario_id=usuario.id, **alvo)

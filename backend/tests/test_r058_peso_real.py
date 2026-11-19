@@ -36,7 +36,7 @@ def test_sem_pendencia_nada_muda(amb):
     client, u, ids, _ = amb
     h = entrar(client, u["itu"])
     s = client.get("/api/pendencias-peso-real", headers=h).json()
-    assert s["quantidade"] == 0 and s["bloqueado"] is False and s["dias_limite"] == 7 and s["aviso"] is None
+    assert s["quantidade"] == 0 and s["bloqueado"] is False and s["dias_limite"] == 14 and s["aviso"] is None
     v = client.post("/api/solicitacoes/validar", json=corpo_solicitacao(ids["l33"]), headers=h).json()
     assert "PESO_REAL_PENDENTE" not in _codigos(v) and "PESO_REAL_AGUARDANDO" not in _codigos(v)
 
@@ -50,10 +50,10 @@ def test_aviso_antes_do_prazo_e_bloqueio_depois(amb):
     assert s["itens"][0]["solicitacao_id"] == sol_id and s["itens"][0]["lote_itu_id"] == lote_itu
     v = client.post("/api/solicitacoes/validar", json=corpo_solicitacao(ids["l33"], op=100600), headers=h).json()
     assert _codigos(v).get("PESO_REAL_AGUARDANDO") == "ALERTA"           # aviso cinza, não bloqueia
-    # passou de 7 dias do recebimento do COP → bloqueia "Enviar ao RJ" para todos
-    _envelhecer(8)
+    # passou de 14 dias do recebimento do COP → bloqueia "Enviar ao RJ" para todos
+    _envelhecer(15)
     s = client.get("/api/pendencias-peso-real", headers=h).json()
-    assert s["bloqueado"] is True and s["vencidas"] == 1 and "sem peso real há mais de 7 dias" in s["mensagem"]
+    assert s["bloqueado"] is True and s["vencidas"] == 1 and "sem peso real há mais de 14 dias" in s["mensagem"]
     corpo = corpo_solicitacao(ids["l33"], op=100601)
     r = client.post("/api/solicitacoes", json=corpo, headers=h)
     assert r.status_code == 409 and _codigos(r.json())["PESO_REAL_PENDENTE"] == "ERRO"
@@ -68,7 +68,7 @@ def test_aviso_antes_do_prazo_e_bloqueio_depois(amb):
     p = client.get("/api/painel/pendencias", headers=h).json()
     card = next(c for c in p["grupos"]["ESTOQUE"] if c["codigo"] == "PECA_INTEIRA_AGUARDANDO_CORTE")
     assert card["nivel"] == "ALERTA" and card["itens"][0]["vencida"] is True
-    assert card["itens"][0]["dias_desde_recebimento"] == 8
+    assert card["itens"][0]["dias_desde_recebimento"] == 15
     from app.core.db import SessionLocal
     from app.services import avisos
     with SessionLocal() as db:
@@ -83,7 +83,7 @@ def test_aviso_antes_do_prazo_e_bloqueio_depois(amb):
 def test_encerrar_pendencia_com_justificativa_desbloqueia(amb):
     client, u, ids, fab = amb
     sol_id, _, _ = _peca_inteira_recebida(client, u, ids, fab)
-    _envelhecer(10)
+    _envelhecer(17)
     h = entrar(client, u["itu"])
     url = f"/api/pendencias-peso-real/{sol_id}/encerrar"
     assert client.post(url, json={"justificativa": ""}, headers=h).status_code == 422
@@ -103,16 +103,16 @@ def test_encerrar_pendencia_com_justificativa_desbloqueia(amb):
 def test_t13_resolve_a_pendencia_e_rascunho_so_avisa(amb):
     client, u, ids, fab = amb
     sid, lote_itu, previsto = _peca_inteira_recebida(client, u, ids, fab)
-    _envelhecer(9)
+    _envelhecer(16)
     h = entrar(client, u["itu"])
     v = client.post("/api/solicitacoes/validar", json=corpo_solicitacao(ids["l33"], op=100603, enviar=False),
                     headers=h).json()
     assert _codigos(v).get("PESO_REAL_AGUARDANDO") == "ALERTA" and "PESO_REAL_PENDENTE" not in _codigos(v)
     p = client.get("/api/painel/pendencias", headers=h).json()
     card = next(c for c in p["grupos"]["ESTOQUE"] if c["codigo"] == "PECA_INTEIRA_AGUARDANDO_CORTE")
-    assert card["limite_dias"] == 7 and card["vencidas"] == 1
+    assert card["limite_dias"] == 14 and card["vencidas"] == 1
     item = card["itens"][0]
-    assert item["pendencia_id"] == sid and item["lote_id"] == lote_itu and item["dias"] == 9 and item["lote"]
+    assert item["pendencia_id"] == sid and item["lote_id"] == lote_itu and item["dias"] == 16 and item["lote"]
     corpo = {"op": 100092, "lote_id": lote_itu, "consumo_kg": round(previsto, 1), "sobra_kg": 300,
              "sobra_na_bitola": True, "pecas": 1, "peso_usado_kg": 1288,
              "confirmacoes": {"PERDA_CORTE_ALTA": "Barra com ponta torta descartada"}}

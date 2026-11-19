@@ -226,11 +226,18 @@ def test_p10_painel_e_sa(amb):
         db.add(sa)
         db.commit()
         sa_id = sa.id
-    assert client.get(f"/api/sas/{sa_id}", headers=hm).status_code == 404
-    assert client.get("/api/sas?situacao=PENDENTE", headers=hm).json()["total"] == 0
+    # desde 2026-11-19 a Operação RJ vê o SA do corte em Itu (B2): é ela que informa a NF (pendências item 17)
+    assert client.get(f"/api/sas/{sa_id}", headers=hm).status_code == 200
+    assert client.get("/api/sas?situacao=PENDENTE", headers=hm).json()["total"] == 1
+    with _db() as db:
+        carga = CadastroSa(origem="CARGA", situacao="PENDENTE", op=100593, item_codigo=1)
+        db.add(carga)
+        db.commit()
+        carga_id = carga.id
+    assert client.get(f"/api/sas/{carga_id}", headers=hm).status_code == 404     # SA da carga sem COP: não
     hi = entrar(client, us["itu"])
     assert client.get(f"/api/sas/{sa_id}", headers=hi).status_code == 200
-    assert client.get("/api/sas?situacao=PENDENTE", headers=hi).json()["total"] == 1
+    assert client.get(f"/api/sas/{carga_id}", headers=hi).status_code == 200
 
 
 def test_modelo_diferenca_explicada_revisao_banco(amb):

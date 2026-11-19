@@ -276,6 +276,7 @@ class NfB2(BaseModel):
 
 
 @router.post("/sas/nf")
-def nf_b2(c: NfB2, request: Request, db: Session = Depends(get_db), u: Usuario = Depends(ITU)) -> list[dict]:
+def nf_b2(c: NfB2, request: Request, db: Session = Depends(get_db), u: Usuario = Depends(RJ)) -> list[dict]:
+    """NF do corte em Itu (B2): emitida no RJ e informada pela Operação RJ (Eduardo, 2026-11-19, pendências 17)."""
     return [sas.para_dict(db, s) for s in sas.informar_nf_b2(db, c.ids, c.numero, c.emitente, c.data, usuario=u,
                                                              ip=deps.ip_cliente(request))]

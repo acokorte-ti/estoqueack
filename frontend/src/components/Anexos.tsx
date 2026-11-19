@@ -58,7 +58,7 @@ function FormAnexo({ aoEscolher, ocupado = false }: { aoEscolher: (tipo: TipoAne
           )}
         </div>
       </div>
-      <small className="dica">PDF, JPG ou PNG{tipo === "PRECIFICADOR" ? " (no precificador, também XLS ou XLSX)" : ""}, até {maxMb.toLocaleString("pt-BR")} MB.{falta ? " Escreva a descrição antes de escolher o arquivo." : ""}</small>
+      <small className="dica">PDF, JPG ou PNG, até {maxMb.toLocaleString("pt-BR")} MB.{falta ? " Escreva a descrição antes de escolher o arquivo." : ""}</small>
       {erro && <p className="validacao erro" role="alert">{erro}</p>}
     </div>
   );

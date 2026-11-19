@@ -144,7 +144,7 @@ export default function Estoque() {
                   <td>
                     {l.indicadores.destinacao && <span className="etiqueta atencao" title="Reserva ou restrição">reserva</span>}
                     {l.indicadores.nota && <span className="etiqueta info" title="Tem nota">nota</span>}
-                    {l.indicadores.anexo && <span className="clipe" title="Tem documento anexo (NF, packing list ou precificador)"><Icone nome="clipe" /><span className="sr-only">tem documento anexo</span></span>}
+                    {l.indicadores.anexo && <span className="clipe" title="Tem documento anexo (NF de recebimento ou outro)"><Icone nome="clipe" /><span className="sr-only">tem documento anexo</span></span>}
                   </td>
                 </tr>
               ))}

@@ -4,7 +4,7 @@
 - Solicitação que passou para Atrasado (> ATRASO_ATRASADO_DIAS, 15 dias) → Estoque Itu e Operação RJ.
 - Reserva/restrição vencendo em AVISO_RESERVA_DIAS (7 dias) → quem criou (ou Análise).
 - Resumo diário das exceções de tolerância justificadas (dia anterior) → Admin, a partir das 07h.
-- Peça inteira do RJ sem peso real depois de PENDENCIA_PESO_REAL_DIAS (7 dias do recebimento) → Estoque Itu e Admin
+- Peça inteira do RJ sem peso real depois de PENDENCIA_PESO_REAL_DIAS (14 dias do recebimento) → Estoque Itu e Admin
   (R058, spec v3.11 §2.2 passo 7; [proposta, P33(d)]).
 """
 from __future__ import annotations

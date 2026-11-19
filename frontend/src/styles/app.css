@@ -515,9 +515,10 @@ label.secundario:focus-within { outline: 2px solid var(--aco-preto); outline-off
 .faixa-bloqueio { display: flex; flex-wrap: wrap; gap: var(--esp-3); align-items: center; justify-content: space-between; margin-bottom: var(--esp-4); }
 .faixa-bloqueio .validacao { flex: 1 1 20rem; margin: 0; }
 
-/* ===================== Cadastro de SA (T14): grupo por COP com progresso; a ação fica na coluna do dado ===================== */
-.tabela tr.grupo-cop td { background: #f1f3f5; border-bottom: 1px solid var(--aco-borda-clara); padding: 0.75rem; height: auto; }
-.tabela tr.grupo-cop:hover td { background: #f1f3f5; }
+/* ===================== Cadastro de SA (T14, v3.19): grupo por COP; um cartão por OP com os campos do SA à mostra ===================== */
+.grupo-sa + .grupo-sa { border-top: 1px solid var(--aco-borda-clara); }
+.grupo-sa:last-child .cartao-sa:last-child { border-radius: 0 0 var(--raio-painel) var(--raio-painel); }
+.grupo-sa > .grupo-cab { background: #f1f3f5; border-bottom: 1px solid var(--aco-borda-clara); padding: 0.75rem 1.125rem; }
 .grupo-cab { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem; }
 .grupo-titulo { display: flex; align-items: center; gap: 10px; font-size: 1rem; font-weight: 700; color: var(--aco-preto); }
 .grupo-titulo .ic { color: var(--aco-medio); }
@@ -526,31 +527,44 @@ label.secundario:focus-within { outline: 2px solid var(--aco-preto); outline-off
 .progresso .trilho { height: 6px; border-radius: 3px; background: #dfe2e6; overflow: hidden; }
 .progresso .trilho i { display: block; height: 100%; background: var(--sucesso); }
 .progresso .trilho i.parcial { background: #c99a1a; }
-/* "Falta": tracejado amarelo = campo obrigatório ainda vazio; clicar abre o preenchimento */
-.falta {
-  display: inline-flex; align-items: center; gap: 6px; min-height: 2rem; padding: 0 10px; white-space: nowrap;
-  border: 1.5px dashed var(--ciencia-borda); border-radius: var(--raio); background: var(--ciencia-fundo); color: var(--ciencia);
-  font-family: var(--f-texto); font-weight: 600; font-size: var(--t-mini);
+/* cartão: [marcar] [dados da peça e situação] [código do SA | R$/kg do precificador] */
+.cartao-sa {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.2fr); gap: var(--esp-3) var(--esp-5); align-items: start;
+  padding: var(--esp-4) 1.125rem; border-bottom: 1px solid var(--aco-linha); background: var(--branco);
 }
-.falta:hover { border-style: solid; }
-.falta .ic, .valor .ic { width: 15px; height: 15px; }
-/* valor já preenchido que pode ser corrigido: mostra o valor e o lápis */
-.valor {
-  display: inline-flex; align-items: center; gap: 8px; min-height: 2rem; padding: 0 8px 0 10px; white-space: nowrap;
-  border: 1.5px solid var(--aco-borda-clara); border-radius: var(--raio); background: var(--branco);
-  font: 600 var(--t-pequeno) var(--f-mono); color: var(--aco-preto);
-}
-.valor .ic { color: var(--aco-medio); }
-.valor:hover { border-color: var(--aco-preto); }
-/* o valor principal da célula não quebra; o texto de apoio e os botões de apoio quebram para a tabela caber na tela */
-.tabela-sa td { white-space: nowrap; }
-.tabela-sa td.quebra, .tabela-sa td .sub, .tabela-sa .celula-acoes, .tabela-sa .celula-acoes .link { white-space: normal; }
-.tabela-sa td.quebra { min-width: 8rem; }
-.tabela-sa .celula-acoes .link { text-align: left; }
-.tabela-sa .botao-teste { flex-wrap: wrap; justify-content: flex-start; row-gap: 4px; padding-top: 4px; padding-bottom: 4px; }
-.tabela-sa .botao-teste .etiqueta { margin-left: 0; }
-.tabela-sa input[type="checkbox"], .grupo-titulo input[type="checkbox"] { accent-color: var(--ack-vermelho-escuro); }
-.tabela-sa .celula-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.grupo-sa .cartao-sa:last-child { border-bottom: 0; }
+.cartao-sa.sem-marcar { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); }
+.cartao-sa.selecionada { background: #fff7f7; }
+.cartao-sa.atrasado { box-shadow: inset 4px 0 0 var(--bloqueio); }
+.sa-marcar { padding-top: 4px; min-width: 1.125rem; }
+.cartao-sa input[type="checkbox"], .grupo-titulo input[type="checkbox"] { accent-color: var(--ack-vermelho-escuro); }
+.sa-topo { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.sa-op { font: 700 1.0625rem var(--f-mono); color: var(--aco-preto); }
+.sa-cliente { font-weight: 600; color: var(--aco-grafite); }
+.sa-item { margin: 2px 0 0; font-size: var(--t-pequeno); color: var(--aco-grafite); }
+.sa-fatos { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: var(--esp-2) 0 0; font-size: var(--t-pequeno); }
+.sa-fatos div { display: flex; gap: 5px; }
+.sa-fatos dt { color: var(--aco-medio); }
+.sa-fatos dd { margin: 0; font-weight: 600; color: var(--aco-preto); }
+.sa-situacao { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: var(--esp-3); font-size: var(--t-pequeno); color: var(--aco-medio); }
+.sa-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--esp-2); }
+.sa-acoes .botao-teste { flex-wrap: wrap; justify-content: flex-start; row-gap: 4px; padding-top: 4px; padding-bottom: 4px; }
+.sa-acoes .botao-teste .etiqueta { margin-left: 0; }
+.sa-ident .validacao { margin: var(--esp-2) 0 0; font-size: var(--t-pequeno); }
+.sa-campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--esp-3); }
+/* campo do SA: rótulo sempre à vista; tracejado amarelo = ainda falta para o SA fechar */
+.campo-sa { display: grid; gap: 6px; align-content: start; padding: 10px 12px; border: 1.5px solid var(--aco-linha); border-radius: var(--raio); background: #fafbfc; }
+.campo-sa.vazio { border-style: dashed; border-color: var(--ciencia-borda); background: var(--ciencia-fundo); }
+.campo-sa .rotulo-campo { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--t-pequeno); font-weight: 700; color: var(--aco-preto); }
+.campo-sa .rotulo-campo .sugerido { margin-left: 0; }
+.campo-sa .obrigatorio { font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ciencia); }
+.campo-sa .campo-linha { display: flex; gap: 8px; }
+.campo-sa .campo-linha input { flex: 1 1 5rem; width: 100%; font-family: var(--f-mono); background: var(--branco); }
+.campo-sa .campo-linha button { min-height: var(--toque); flex: none; }
+.campo-sa .valor-fixo { font: 600 1.0625rem var(--f-mono); color: var(--aco-preto); }
+.campo-sa .dica { font-size: var(--t-mini); line-height: 1.35; }
+.campo-sa .erro-campo { color: var(--bloqueio); font-size: var(--t-mini); font-weight: 600; }
+@media (max-width: 1200px) { .sa-campos { grid-template-columns: 1fr; } }
 
 /* ===================== Impressão (A4, sem menu) ===================== */
 .so-impressao { display: none; }
@@ -682,19 +696,11 @@ label.secundario:focus-within { outline: 2px solid var(--aco-preto); outline-off
   .tarefa > .secundario, .tarefa > .primario { grid-column: 2 / -1; justify-self: start; }
   .barra-lote { left: var(--esp-3); right: var(--esp-3); bottom: var(--esp-3); transform: none; width: auto; max-width: none; }
 
-  /* Cadastro de SA: cada pedido vira um cartão */
-  .tabela.tabela-sa { display: block; border-radius: 0 0 var(--raio-painel) var(--raio-painel); }
-  .tabela-sa thead { display: none; }
-  .tabela-sa tbody, .tabela-sa tr, .tabela-sa td { display: block; width: 100%; }
-  .tabela-sa tr.linha-sa { position: relative; padding: 10px 14px 12px 3rem; border-bottom: 1px solid var(--aco-linha); }
-  .tabela-sa tr.linha-sa td { border: 0; padding: 3px 0; height: auto; text-align: left; white-space: normal; }
-  .tabela-sa tr.linha-sa td[data-rotulo]::before { content: attr(data-rotulo); display: block; font: 700 0.75rem var(--f-texto); color: var(--aco-medio); }
-  .tabela-sa tr.linha-sa td.marcar-linha { position: absolute; left: 14px; top: 12px; width: auto; }
-  .tabela-sa tr.linha-sa td.marcar-linha::before { display: none; }
-  .tabela-sa tr.grupo-cop td { display: block; }
-  .tabela-sa tr.linha-aviso td { padding: 0 14px; }
-  .tabela-sa tr.atrasado td:first-child { box-shadow: none; }
-  .tabela-sa tr.atrasado { box-shadow: inset 4px 0 0 var(--bloqueio); }
+  /* Cadastro de SA: os campos do SA descem para baixo dos dados da peça, na largura toda */
+  .cartao-sa, .cartao-sa.sem-marcar { grid-template-columns: auto minmax(0, 1fr); gap: var(--esp-3); padding: 12px 14px; }
+  .cartao-sa.sem-marcar { grid-template-columns: minmax(0, 1fr); }
+  .cartao-sa .sa-campos { grid-column: 1 / -1; }
+  .grupo-sa > .grupo-cab { padding: 0.75rem 14px; }
 }
 @media (max-width: 900px) and (prefers-reduced-motion: reduce) { .lateral { transition: none; } }
 @media (max-width: 480px) { .topo-pedir { display: none; } }

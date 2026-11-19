@@ -93,17 +93,19 @@ def test_confirmar_sa_teste_libera_o_envio_do_cop(amb, modo):
     assert r.status_code == 400 and "código do SA" in r.json()["detail"]      # linha nova ainda sem código
     r = client.post(f"/api/sas/{sa['id']}/confirmar-teste", json={"sa_codigo": 50001}, headers=h)
     assert r.status_code == 200, r.text
-    assert r.json()["situacao"] == "CONFIRMADO" and r.json()["sa_codigo"] == 50001
-    assert r.json()["confirmacao_teste"] is True
-    assert client.post(f"/api/sas/{sa['id']}/confirmar-teste", json={}, headers=h).status_code == 400
-    assert client.get(f"/api/solicitacoes/{sid}").json()["situacao"] == "SA_PRONTO"
+    # v3.19: igual à confirmação real, sem o precificador o SA fica no Mega esperando por ele
+    assert r.json()["situacao"] == "AGUARDANDO_MEGA" and r.json()["sa_no_mega"] is True
+    assert r.json()["sa_codigo"] == 50001 and r.json()["confirmacao_teste"] is True
     with SessionLocal() as db:
         aud = db.scalar(select(Auditoria).where(Auditoria.acao == "SA_CONFIRMADO_TESTE"))
         assert aud.entidade_id == str(sa["id"]) and aud.usuario_id is not None
         assert aud.depois["confirmacao"] == "confirmação de teste" and aud.depois["usuario"] == "admin"
         assert aud.antes["situacao"] == "PENDENTE"
 
-    client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h)   # v3.16: R$/kg antes da NF
+    r = client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h)
+    assert r.json()["situacao"] == "CONFIRMADO" and r.json()["sa_no_mega"] is False
+    assert client.post(f"/api/sas/{sa['id']}/confirmar-teste", json={}, headers=h).status_code == 400
+    assert client.get(f"/api/solicitacoes/{sid}").json()["situacao"] == "SA_PRONTO"
 
     # RJ segue o fluxo normal: aviso, NF e envio
     h = entrar(client, u["rj"])
@@ -118,6 +120,7 @@ def test_confirmar_sa_teste_aguardando_mega_usa_o_codigo_informado(amb, modo):
     modo(True)
     _, _, sa = _cop_fechado(client, u, ids)
     h = entrar(client, u["itu"])
+    client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h)
     r = client.post(f"/api/sas/{sa['id']}/codigo", json={"sa_codigo": 50007}, headers=h)
     assert r.json()["situacao"] == "AGUARDANDO_MEGA"                          # Mega falso sem a carga do SA
     h = entrar(client, u["admin"])

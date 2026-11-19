@@ -57,6 +57,7 @@ def test_lote_dividido_vale_o_estagio_menos_avancado(amb):
     fab.obter().situacoes_sa[50001] = SituacaoSa(50001, True, "SA PECA", True, date.today(), 12)
     h = entrar(client, u["itu"])
     for sa in client.get("/api/sas").json()["itens"]:
+        client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h)   # v3.19: só fecha com precificador
         client.post(f"/api/sas/{sa['id']}/codigo", json={"sa_codigo": 50001,
                                                         "confirmacoes": {"SA_CODIGO_TROCADO": "Mesmo SA da OP"}},
                     headers=h)
@@ -98,6 +99,7 @@ def test_trocar_op_depois_do_sa_confirmado_avisa(amb):
     fab.obter().situacoes_sa[50001] = SituacaoSa(50001, True, "SA PECA", True, date.today(), 12)
     h = entrar(client, u["itu"])
     sa = client.get("/api/sas").json()["itens"][0]
+    client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h)   # v3.19: só fecha com precificador
     client.post(f"/api/sas/{sa['id']}/codigo", json={"sa_codigo": 50001}, headers=h)
     r = client.post(f"/api/solicitacoes/{s['id']}/trocar-op",
                     json={"op": 100777, "justificativa": "OP original cancelada pelo cliente"}, headers=h)

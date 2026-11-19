@@ -40,13 +40,13 @@ def _cop_fechado(client, u, ids, numero=801):
     return cop["id"], client.get("/api/sas", params={"cop": numero}).json()["itens"][0]
 
 
-def _confirmar(client, fab, h, sa, codigo=50101):
+def _confirmar(client, fab, h, sa, codigo=50101, situacao="CONFIRMADO"):
     from app.integrations.mega.gateway import SituacaoSa
     fab.obter().situacoes_sa[codigo] = SituacaoSa(codigo, True, "SA PECA - CÓD.777", True, date.today(), 82.0)
     v = client.post(f"/api/sas/{sa['id']}/codigo/validar", json={"sa_codigo": codigo}, headers=h).json()
     conf = {o["codigo"]: "Teste" for o in v["ocorrencias"]}
     client.post(f"/api/sas/{sa['id']}/codigo", json={"sa_codigo": codigo, "confirmacoes": conf}, headers=h)
-    assert client.get(f"/api/sas/{sa['id']}").json()["situacao"] == "CONFIRMADO"
+    assert client.get(f"/api/sas/{sa['id']}").json()["situacao"] == situacao
 
 
 NF = {"numero": "556", "emitente": "FIO_CERTO"}
@@ -62,22 +62,22 @@ def test_nf_do_cop_espera_sa_confirmado_e_precificador(amb):
     assert r.status_code == 400
     assert "SA confirmado em 1 item(ns)" in _falta(r) and "R$/kg do precificador em 1" in _falta(r)
 
-    # SA confirmado, ainda sem R$/kg: o COP não chega a "Aguardando NF" e o RJ não é avisado
+    # v3.19: SA achado no Mega, ainda sem R$/kg: não fecha; o COP não chega a "Aguardando NF" e o RJ não é avisado
     h = entrar(client, u["itu"])
-    _confirmar(client, fab, h, sa)
+    _confirmar(client, fab, h, sa, situacao="AGUARDANDO_MEGA")
+    assert client.get(f"/api/sas/{sa['id']}").json()["sa_no_mega"] is True
     h = entrar(client, u["rj"])
     cop = client.get(f"/api/cops/{cop_id}").json()
     assert cop["situacao"] == "FECHADO"
-    assert cop["itens"][0]["sa"]["situacao"] == "CONFIRMADO" and cop["itens"][0]["sa"]["rs_kg"] is None
+    assert cop["itens"][0]["sa"]["situacao"] == "AGUARDANDO_MEGA" and cop["itens"][0]["sa"]["rs_kg"] is None
     assert "COP_SA_PRONTO" not in [n["tipo"] for n in client.get("/api/notificacoes").json()["itens"]]
     r = client.post(f"/api/cops/{cop_id}/nf", json=NF, headers=h)
-    assert r.status_code == 400 and "SA confirmado" not in _falta(r) and "R$/kg" in _falta(r)
-    v = client.post(f"/api/cops/{cop_id}/enviar/validar", headers=h).json()
-    assert {o["codigo"] for o in v["ocorrencias"]} == {"PRECIFICADOR_PENDENTE", "NF_PENDENTE"}
+    assert r.status_code == 400 and "SA confirmado em 1" in _falta(r) and "R$/kg" in _falta(r)
 
-    # R$/kg preenchido: "Aguardando NF", aviso ao RJ e o precificador no item do COP
+    # R$/kg preenchido: o SA fecha sem ler o Mega de novo, "Aguardando NF", aviso ao RJ e o precificador no COP
     h = entrar(client, u["itu"])
-    assert client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h).status_code == 200
+    r = client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h)
+    assert r.status_code == 200 and r.json()["situacao"] == "CONFIRMADO"
     h = entrar(client, u["rj"])
     cop = client.get(f"/api/cops/{cop_id}").json()
     assert cop["situacao"] == "AGUARDANDO_NF"

@@ -58,11 +58,19 @@ def test_caminho_a_corte_rj(amb):
     sa = fila["itens"][0]
     assert sa["sa_novo"] is True and sa["peso_kg"] == 85 and sa["dimensao"] == "33X105" and sa["conteiner"] == "CH33K"
     r = client.post(f"/api/sas/{sa['id']}/codigo", json={"sa_codigo": 50001}, headers=h)
-    assert r.json()["situacao"] == "AGUARDANDO_MEGA"
+    assert r.json()["situacao"] == "AGUARDANDO_MEGA" and r.json()["sa_no_mega"] is False
     _confirmar_no_mega(fab, 50001)
-    assert client.post("/api/sas/verificar", json={}, headers=h).json()["confirmados"] == 1
+    # v3.19: achado no Mega, o SA só fecha com o R$/kg do precificador
+    v = client.post("/api/sas/verificar", json={}, headers=h).json()
+    assert v["confirmados"] == 0 and v["falta_precificador"] == 1
+    j = client.get(f"/api/sas/{sa['id']}").json()
+    assert j["situacao"] == "AGUARDANDO_MEGA" and j["sa_no_mega"] is True and j["precificador_obrigatorio"] is True
+    assert client.get(f"/api/solicitacoes/{sid}").json()["situacao"] == "EM_COP"
+    assert client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h).json()["situacao"] == "CONFIRMADO"
     assert client.get(f"/api/solicitacoes/{sid}").json()["situacao"] == "SA_PRONTO"
-    client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h)   # v3.16: R$/kg antes da NF
+    # fechado, o R$/kg pode ser corrigido, mas não apagado
+    r = client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": None}, headers=h)
+    assert r.status_code == 400 and "não apagado" in r.json()["detail"]
 
     # RJ: NF + envio
     h = entrar(client, u["rj"])
@@ -191,6 +199,7 @@ def test_confirmacao_preenche_ncm_ipi_e_nf_do_mega(amb):
     h, sa = _sa_pendente(client, u, ids)
     fab.obter().situacoes_sa[37983] = SituacaoSa(37983, True, "SA FACA TESOURA T1 - 32X99,5X155MM - CÓD.19918",
                                                  True, date(2016, 9, 8), 10, "3215", "82081000", 5.2)
+    client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h)   # v3.19: precificador antes, fecha já
     client.post(f"/api/sas/{sa['id']}/codigo", json={"sa_codigo": 37983}, headers=h)
     j = client.get(f"/api/sas/{sa['id']}").json()
     assert j["situacao"] == "CONFIRMADO" and j["ncm"] == "82081000" and j["ipi"] == "0.052"

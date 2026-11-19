@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, data, kg, num, qs, reais, rsKg, validacaoDoErro, type Validacao } from "../api/cliente";
 import { useSessao } from "../api/sessao";
@@ -21,15 +21,19 @@ interface Sa {
   avisos?: { codigo: string; nivel: string; mensagem: string }[];
   /** contrato §7.1 (R070): confirmado pela ferramenta de teste, sem ler o Mega */
   confirmacao_teste?: boolean;
+  /** contrato §7 (spec v3.19): o Mega já tem o SA, mas a linha não fechou porque falta o R$/kg do precificador */
+  sa_no_mega?: boolean;
+  /** contrato §7 (spec v3.19): o SA só fecha com o precificador (o histórico da carga fica como veio) */
+  precificador_obrigatorio?: boolean;
 }
 interface CopResumo { id: number; numero: number; situacao: string; qtd_itens: number; peso_total_kg: number }
 interface Lista { itens: Sa[]; total: number; cops_aguardando_sa: CopResumo[] }
 
 const SITUACAO: Record<SituacaoSa, { nome: string; classe: string; dica: string }> = {
-  PENDENTE: { nome: "Pendente", classe: "", dica: "Fabiano confere e pede o SA" },
-  PREPARADO: { nome: "Preparado", classe: "info", dica: "aguardando cadastro do SA (Amanda)" },
-  AGUARDANDO_MEGA: { nome: "Aguardando Mega", classe: "atencao", dica: "código informado; o sistema confere no Mega" },
-  CONFIRMADO: { nome: "Confirmado", classe: "ok", dica: "" },
+  PENDENTE: { nome: "Pendente", classe: "", dica: "o Fabiano confere e pede o SA" },
+  PREPARADO: { nome: "Preparado", classe: "info", dica: "a Amanda cadastra no Mega e grava o código" },
+  AGUARDANDO_MEGA: { nome: "Aguardando Mega", classe: "atencao", dica: "o sistema confere o código no Mega" },
+  CONFIRMADO: { nome: "Confirmado", classe: "ok", dica: "SA fechado" },
 };
 const FILTROS: { chave: string; nome: string; situacao: SituacaoSa[] }[] = [
   { chave: "abertos", nome: "Em aberto", situacao: [] },
@@ -39,7 +43,25 @@ const FILTROS: { chave: string; nome: string; situacao: SituacaoSa[] }[] = [
   { chave: "CONFIRMADO", nome: "Confirmados", situacao: ["CONFIRMADO"] },
 ];
 
-/** "SA confirmado 1 de 3" com a barrinha (layout A): mostra por que a NF do COP está bloqueada sem abrir o COP. */
+const temRs = (s: Sa) => (s.rs_kg ?? 0) > 0;
+const obrigaRs = (s: Sa) => s.precificador_obrigatorio ?? s.origem !== "CARGA";
+/** o código só conta como informado em "Aguardando Mega" ou depois; antes disso é a sugestão do sistema */
+const informado = (s: Sa) => s.situacao === "AGUARDANDO_MEGA" || s.situacao === "CONFIRMADO";
+
+function situacaoDe(s: Sa) {
+  if (s.situacao === "AGUARDANDO_MEGA" && s.sa_no_mega) {
+    return { nome: "Falta o precificador", classe: "atencao", dica: "o SA já está no Mega; grave o R$/kg para fechar" };
+  }
+  return SITUACAO[s.situacao] ?? { nome: s.situacao, classe: "", dica: "" };
+}
+
+function mensagemCodigo(r: Sa, codigo: number, op: number) {
+  if (r.situacao === "CONFIRMADO") return `SA ${codigo} confirmado no Mega e fechado na OP ${op}.`;
+  if (r.sa_no_mega) return `SA ${codigo} encontrado no Mega para a OP ${op}. Falta o R$/kg do precificador para fechar.`;
+  return `Código ${codigo} gravado na OP ${op}. Aguardando a confirmação no Mega.`;
+}
+
+/** "SA fechado 1 de 3" com a barrinha (layout A): mostra por que a NF do COP está bloqueada sem abrir o COP. */
 function Progresso({ rotulo, feito, total }: { rotulo: string; feito: number; total: number }) {
   const pct = total ? (feito / total) * 100 : 0;
   return (
@@ -47,6 +69,135 @@ function Progresso({ rotulo, feito, total }: { rotulo: string; feito: number; to
       <span>{rotulo} {feito} de {total}</span>
       <span className="trilho" aria-hidden="true"><i className={feito < total ? "parcial" : undefined} style={{ width: `${pct}%` }} /></span>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ campos à mostra no cartão (spec v3.19 T14) */
+
+/** "Código do SA": campo e botão à vista (Amanda/Fabiano). Sem pendência grava direto; com pendência abre a janela. */
+function CampoCodigo({ sa, pode, aoGravar, aoConferir }: {
+  sa: Sa; pode: boolean; aoGravar: (msg: string) => void; aoConferir: (codigo: number, v: Validacao) => void;
+}) {
+  const id = `sa-codigo-${sa.id}`;
+  const [codigo, setCodigo] = useState(String(sa.sa_codigo ?? sa.sa_codigo_sugerido ?? ""));
+  const [erro, setErro] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  const feito = informado(sa);
+  const sugestao = !feito && codigo.trim() !== "" && (Number(codigo) === sa.sa_codigo || Number(codigo) === sa.sa_codigo_sugerido);
+  const outros = sa.outros_codigos.length ? ` Outros já usados nesta peça: ${sa.outros_codigos.join(", ")}.` : "";
+
+  if (sa.situacao === "CONFIRMADO" || !pode) {
+    return (
+      <div className={`campo-sa${feito ? "" : " vazio"}`}>
+        <span className="rotulo-campo">Código do SA {!feito && sa.sa_codigo && <span className="sugerido">sugerido</span>}</span>
+        <span className="valor-fixo">{sa.sa_codigo ?? "—"}</span>
+        <span className="dica">{sa.situacao === "CONFIRMADO" ? "conferido no Mega" : feito ? "o sistema confere no Mega"
+          : "a Amanda grava depois de cadastrar no Mega"}</span>
+      </div>
+    );
+  }
+
+  async function gravar(e: FormEvent) {
+    e.preventDefault();
+    setErro("");
+    const n = Number(codigo);
+    if (!Number.isInteger(n) || n <= 0) return setErro("Digite o código do SA (só números).");
+    setOcupado(true);
+    try {
+      const v = await api.post<Validacao>(`/sas/${sa.id}/codigo/validar`, { sa_codigo: n, confirmacoes: {} });
+      if (v.ocorrencias.length) {
+        aoConferir(n, v);   // estou ciente / justificativa na janela
+        return;
+      }
+      const r = await api.post<Sa>(`/sas/${sa.id}/codigo`, { sa_codigo: n, confirmacoes: {} });
+      aoGravar(mensagemCodigo(r, n, sa.op));
+    } catch (err) {
+      const v = validacaoDoErro<Record<string, unknown>>(err);
+      if (v) aoConferir(n, v);
+      else setErro(err instanceof Error ? err.message : "Não foi possível gravar o código.");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  const mudou = !feito || Number(codigo) !== sa.sa_codigo;
+  const dica = feito
+    ? `Gravado; o sistema confere no Mega.${sa.sa_codigo_sugerido && sa.sa_codigo !== sa.sa_codigo_sugerido ? ` Sugerido: ${sa.sa_codigo_sugerido}.` : ""}`
+    : sugestao ? "Código sugerido pelo sistema (último SA desta peça). Grave depois de conferir no Mega."
+      : sa.sa_novo ? "SA novo: a Amanda cadastra no Mega e digita o código aqui."
+        : "Digite o código depois do cadastro no Mega.";
+  return (
+    <form className={`campo-sa${feito ? "" : " vazio"}`} onSubmit={(e) => void gravar(e)}>
+      <label className="rotulo-campo" htmlFor={id}>Código do SA {sugestao && <span className="sugerido">sugerido</span>}</label>
+      <div className="campo-linha">
+        <input id={id} inputMode="numeric" value={codigo} placeholder="código"
+          onChange={(e) => { setCodigo(e.target.value); setErro(""); }} />
+        <button className="secundario pequeno" disabled={ocupado || !codigo.trim() || !mudou}
+          aria-label={`Gravar o código do SA da OP ${sa.op}`}>{ocupado ? "Gravando…" : "Gravar"}</button>
+      </div>
+      {erro ? <span className="erro-campo" role="alert">{erro}</span> : <span className="dica">{dica}{outros}</span>}
+    </form>
+  );
+}
+
+/** "R$/kg do precificador": obrigatório para o SA fechar (Eduardo, 2026-11-19); campo à vista com o valor por peça. */
+function CampoPrecificador({ sa, pode, aoGravar }: { sa: Sa; pode: boolean; aoGravar: (msg: string) => void }) {
+  const id = `sa-rs-${sa.id}`;
+  const [valor, setValor] = useState(sa.rs_kg !== null ? String(sa.rs_kg).replace(".", ",") : "");
+  const [erro, setErro] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  const obriga = obrigaRs(sa);
+  const falta = obriga && !temRs(sa);
+  const n = num(valor);
+  const valido = n !== undefined && !Number.isNaN(n) && n > 0;
+  const porPeca = valido && sa.quantidade ? ((n ?? 0) * sa.peso_kg) / sa.quantidade : null;
+  const rotulo = <>R$/kg do precificador {obriga && <span className="obrigatorio">obrigatório</span>}</>;
+
+  if (!pode) {
+    return (
+      <div className={`campo-sa${falta ? " vazio" : ""}`}>
+        <span className="rotulo-campo">{rotulo}</span>
+        <span className="valor-fixo">{temRs(sa) ? rsKg(sa.rs_kg ?? 0) : falta ? "falta" : "—"}</span>
+        <span className="dica">{sa.valor_precificador ? `R$ ${reais(sa.valor_precificador)} por peça` : falta ? "sem ele o SA não fecha" : ""}</span>
+      </div>
+    );
+  }
+
+  async function gravar(e: FormEvent) {
+    e.preventDefault();
+    setErro("");
+    if (!valido) return setErro("Digite o R$/kg do precificador, maior que zero (ex.: 42,50).");
+    setOcupado(true);
+    try {
+      const r = await api.patch<Sa>(`/sas/${sa.id}`, { rs_kg: n });
+      aoGravar(r.situacao === "CONFIRMADO" && sa.situacao !== "CONFIRMADO"
+        ? `Precificador gravado. SA ${r.sa_codigo ?? ""} da OP ${sa.op} fechado.`
+        : `R$/kg do precificador gravado na OP ${sa.op}.`);
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Não foi possível gravar o R$/kg.");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  const mudou = valido && n !== sa.rs_kg;
+  return (
+    <form className={`campo-sa${falta ? " vazio" : ""}`} onSubmit={(e) => void gravar(e)}>
+      <label className="rotulo-campo" htmlFor={id}>{rotulo}</label>
+      <div className="campo-linha">
+        <input id={id} inputMode="decimal" value={valor} placeholder="0,00"
+          onChange={(e) => { setValor(e.target.value); setErro(""); }} />
+        <button className="secundario pequeno" disabled={ocupado || !mudou}
+          aria-label={`Gravar o R$/kg do precificador da OP ${sa.op}`}>{ocupado ? "Gravando…" : "Gravar"}</button>
+      </div>
+      {erro ? <span className="erro-campo" role="alert">{erro}</span> : (
+        <span className="dica">
+          {porPeca !== null ? `= R$ ${reais(porPeca)} por peça` : falta ? "Sem o precificador o SA não fecha e a NF do RJ não libera."
+            : "Opcional no histórico da carga."}
+          {sa.exportado_renato_em && ` Já exportado para o Renato em ${data(sa.exportado_renato_em)}: a alteração avisa o Renato.`}
+        </span>
+      )}
+    </form>
   );
 }
 
@@ -118,6 +269,13 @@ export default function Sas() {
     }
   }
 
+  /** campo do cartão gravou: mostra o resultado e relê a fila */
+  const gravado = (msg: string) => {
+    setErro("");
+    setAviso(msg);
+    void carregar();
+  };
+
   const preparar = () =>
     acao(async () => {
       const r = await api.post<Sa[]>("/sas/preparar", { ids: sel });
@@ -128,32 +286,30 @@ export default function Sas() {
   /** sem ids: verifica todos os aguardando Mega; com ids: só os marcados */
   const verificar = (ids: number[]) =>
     acao(async () => {
-      const r = await api.post<{ verificados: number; confirmados: number; erro?: string | null }>("/sas/verificar", ids.length ? { ids } : {});
+      const r = await api.post<{ verificados: number; confirmados: number; falta_precificador?: number; erro?: string | null }>(
+        "/sas/verificar", ids.length ? { ids } : {});
       if (r.erro) throw new Error(`Mega: ${r.erro}`);
-      return `${r.verificados} SA(s) verificado(s) no Mega, ${r.confirmados} confirmado(s).`;
+      const falta = r.falta_precificador ? `, ${r.falta_precificador} esperando o precificador` : "";
+      return `${r.verificados} SA(s) verificado(s) no Mega, ${r.confirmados} fechado(s)${falta}.`;
     });
 
-  const atualizarLinha = (r: Sa) => setLista((l) => (l ? { ...l, itens: l.itens.map((i) => (i.id === r.id ? { ...i, ...r } : i)) } : l));
+  const msgTeste = (r: Sa, op: number) => r.situacao === "CONFIRMADO"
+    ? `SA ${r.sa_codigo ?? ""} da OP ${op} confirmado em teste (sem ler o Mega).`
+    : `SA ${r.sa_codigo ?? ""} da OP ${op} dado como achado no Mega (teste). Falta o R$/kg do precificador para fechar.`;
 
   const confirmarTeste = (s: Sa) => {
     if (!s.sa_codigo) return setTesteDe(s);
-    void acao(async () => {
-      const r = await api.post<Sa>(`/sas/${s.id}/confirmar-teste`, {});
-      atualizarLinha(r);
-      return `SA ${r.sa_codigo ?? s.sa_codigo} da OP ${s.op} confirmado em teste (sem ler o Mega).`;
-    });
+    void acao(async () => msgTeste(await api.post<Sa>(`/sas/${s.id}/confirmar-teste`, {}), s.op));
   };
 
   // janelas
   const [testeDe, setTesteDe] = useState<Sa | null>(null);
-  const [codigoDe, setCodigoDe] = useState<Sa | null>(null);
-  // soRs: o botão da coluna R$/kg abre só o R$/kg; "Dados do SA" abre descrição, NCM, ICMS, IPI e pedido também
-  const [editarDe, setEditarDe] = useState<{ sa: Sa; soRs: boolean } | null>(null);
+  const [codigoDe, setCodigoDe] = useState<{ sa: Sa; codigo?: number; validacao?: Validacao } | null>(null);
+  const [dadosDe, setDadosDe] = useState<Sa | null>(null);
   const [nfAberta, setNfAberta] = useState(false);
   const selB2 = selecionados.filter((s) => s.origem === "CORTE_ITU");
 
   // spec v3.16 T14: um grupo por COP, na ordem em que aparecem; corte em Itu (B2) num grupo próprio
-  const NCOL = seleciona ? 9 : 8;
   const grupos: { chave: string; titulo: string; cop: Sa["cop"]; itens: Sa[] }[] = [];
   for (const s of itens) {
     const chave = s.cop ? `cop-${s.cop.id}` : s.origem === "CORTE_ITU" ? "corte-itu" : "outros";
@@ -166,58 +322,60 @@ export default function Sas() {
     g.itens.push(s);
   }
 
-  /** Coluna "Código do SA": o código, ou o botão para informar/corrigir (Fabiano, Amanda) */
-  function celulaCodigo(s: Sa) {
-    const pode = informaCodigo && s.situacao !== "CONFIRMADO";
+  /** Um cartão por OP: dados da peça à esquerda; à direita os dois campos que fecham o SA, sempre à mostra. */
+  function cartao(s: Sa) {
+    const sit = situacaoDe(s);
+    const aberto = s.situacao !== "CONFIRMADO";
+    const teste = confirmaTeste && aberto && !s.sa_no_mega;
     return (
-      <>
-        {s.sa_codigo ? (
-          pode ? (
-            <button type="button" className="valor" onClick={() => setCodigoDe(s)} title="Corrigir o código do SA"
-              aria-label={`Código do SA ${s.sa_codigo} da OP ${s.op}: corrigir`}>{s.sa_codigo}<Icone nome="editar" /></button>
-          ) : <strong className="mono">{s.sa_codigo}</strong>
-        ) : pode ? (
-          <button type="button" className="falta" onClick={() => setCodigoDe(s)} aria-label={`Informar o código do SA da OP ${s.op}`}>
-            <Icone nome="codigo" />Informar código
-          </button>
-        ) : <span className="desc">—</span>}
-        {s.sa_codigo && s.sa_codigo_sugerido && s.sa_codigo !== s.sa_codigo_sugerido && <span className="sub">sugerido {s.sa_codigo_sugerido}</span>}
-        {!s.sa_codigo && s.sa_novo && <span className="sub">SA novo · a Amanda cadastra no Mega</span>}
-        {altera && s.situacao !== "CONFIRMADO" && (
-          <div className="celula-acoes">
-            <button type="button" className="link" onClick={() => setEditarDe({ sa: s, soRs: false })}
-              aria-label={`Dados do SA da OP ${s.op}: descrição, NCM, ICMS, IPI e pedido`}><Icone nome="editar" />Dados do SA</button>
-          </div>
+      <article key={s.id} aria-label={`OP ${s.op}`}
+        className={["cartao-sa", seleciona ? "" : "sem-marcar", s.atrasado ? "atrasado" : "", sel.includes(s.id) ? "selecionada" : ""].join(" ")}>
+        {seleciona && (
+          <div className="sa-marcar">{(altera || s.origem === "CORTE_ITU") &&
+            <input type="checkbox" aria-label={`Selecionar OP ${s.op}`} checked={sel.includes(s.id)} onChange={() => alternar(s.id)} />}</div>
         )}
-      </>
-    );
-  }
-
-  /** Coluna "R$/kg": "Falta" tracejado (obrigatório antes da NF do RJ) ou o valor com o lápis para corrigir */
-  function celulaRs(s: Sa) {
-    const tem = (s.rs_kg ?? 0) > 0;
-    const porPeca = s.valor_precificador ? <span className="sub">R$&nbsp;{reais(s.valor_precificador)}/pç</span> : null;
-    if (!editaRs) {
-      return tem ? <>{rsKg(s.rs_kg ?? 0)}{porPeca}</>
-        : s.origem === "CARGA" ? "—" : <span className="etiqueta atencao" title="Obrigatório antes da NF de transferência">falta</span>;
-    }
-    const abrir = () => setEditarDe({ sa: s, soRs: true });
-    if (tem) {
-      return (
-        <>
-          <button type="button" className="valor" onClick={abrir} title="Corrigir o R$/kg"
-            aria-label={`R$/kg da OP ${s.op}: ${rsKg(s.rs_kg ?? 0)}, corrigir`}>{rsKg(s.rs_kg ?? 0)}<Icone nome="editar" /></button>
-          {porPeca}
-        </>
-      );
-    }
-    if (s.origem === "CARGA") {
-      return <button type="button" className="valor" onClick={abrir} title="Informar o R$/kg (opcional no histórico da carga)"
-        aria-label={`Informar o R$/kg da OP ${s.op} (opcional)`}>—<Icone nome="editar" /></button>;
-    }
-    return (
-      <button type="button" className="falta" onClick={abrir} title="Obrigatório antes da NF de transferência do RJ"
-        aria-label={`Informar o R$/kg da OP ${s.op} (falta, obrigatório antes da NF do RJ)`}><Icone nome="alerta" />Falta</button>
+        <div className="sa-ident">
+          <div className="sa-topo">
+            <strong className="sa-op">OP {s.op}</strong>
+            <span className="sa-cliente">{s.cliente ?? "—"}</span>
+          </div>
+          <p className="sa-item">Item {s.item_codigo ?? "—"}{s.item_descricao ? ` · ${s.item_descricao}` : ""}</p>
+          <dl className="sa-fatos">
+            <div><dt>Material</dt><dd>{s.material} {s.dimensao}</dd></div>
+            <div><dt>Contêiner</dt><dd className="mono">{s.conteiner ?? "—"}</dd></div>
+            <div><dt>Peso</dt><dd>{kg(s.peso_kg)} kg · {s.quantidade} pç</dd></div>
+            <div><dt>Pedido</dt><dd>{s.pedido ?? "—"}</dd></div>
+            <div><dt>Data</dt><dd>{data(s.data)}</dd></div>
+            <div><dt>NF</dt><dd>{s.nf ? `${s.nf.numero} · ${nomeEmitente(s.nf.emitente)}` : "sem NF"}</dd></div>
+          </dl>
+          <div className="sa-situacao">
+            <span className={`etiqueta ${sit.classe}`}>{sit.nome}</span>
+            {sit.dica && <span>{sit.dica}</span>}
+            {s.atrasado && <span className="etiqueta ruim">mais de 48 h</span>}
+            {s.confirmacao_teste && <span className="etiqueta atencao" title="Pela ferramenta de teste, sem ler o Mega">confirmado em teste</span>}
+          </div>
+          {((altera && aberto) || teste) && (
+            <div className="sa-acoes">
+              {altera && aberto && (
+                <button type="button" className="link" onClick={() => setDadosDe(s)}
+                  aria-label={`Dados do SA da OP ${s.op}: descrição, NCM, ICMS, IPI e pedido`}><Icone nome="editar" />Dados do SA</button>
+              )}
+              {teste && (
+                <button type="button" className="link botao-teste" disabled={ocupado} onClick={() => confirmarTeste(s)}
+                  title="Faz de conta que o Mega achou o SA. Só existe na homologação.">
+                  Confirmar SA (teste) <span className="etiqueta atencao">só homologação</span>
+                </button>
+              )}
+            </div>
+          )}
+          {s.avisos?.map((a) => <p key={a.codigo} className="validacao alerta">{a.mensagem}</p>)}
+        </div>
+        <div className="sa-campos">
+          <CampoCodigo key={`c-${s.sa_codigo ?? ""}-${s.situacao}`} sa={s} pode={informaCodigo} aoGravar={gravado}
+            aoConferir={(codigo, validacao) => setCodigoDe({ sa: s, codigo, validacao })} />
+          <CampoPrecificador key={`r-${s.rs_kg ?? ""}`} sa={s} pode={editaRs} aoGravar={gravado} />
+        </div>
+      </article>
     );
   }
 
@@ -227,8 +385,8 @@ export default function Sas() {
         <div>
           <h1>Cadastro de SA</h1>
           <p>Pedidos de SA (semiacabado) agrupados por COP, e os do corte em Itu de material RJ. O Fabiano confere e pede o SA;
-            a Amanda cadastra no Mega e informa o código; o sistema confirma lendo o Mega. O RJ só informa a NF de um COP quando
-            todos os itens têm <strong>SA confirmado e R$/kg do precificador</strong>.</p>
+            a Amanda cadastra no Mega e grava o código; o precificador grava o R$/kg. <strong>O SA só fecha com o código
+            conferido no Mega e o R$/kg do precificador</strong>, e o RJ só informa a NF de um COP com todos os SAs fechados.</p>
         </div>
         <div className="acoes-cabecalho">
           <a className="secundario" href={exportarTudo} download><Icone nome="baixar" />Exportar para Excel</a>
@@ -278,98 +436,39 @@ export default function Sas() {
             Os pedidos aparecem aqui quando o RJ fecha um COP ou quando há corte em Itu de material RJ.
           </div>
         ) : (
-          <div className="tabela-rolagem">
-            <table className="tabela tabela-sa">
-              <thead>
-                <tr>
-                  {seleciona && <th className="marcar-linha"><span className="sr-only">Selecionar</span></th>}
-                  <th>OP / cliente</th><th>Item</th><th>Material · contêiner</th><th className="num">Peso · peças</th>
-                  <th>Código do SA</th><th>Situação</th><th>NF</th><th className="num">R$/kg</th>
-                </tr>
-              </thead>
-              <tbody>
-                {grupos.map((g) => {
-                  const n = g.itens.length;
-                  const conf = g.itens.filter((s) => s.situacao === "CONFIRMADO").length;
-                  const comRs = g.itens.filter((s) => (s.rs_kg ?? 0) > 0).length;
-                  const todosSel = g.itens.every((s) => sel.includes(s.id));
-                  return (
-                  <Fragment key={g.chave}>
-                  <tr className="grupo-cop">
-                    <td colSpan={NCOL}>
-                      <div className="grupo-cab">
-                        <span className="grupo-titulo">
-                          {(altera || (informaNfB2 && g.chave === "corte-itu")) && (
-                            <input type="checkbox" aria-label={`Selecionar ${g.titulo}`} checked={todosSel}
-                              onChange={() => setSel(todosSel ? sel.filter((id) => !g.itens.some((s) => s.id === id)) : [...new Set([...sel, ...g.itens.map((s) => s.id)])])} />
-                          )}
-                          <Icone nome={g.cop ? "envio" : g.chave === "corte-itu" ? "corte" : "lista"} />
-                          {g.titulo}
-                        </span>
-                        {g.cop && (conf === n && comRs === n
-                          ? <span className="etiqueta ok">Pronto para a NF do RJ</span>
-                          : g.cop.situacao === "FECHADO" && <span className="etiqueta bloqueio">NF do RJ bloqueada até SA e R$/kg</span>)}
-                        <Progresso rotulo="SA confirmado" feito={conf} total={n} />
-                        {g.chave !== "outros" && <Progresso rotulo="R$/kg" feito={comRs} total={n} />}
-                        <span className="desc">{n} OP(s)</span>
-                        {g.cop && (
-                          <div className="empurra">
-                            <Link className="secundario pequeno" to={`/cops/${g.cop.id}`}>Abrir COP<Icone nome="seta" /></Link>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                  {g.itens.map((s) => (
-                  <Fragment key={s.id}>
-                  <tr className={["linha-sa", s.atrasado ? "atrasado" : "", sel.includes(s.id) ? "selecionada" : "", s.avisos?.length ? "com-aviso" : ""].join(" ")}>
-                    {seleciona && (
-                      <td className="marcar-linha">{(altera || s.origem === "CORTE_ITU") &&
-                        <input type="checkbox" aria-label={`Selecionar OP ${s.op}`} checked={sel.includes(s.id)} onChange={() => alternar(s.id)} />}</td>
-                    )}
-                    <td className="quebra" data-rotulo="OP / cliente">
-                      <strong className="mono">{s.op}</strong>
-                      <span className="sub">{s.cliente ?? "—"}</span>
-                      <span className="sub">{data(s.data)} · {s.pedido ? `pedido ${s.pedido}` : "sem pedido"}</span>
-                    </td>
-                    <td className="quebra" data-rotulo="Item">{s.item_codigo ?? "—"}<span className="sub">{s.item_descricao ?? ""}</span></td>
-                    <td data-rotulo="Material · contêiner">{s.material} {s.dimensao}<span className="sub mono">{s.conteiner ?? "—"}</span></td>
-                    <td className="num" data-rotulo="Peso · peças">{kg(s.peso_kg)} kg<span className="sub">{s.quantidade} pç</span></td>
-                    <td data-rotulo="Código do SA">{celulaCodigo(s)}</td>
-                    <td className="quebra" data-rotulo="Situação">
-                      <span className={`etiqueta ${SITUACAO[s.situacao]?.classe ?? ""}`}>{SITUACAO[s.situacao]?.nome ?? s.situacao}</span>
-                      {SITUACAO[s.situacao]?.dica && <span className="sub">{SITUACAO[s.situacao].dica}</span>}
-                      {(s.atrasado || s.confirmacao_teste || (confirmaTeste && s.situacao !== "CONFIRMADO")) && (
-                        <div className="celula-acoes">
-                          {s.atrasado && <span className="etiqueta ruim">mais de 48 h</span>}
-                          {s.confirmacao_teste && <span className="etiqueta atencao" title="Confirmado pela ferramenta de teste, sem ler o Mega">confirmado em teste</span>}
-                          {confirmaTeste && s.situacao !== "CONFIRMADO" && (
-                            <button type="button" className="link botao-teste" disabled={ocupado} onClick={() => confirmarTeste(s)} title="Marca como confirmado sem ler o Mega. Só existe na homologação.">
-                              Confirmar SA (teste) <span className="etiqueta atencao">só homologação</span>
-                            </button>
-                          )}
-                        </div>
+          <div className="grupos-sa">
+            {grupos.map((g) => {
+              const n = g.itens.length;
+              const conf = g.itens.filter((s) => s.situacao === "CONFIRMADO").length;
+              const comRs = g.itens.filter(temRs).length;
+              const todosSel = g.itens.every((s) => sel.includes(s.id));
+              return (
+                <section key={g.chave} className="grupo-sa" aria-label={g.titulo}>
+                  <div className="grupo-cab">
+                    <span className="grupo-titulo">
+                      {(altera || (informaNfB2 && g.chave === "corte-itu")) && (
+                        <input type="checkbox" aria-label={`Selecionar ${g.titulo}`} checked={todosSel}
+                          onChange={() => setSel(todosSel ? sel.filter((id) => !g.itens.some((s) => s.id === id)) : [...new Set([...sel, ...g.itens.map((s) => s.id)])])} />
                       )}
-                    </td>
-                    <td data-rotulo="NF">
-                      {s.nf ? <>NF {s.nf.numero}<span className="sub">{nomeEmitente(s.nf.emitente)}</span></> : <span className="desc">sem NF</span>}
-                    </td>
-                    <td className="num" data-rotulo="R$/kg">{celulaRs(s)}</td>
-                  </tr>
-                  {!!s.avisos?.length && (
-                    <tr className="linha-aviso">
-                      <td colSpan={NCOL}>
-                        {s.avisos.map((a) => <p key={a.codigo} className="validacao alerta">{a.mensagem}</p>)}
-                      </td>
-                    </tr>
-                  )}
-                  </Fragment>
-                  ))}
-                  </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
+                      <Icone nome={g.cop ? "envio" : g.chave === "corte-itu" ? "corte" : "lista"} />
+                      {g.titulo}
+                    </span>
+                    {g.cop && (conf === n && comRs === n
+                      ? <span className="etiqueta ok">Pronto para a NF do RJ</span>
+                      : g.cop.situacao === "FECHADO" && <span className="etiqueta bloqueio">NF do RJ bloqueada até todos os SAs fecharem</span>)}
+                    <Progresso rotulo="SA fechado" feito={conf} total={n} />
+                    {g.chave !== "outros" && <Progresso rotulo="Precificador" feito={comRs} total={n} />}
+                    <span className="desc">{n} OP(s)</span>
+                    {g.cop && (
+                      <div className="empurra">
+                        <Link className="secundario pequeno" to={`/cops/${g.cop.id}`}>Abrir COP<Icone nome="seta" /></Link>
+                      </div>
+                    )}
+                  </div>
+                  {g.itens.map(cartao)}
+                </section>
+              );
+            })}
           </div>
         )}
       </section>
@@ -397,16 +496,19 @@ export default function Sas() {
 
       {testeDe && (
         <JanelaTeste sa={testeDe} aoFechar={() => setTesteDe(null)}
-          aoGravar={(r) => { setTesteDe(null); atualizarLinha(r); setAviso(`SA ${r.sa_codigo ?? ""} da OP ${testeDe.op} confirmado em teste (sem ler o Mega).`); void carregar(); }} />
+          aoGravar={(r) => { const op = testeDe.op; setTesteDe(null); gravado(msgTeste(r, op)); }} />
       )}
-      {codigoDe && <JanelaCodigo sa={codigoDe} aoFechar={() => setCodigoDe(null)} aoGravar={(m) => { setCodigoDe(null); setAviso(m); void carregar(); }} />}
-      {editarDe && (
-        <JanelaEditar sa={editarDe.sa} soRs={editarDe.soRs || !altera || editarDe.sa.situacao === "CONFIRMADO"} aoFechar={() => setEditarDe(null)}
-          aoGravar={() => { setEditarDe(null); setAviso("Pedido de SA atualizado."); void carregar(); }} />
+      {codigoDe && (
+        <JanelaCodigo sa={codigoDe.sa} codigoInicial={codigoDe.codigo} validacaoInicial={codigoDe.validacao}
+          aoFechar={() => setCodigoDe(null)} aoGravar={(m) => { setCodigoDe(null); gravado(m); }} />
+      )}
+      {dadosDe && (
+        <JanelaDados sa={dadosDe} aoFechar={() => setDadosDe(null)}
+          aoGravar={() => { setDadosDe(null); gravado("Dados do SA atualizados."); }} />
       )}
       {nfAberta && (
         <JanelaNf ids={selB2.map((s) => s.id)} aoFechar={() => setNfAberta(false)}
-          aoGravar={(n) => { setNfAberta(false); setSel([]); setAviso(`NF ${n} informada em ${selB2.length} linha(s).`); void carregar(); }} />
+          aoGravar={(n) => { setNfAberta(false); setSel([]); gravado(`NF ${n} informada em ${selB2.length} linha(s).`); }} />
       )}
     </>
   );
@@ -414,10 +516,12 @@ export default function Sas() {
 
 /* ------------------------------------------------------------------ janelas */
 
-// janelas usam o componente compartilhado components/Janela (antes: useJanela + <dialog> repetidos aqui)
-function JanelaCodigo({ sa, aoFechar, aoGravar }: { sa: Sa; aoFechar: () => void; aoGravar: (msg: string) => void }) {
-  const [codigo, setCodigo] = useState(String(sa.sa_codigo ?? sa.sa_codigo_sugerido ?? ""));
-  const [validacao, setValidacao] = useState<Validacao | null>(null);
+/** Código com pendência (troca do sugerido, inativo, não achado no Mega): estou ciente + justificativa antes de gravar */
+function JanelaCodigo({ sa, codigoInicial, validacaoInicial, aoFechar, aoGravar }: {
+  sa: Sa; codigoInicial?: number; validacaoInicial?: Validacao; aoFechar: () => void; aoGravar: (msg: string) => void;
+}) {
+  const [codigo, setCodigo] = useState(String(codigoInicial ?? sa.sa_codigo ?? sa.sa_codigo_sugerido ?? ""));
+  const [validacao, setValidacao] = useState<Validacao | null>(validacaoInicial ?? null);
   const [conf, setConf] = useState<Confirmacoes>({});
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
@@ -442,8 +546,9 @@ function JanelaCodigo({ sa, aoFechar, aoGravar }: { sa: Sa; aoFechar: () => void
     setErro("");
     setOcupado(true);
     try {
-      const r = await api.post<Sa>(`/sas/${sa.id}/codigo`, { sa_codigo: Number(codigo), confirmacoes: confirmacoesValidas(validacao.ocorrencias, conf) });
-      aoGravar(r.situacao === "CONFIRMADO" ? `SA ${codigo} confirmado no Mega para a OP ${sa.op}.` : `Código ${codigo} informado para a OP ${sa.op}. Aguardando a confirmação no Mega.`);
+      const n = Number(codigo);
+      const r = await api.post<Sa>(`/sas/${sa.id}/codigo`, { sa_codigo: n, confirmacoes: confirmacoesValidas(validacao.ocorrencias, conf) });
+      aoGravar(mensagemCodigo(r, n, sa.op));
     } catch (err) {
       const v = validacaoDoErro<Record<string, unknown>>(err);
       if (v) setValidacao(v);
@@ -510,7 +615,8 @@ function JanelaTeste({ sa, aoFechar, aoGravar }: { sa: Sa; aoFechar: () => void;
       <form className="bloco-passo" style={{ gap: "var(--esp-4)" }} onSubmit={(e) => void confirmar(e)}>
         <p><span className="etiqueta atencao">só homologação</span></p>
         <p className="desc">{sa.item_codigo} · {sa.item_descricao}</p>
-        <p className="dica">Esta linha ainda não tem código do SA. Informe um código para marcar como confirmado sem ler o Mega.</p>
+        <p className="dica">Esta linha ainda não tem código do SA. Informe um código para dar o SA como achado no Mega, sem ler o Mega.
+          O SA fecha se o R$/kg do precificador já estiver gravado.</p>
         <label>
           Código do SA
           <input inputMode="numeric" autoFocus value={codigo} onChange={(e) => setCodigo(e.target.value)} required />
@@ -525,49 +631,34 @@ function JanelaTeste({ sa, aoFechar, aoGravar }: { sa: Sa; aoFechar: () => void;
   );
 }
 
-function JanelaEditar({ sa, soRs, aoFechar, aoGravar }: { sa: Sa; soRs: boolean; aoFechar: () => void; aoGravar: () => void }) {
-  const [f, setF] = useState({
-    rs_kg: sa.rs_kg !== null ? String(sa.rs_kg).replace(".", ",") : "",
-    sa_descricao: sa.sa_descricao ?? "", ncm: sa.ncm ?? "", icms: sa.icms ?? "", ipi: sa.ipi ?? "", pedido: sa.pedido ?? "",
-  });
+/** "Dados do SA" (Estoque Itu/Admin): descrição, NCM, ICMS, IPI e pedido. O R$/kg fica no cartão. */
+function JanelaDados({ sa, aoFechar, aoGravar }: { sa: Sa; aoFechar: () => void; aoGravar: () => void }) {
+  const [f, setF] = useState({ sa_descricao: sa.sa_descricao ?? "", ncm: sa.ncm ?? "", icms: sa.icms ?? "", ipi: sa.ipi ?? "", pedido: sa.pedido ?? "" });
   const [erro, setErro] = useState("");
 
   async function salvar(e: FormEvent) {
     e.preventDefault();
     setErro("");
-    const corpo: Record<string, unknown> = { rs_kg: num(f.rs_kg) ?? null };
-    if (!soRs) Object.assign(corpo, { sa_descricao: f.sa_descricao || null, ncm: f.ncm || null, icms: f.icms || null, ipi: f.ipi || null, pedido: f.pedido || null });
     try {
-      await api.patch(`/sas/${sa.id}`, corpo);
+      await api.patch(`/sas/${sa.id}`, { sa_descricao: f.sa_descricao || null, ncm: f.ncm || null, icms: f.icms || null,
+        ipi: f.ipi || null, pedido: f.pedido || null });
       aoGravar();
     } catch (err) {
       setErro(err instanceof Error ? err.message : "Não foi possível salvar.");
     }
   }
 
-  const valor = num(f.rs_kg) !== undefined && sa.quantidade ? ((num(f.rs_kg) ?? 0) * sa.peso_kg) / sa.quantidade : null;
-
   return (
-    <Janela titulo={`${soRs ? "R$/kg do precificador" : "Pedido de SA"} · OP ${sa.op}`} aoFechar={aoFechar}>
+    <Janela titulo={`Dados do SA · OP ${sa.op}`} aoFechar={aoFechar}>
       <form className="bloco-passo" style={{ gap: "var(--esp-4)" }} onSubmit={(e) => void salvar(e)}>
         {sa.exportado_renato_em && <p className="validacao alerta">Já exportado para o Renato em {data(sa.exportado_renato_em)}. A alteração avisa o Renato.</p>}
-        <label>
-          R$/kg do precificador{sa.origem !== "CARGA" && " (obrigatório)"}
-          <input inputMode="decimal" value={f.rs_kg} onChange={(e) => setF({ ...f, rs_kg: e.target.value })} autoFocus required={sa.origem !== "CARGA"} />
-          {sa.origem !== "CARGA" && <small className="dica">Sem o R$/kg o RJ não consegue informar a NF de transferência{sa.cop ? ` do COP ${sa.cop.numero}` : ""}.</small>}
-          <small className="dica">{valor !== null ? `Valor precificador: R$ ${reais(valor)} por peça` : "Preenchido por quem cuida do custo; o sistema não calcula."}</small>
-        </label>
-        {!soRs && (
-          <>
-            <label>Descrição do SA<input value={f.sa_descricao} onChange={(e) => setF({ ...f, sa_descricao: e.target.value })} /></label>
-            <div className="grade-form">
-              <label>NCM<input value={f.ncm} onChange={(e) => setF({ ...f, ncm: e.target.value })} /></label>
-              <label>ICMS<input value={f.icms} onChange={(e) => setF({ ...f, icms: e.target.value })} /></label>
-              <label>IPI<input value={f.ipi} onChange={(e) => setF({ ...f, ipi: e.target.value })} /></label>
-              <label>Pedido<input value={f.pedido} onChange={(e) => setF({ ...f, pedido: e.target.value })} /></label>
-            </div>
-          </>
-        )}
+        <label>Descrição do SA<input value={f.sa_descricao} autoFocus onChange={(e) => setF({ ...f, sa_descricao: e.target.value })} /></label>
+        <div className="grade-form">
+          <label>NCM<input value={f.ncm} onChange={(e) => setF({ ...f, ncm: e.target.value })} /></label>
+          <label>ICMS<input value={f.icms} onChange={(e) => setF({ ...f, icms: e.target.value })} /></label>
+          <label>IPI<input value={f.ipi} onChange={(e) => setF({ ...f, ipi: e.target.value })} /></label>
+          <label>Pedido<input value={f.pedido} onChange={(e) => setF({ ...f, pedido: e.target.value })} /></label>
+        </div>
         {erro && <p className="erro" role="alert">{erro}</p>}
         <div className="botoes">
           <button className="primario">Salvar alterações</button>

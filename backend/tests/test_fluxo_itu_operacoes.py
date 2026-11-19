@@ -124,8 +124,9 @@ def test_peca_inteira_corte_itu_conclui_e_sobra_vira_b2(amb):
     v = client.post(f"/api/sas/{sa['id']}/codigo/validar", json={"sa_codigo": 70009}, headers=h).json()
     conf = {o["codigo"]: "Teste" for o in v["ocorrencias"]}
     client.post(f"/api/sas/{sa['id']}/codigo", json={"sa_codigo": 70009, "confirmacoes": conf}, headers=h)
+    assert client.get(f"/api/sas/{sa['id']}").json()["situacao"] == "AGUARDANDO_MEGA"   # v3.19: falta precificador
+    client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h)
     assert client.get(f"/api/sas/{sa['id']}").json()["situacao"] == "CONFIRMADO"
-    client.patch(f"/api/sas/{sa['id']}", json={"rs_kg": 42.5}, headers=h)   # v3.16: R$/kg antes da NF
     hrj = entrar(client, u["rj"])
     r = client.post("/api/sas/nf", json=nf, headers=hrj)
     assert r.json()[0]["nf"]["numero"] == "558"

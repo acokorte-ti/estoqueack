@@ -129,16 +129,22 @@ def editar(db: Session, sa_id: int, dados: dict[str, Any], *, usuario: Usuario, 
     sa = obter(db, sa_id, travar=True)
     if sa.situacao == "CONFIRMADO" and set(dados) - {"rs_kg"}:
         raise ErroNegocio("SA confirmado no Mega: só o R$/kg pode ser alterado.")
-    if "rs_kg" in dados and not dados["rs_kg"] and sa.nf_id is not None and sa.origem != "CARGA":
+    if "rs_kg" in dados and not dados["rs_kg"] and sa.origem != "CARGA":
         # spec v3.16 T14 [proposta, P44(d)]: depois da NF, o R$/kg pode ser corrigido, mas não apagado
-        raise ErroNegocio("A NF de transferência já foi informada: o R$/kg pode ser corrigido, mas não apagado.")
+        if sa.nf_id is not None:
+            raise ErroNegocio("A NF de transferência já foi informada: o R$/kg pode ser corrigido, mas não apagado.")
+        # spec v3.19 T14 (Eduardo, 2026-11-19): o SA só fecha com o precificador, então o fechado não fica sem ele
+        if sa.situacao == "CONFIRMADO":
+            raise ErroNegocio("SA fechado: o R$/kg do precificador pode ser corrigido, mas não apagado.")
     pronto_antes = sa.cop_item_id is not None and _cop_pronto(db, db.get(CopItem, sa.cop_item_id).cop)
     antes = {c: getattr(sa, c) for c in dados}
     for c, v in dados.items():
         if c in CAMPOS_EDITAVEIS:
             setattr(sa, c, v)
     _marcar_alteracao(db, sa)
-    _avisar_se_cop_pronto(db, sa, antes=pronto_antes)
+    # o SA que já estava no Mega esperando o precificador fecha aqui (o aviso ao RJ sai dentro de _fechar)
+    if not _fechar(db, sa):
+        _avisar_se_cop_pronto(db, sa, antes=pronto_antes)
     auditoria.registrar(db, "SA_EDITADO", usuario_id=usuario.id, entidade="sa", entidade_id=sa.id, antes=antes,
                         depois=dados, ip=ip)
     db.commit()
@@ -231,6 +237,8 @@ def informar_codigo(db: Session, sa_id: int, codigo: int, confirmacoes: dict[str
     conf = exigir_sem_pendencias(validar_codigo(db, sa, codigo), confirmacoes)
     antes = sa.sa_codigo
     sa.sa_codigo, sa.situacao, sa.informado_em = codigo, "AGUARDANDO_MEGA", agora()
+    # código novo ou corrigido: o que o Mega disse do código anterior não vale mais
+    sa.dados_extra = {k: v for k, v in (sa.dados_extra or {}).items() if k != "mega"} or None
     sa.confirmacoes = {**(sa.confirmacoes or {}), **conf} or None
     _marcar_alteracao(db, sa)
     auditoria.registrar(db, "SA_CODIGO_INFORMADO", usuario_id=usuario.id, entidade="sa", entidade_id=sa.id,
@@ -243,23 +251,27 @@ def informar_codigo(db: Session, sa_id: int, codigo: int, confirmacoes: dict[str
 
 def verificar(db: Session, sas: list[CadastroSa]) -> dict[str, Any]:
     """'Verificar no Mega agora': o código existe, está ativo e recebeu a carga (entrada por compra na filial 13 ou
-    entrada na filial 3, em peças) a partir da data do SA − SA_JANELA_ANTES_DIAS (7). Ver consultas.SITUACAO_SA."""
+    entrada na filial 3, em peças) a partir da data do SA − SA_JANELA_ANTES_DIAS (7). Ver consultas.SITUACAO_SA.
+    Achado no Mega, o SA só fecha com o R$/kg do precificador (spec v3.19): sem ele, fica em Aguardando Mega com
+    `sa_no_mega` e fecha quando o R$/kg for gravado (`editar`), sem ler o Mega de novo."""
     janela = _janela(db)
     try:
         g = fabrica.obter()
     except fabrica.MegaIndisponivel as e:
-        return {"verificados": 0, "confirmados": 0, "erro": str(e)}
-    confirmados = 0
+        return {"verificados": 0, "confirmados": 0, "falta_precificador": 0, "erro": str(e)}
+    confirmados = falta_rs = 0
     for sa in sas:
         if sa.situacao != "AGUARDANDO_MEGA" or not sa.sa_codigo:
             continue
-        try:
-            st = g.situacao_sa(sa.sa_codigo, sa.data - timedelta(days=janela))
-        except Exception as e:  # noqa: BLE001
-            return {"verificados": 0, "confirmados": confirmados, "erro": f"Erro no Mega ({type(e).__name__})"}
-        sa.verificado_mega_em = agora()
-        if st is not None and st.existe and st.ativo is not False and st.qtd_entrada > 0:
-            sa.situacao, sa.confirmado_em = "CONFIRMADO", agora()
+        if not sa_no_mega(sa):
+            try:
+                st = g.situacao_sa(sa.sa_codigo, sa.data - timedelta(days=janela))
+            except Exception as e:  # noqa: BLE001
+                return {"verificados": 0, "confirmados": confirmados, "falta_precificador": falta_rs,
+                        "erro": f"Erro no Mega ({type(e).__name__})"}
+            sa.verificado_mega_em = agora()
+            if not (st is not None and st.existe and st.ativo is not False and st.qtd_entrada > 0):
+                continue
             if st.descricao and not sa.sa_descricao:
                 sa.sa_descricao = st.descricao
             if st.ncm and not sa.ncm:
@@ -269,16 +281,41 @@ def verificar(db: Session, sas: list[CadastroSa]) -> dict[str, Any]:
             sa.dados_extra = {**(sa.dados_extra or {}),
                               "mega": {"qtd_entrada": st.qtd_entrada, "nf_entrada": st.nf_entrada,
                                        "ncm": st.ncm, "ipi_pct": st.ipi_pct}}
+        if _fechar(db, sa):
             confirmados += 1
-            _ao_confirmar(db, sa)
+        else:
+            falta_rs += 1
     db.flush()
-    return {"verificados": len(sas), "confirmados": confirmados, "erro": None}
+    return {"verificados": len(sas), "confirmados": confirmados, "falta_precificador": falta_rs, "erro": None}
+
+
+def sa_no_mega(sa: CadastroSa) -> bool:
+    """O Mega já tem a carga do SA (gravado na verificação); se a linha não fechou, falta só o precificador."""
+    return bool((sa.dados_extra or {}).get("mega"))
+
+
+def precisa_precificador(sa: CadastroSa) -> bool:
+    """SA da carga (histórico) fica como veio; os outros só fecham com o R$/kg do precificador."""
+    return sa.origem != "CARGA"
+
+
+def _fechar(db: Session, sa: CadastroSa) -> bool:
+    """Eduardo, 2026-11-19 (spec v3.19 T14): o SA só fecha (CONFIRMADO) com o SA no Mega **e** o R$/kg do
+    precificador. Devolve True se fechou agora."""
+    if sa.situacao != "AGUARDANDO_MEGA" or not sa_no_mega(sa):
+        return False
+    if precisa_precificador(sa) and not tem_precificador(sa):
+        return False
+    sa.situacao, sa.confirmado_em = "CONFIRMADO", agora()
+    _ao_confirmar(db, sa)
+    return True
 
 
 def confirmar_teste(db: Session, sa_id: int, sa_codigo: int | None, *, usuario: Usuario,
                     ip: str | None) -> CadastroSa:
     """Ferramenta de teste (contrato §7.1, só fora de produção; quem chama confere o modo de teste): marca o SA como
-    CONFIRMADO sem ler o Mega, para o teste manual dos caminhos A e B, e segue igual à confirmação real."""
+    CONFIRMADO sem ler o Mega, para o teste manual dos caminhos A e B, e segue igual à confirmação real: faz de conta
+    que o Mega achou o SA; sem o R$/kg do precificador a linha fica esperando por ele (spec v3.19)."""
     sa = obter(db, sa_id, travar=True)
     if sa.situacao == "CONFIRMADO":
         raise ErroNegocio("Este SA já está confirmado.")
@@ -286,18 +323,18 @@ def confirmar_teste(db: Session, sa_id: int, sa_codigo: int | None, *, usuario: 
     if not codigo:
         raise ErroNegocio("Informe o código do SA para confirmar em teste.")
     antes = {"situacao": sa.situacao, "sa_codigo": sa.sa_codigo}
-    sa.sa_codigo, sa.situacao = codigo, "CONFIRMADO"
-    sa.informado_em = sa.informado_em or agora()
-    sa.confirmado_em = agora()
-    sa.dados_extra = {**(sa.dados_extra or {}),
-                      "confirmacao_teste": {"usuario": usuario.login, "em": sa.confirmado_em.isoformat()}}
+    em = agora()
+    sa.sa_codigo, sa.situacao = codigo, "AGUARDANDO_MEGA"
+    sa.informado_em = sa.informado_em or em
+    sa.dados_extra = {**(sa.dados_extra or {}), "mega": {"teste": True},
+                      "confirmacao_teste": {"usuario": usuario.login, "em": em.isoformat()}}
     _marcar_alteracao(db, sa)
+    db.flush()
+    _fechar(db, sa)
     auditoria.registrar(db, "SA_CONFIRMADO_TESTE", usuario_id=usuario.id, entidade="sa", entidade_id=sa.id,
-                        antes=antes, depois={"situacao": "CONFIRMADO", "sa_codigo": codigo,
+                        antes=antes, depois={"situacao": sa.situacao, "sa_codigo": codigo,
                                              "confirmacao": "confirmação de teste", "usuario": usuario.login},
                         ip=ip)
-    db.flush()
-    _ao_confirmar(db, sa)
     db.commit()
     return sa
 
@@ -453,6 +490,9 @@ def para_dict(db: Session, sa: CadastroSa) -> dict[str, Any]:
         "atrasado": atrasado(db, sa),
         "avisos": avisos(sa),
         "confirmacao_teste": bool((sa.dados_extra or {}).get("confirmacao_teste")),
+        # spec v3.19: SA já achado no Mega que ainda não fechou por falta do R$/kg do precificador
+        "sa_no_mega": sa.situacao != "CONFIRMADO" and sa_no_mega(sa),
+        "precificador_obrigatorio": precisa_precificador(sa),
     }
 
 

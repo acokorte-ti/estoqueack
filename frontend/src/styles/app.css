@@ -400,6 +400,7 @@ details.avancado > summary:hover { border-color: var(--aco-preto); background: v
 tr.atrasado td:first-child { box-shadow: inset 4px 0 0 var(--bloqueio); }
 tr.selecionada td { background: #fff7f7; }
 .aviso-topo { border: 1px solid var(--ciencia-borda); border-left-width: 4px; border-radius: 0 var(--raio) var(--raio) 0; background: var(--ciencia-fundo); padding: var(--esp-3) var(--esp-4); margin-bottom: var(--esp-4); }
+.aviso-versao { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--esp-2) var(--esp-3); margin: 0 0 var(--esp-4); padding: var(--esp-2) var(--esp-3); border: 1.5px solid var(--estoque-mega); border-radius: var(--raio); background: var(--estoque-mega-fundo); color: var(--aco-preto); font-weight: 600; font-size: var(--t-pequeno); }
 .faixa-teste { margin: calc(-1 * var(--esp-3)) 0 var(--esp-4); padding: var(--esp-1) var(--esp-3); border: 1px dashed var(--ciencia-borda); border-radius: var(--raio); background: var(--ciencia-fundo); color: var(--ciencia); font-size: var(--t-mini); }
 .aviso-topo ul { margin: var(--esp-1) 0 0; padding-left: var(--esp-5); }
 .estado-vazio { background: var(--branco); border: 1px dashed var(--aco-borda); border-radius: var(--raio-painel); padding: var(--esp-6); text-align: center; color: var(--aco-medio); }

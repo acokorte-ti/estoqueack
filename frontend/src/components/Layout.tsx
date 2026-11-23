@@ -5,6 +5,7 @@ import { NOME_PERFIL, type Perfil } from "../api/cliente";
 import { ACESSO } from "../api/acesso";
 import { contadoresDoMenu, lerSeVelho, limparPendencias, recarregarPendencias, usePendencias, type Contador } from "../api/pendencias";
 import Sino from "./Sino";
+import AvisoVersao from "./AvisoVersao";
 import Icone, { type NomeIcone } from "./Icone";
 
 interface Item {
@@ -220,6 +221,7 @@ export default function Layout() {
       {menuAberto && <div className="fundo-menu" onClick={() => setMenuAberto(false)} aria-hidden="true" />}
 
       <main className="conteudo">
+        <AvisoVersao />
         {modoTeste && (
           <p className="faixa-teste" role="note">Ambiente de teste (homologação): os dados podem ser apagados na próxima recarga.</p>
         )}

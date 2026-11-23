@@ -12,7 +12,8 @@ from typing import Any
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import CadastroSa, Cop, Destinacao, ItemMP, Lote, MegaSaldo, Movimento, SolicitacaoCorte, Usuario
+from app.models import (CadastroSa, Cop, CopItem, Destinacao, ItemMP, Lote, MegaSaldo, Movimento, SolicitacaoCorte,
+                        Usuario)
 
 from . import cops as svc_cops
 from . import entradas_mega, peso_real
@@ -173,6 +174,27 @@ def pendencias_analise(db: Session) -> list[dict]:
     ]
 
 
+def pendencias_financeiro(db: Session) -> list[dict]:
+    """Perfil Financeiro (spec v3.21 T03): os SAs que esperam o R$/kg do precificador (SA da carga fica como veio).
+    Os já achados no Mega (só falta o R$/kg para fechar e liberar a NF) vêm primeiro."""
+    q = (select(CadastroSa).options(selectinload(CadastroSa.cop_item).selectinload(CopItem.cop))
+         .where(CadastroSa.origem != "CARGA", or_(CadastroSa.rs_kg.is_(None), CadastroSa.rs_kg <= 0))
+         .order_by(CadastroSa.criado_em, CadastroSa.id))
+    itens = []
+    for s in db.scalars(q):
+        cop = s.cop_item.cop if s.cop_item else None
+        itens.append({"id": s.id, "op": s.op, "cliente": s.cliente, "material": s.material, "dimensao": s.dimensao,
+                      "peso_kg": s.peso_kg, "sa_codigo": s.sa_codigo, "situacao": s.situacao,
+                      "sa_no_mega": svc_sas.sa_no_mega(s), "cop": cop.numero if cop else None,
+                      "origem": s.origem, "criado_em": s.criado_em.isoformat()})
+    itens.sort(key=lambda x: not x["sa_no_mega"])            # estável: dentro de cada grupo, o mais antigo primeiro
+    return [
+        _p("SA_SEM_PRECIFICADOR", "SAs aguardando o R$/kg do precificador", itens, "/sa",
+           nivel="ALERTA" if any(x["sa_no_mega"] for x in itens) else "NORMAL")
+        | {"no_mega": sum(1 for x in itens if x["sa_no_mega"])},
+    ]
+
+
 def excecoes_da_semana(db: Session, dias: int = 7) -> list[dict]:
     desde = agora() - timedelta(days=dias)
     out = []
@@ -208,6 +230,8 @@ def pendencias(db: Session, usuario: Usuario) -> dict[str, Any]:
         grupos["OPERACAO_RJ"] = pendencias_rj(db)
     if p in ("ANALISE", "ADMIN"):
         grupos["ANALISE"] = pendencias_analise(db)
+    if p in ("FINANCEIRO", "ADMIN"):
+        grupos["FINANCEIRO"] = pendencias_financeiro(db)
     rj = p == "OPERACAO_RJ"
     u = None if rj else sync_mega.ultima(db, "ESTOQUE", None)     # P10: o Marcelo não vê o Mega nem Itu
     ok = None if rj else sync_mega.ultima(db, "ESTOQUE")

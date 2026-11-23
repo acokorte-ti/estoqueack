@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-PerfilTipo = Literal["ADMIN", "ESTOQUE", "OPERACAO_RJ", "ANALISE"]
+PerfilTipo = Literal["ADMIN", "ESTOQUE", "OPERACAO_RJ", "ANALISE", "FINANCEIRO"]
 PlantaTipo = Literal["ITU", "RJ"]
 
 

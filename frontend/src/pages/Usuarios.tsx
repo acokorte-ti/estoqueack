@@ -10,6 +10,7 @@ const PERFIS: { valor: Perfil; ajuda: string }[] = [
   { valor: "ESTOQUE", ajuda: "Movimentações em Itu: corte, recebimento, SA, consumo e RETO" },
   { valor: "OPERACAO_RJ", ajuda: "Barra Mansa: entrada por NF, corte, peso real e COP" },
   { valor: "ANALISE", ajuda: "Consulta, relatórios, destinações e notas" },
+  { valor: "FINANCEIRO", ajuda: "R$/kg do precificador no Cadastro de SA; consulta o resto" },
   { valor: "ADMIN", ajuda: "Tudo, inclusive usuários e parâmetros" },
 ];
 

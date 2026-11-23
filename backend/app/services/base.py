@@ -122,6 +122,7 @@ def notificar(db: Session, *, perfis: tuple[str, ...] = (), usuarios: tuple[int,
 ESTOQUE_ITU = ("ESTOQUE",)
 OPERACAO_RJ = ("OPERACAO_RJ",)
 ANALISE = ("ANALISE",)
+FINANCEIRO = ("FINANCEIRO",)    # Bruna (spec v3.21): R$/kg do precificador no Cadastro de SA
 
 
 def so_rj_no_rio(usuario: Usuario) -> bool:

@@ -122,7 +122,7 @@ export const data = (iso: string | null | undefined) =>
 
 export const num = (s: string) => (s.trim() === "" ? undefined : Number(s.replace(",", ".")));
 
-export type Perfil = "ADMIN" | "ESTOQUE" | "OPERACAO_RJ" | "ANALISE";
+export type Perfil = "ADMIN" | "ESTOQUE" | "OPERACAO_RJ" | "ANALISE" | "FINANCEIRO";
 
 export interface Usuario {
   id: number;
@@ -158,6 +158,7 @@ export const NOME_PERFIL: Record<Perfil, string> = {
   ESTOQUE: "Estoque Itu",
   OPERACAO_RJ: "Operação RJ",
   ANALISE: "Análise",
+  FINANCEIRO: "Financeiro",
 };
 
 export const kg = (v: number) =>

@@ -11,14 +11,14 @@ SENHA = "123456"
 def criar_usuarios(client) -> dict:
     h = preparar_admin(client)
     for login, perfil, planta in (("fabiano.camargo", "ESTOQUE", "ITU"), ("marcello.teixeira", "OPERACAO_RJ", "RJ"),
-                                  ("renato.pinto", "ANALISE", "ITU")):
+                                  ("renato.pinto", "ANALISE", "ITU"), ("ana.souza", "FINANCEIRO", "ITU")):
         r = client.post("/api/usuarios", json={"login": login, "nome": login.replace(".", " ").title(),
                                                "email": f"{login}@acokorte.com.br", "perfil": perfil,
                                                "planta": planta, "senha": SENHA, "trocar_senha": False}, headers=h)
         assert r.status_code == 201, r.text
     client.post("/api/auth/logout", headers=h)
     return {"admin": ("admin", "NovaSenha2026x"), "itu": ("fabiano.camargo", SENHA),
-            "rj": ("marcello.teixeira", SENHA), "analise": ("renato.pinto", SENHA)}
+            "rj": ("marcello.teixeira", SENHA), "analise": ("renato.pinto", SENHA), "financeiro": ("ana.souza", SENHA)}
 
 
 def entrar(client, credencial: tuple[str, str]) -> dict:

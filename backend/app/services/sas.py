@@ -16,7 +16,7 @@ from app.integrations.mega import fabrica
 from app.models import CadastroSa, CopItem, Lote, NfTransferencia, SolicitacaoCorte, Usuario
 
 from . import auditoria
-from .base import ErroNegocio, NaoEncontrado, Previa, agora, exigir_sem_pendencias, notificar, parametro
+from .base import FINANCEIRO, ErroNegocio, NaoEncontrado, Previa, agora, exigir_sem_pendencias, notificar, parametro
 from .estoque import bitola
 from .fluxo import recalcular_solicitacao
 
@@ -345,6 +345,11 @@ def _ao_confirmar(db: Session, sa: CadastroSa) -> None:
         if sol is not None:
             recalcular_solicitacao(db, sol)
     _avisar_se_cop_pronto(db, sa)
+
+
+def avisar_financeiro(db: Session, texto: str, link: str) -> None:
+    """Perfil Financeiro (spec v3.21 §6): linha de SA nova pede o R$/kg do precificador."""
+    notificar(db, perfis=FINANCEIRO, tipo="SA_AGUARDANDO_PRECIFICADOR", texto=texto, link=link)
 
 
 def tem_precificador(sa: CadastroSa | None) -> bool:

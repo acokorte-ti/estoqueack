@@ -18,9 +18,9 @@ router = APIRouter(tags=["COP e SA"])
 
 RJ = deps.exigir_perfil("OPERACAO_RJ")
 ITU = deps.exigir_perfil("ESTOQUE")
-VER_COP = deps.exigir_perfil("OPERACAO_RJ", "ESTOQUE", "ANALISE")
-VER_SA = deps.exigir_perfil("ESTOQUE", "OPERACAO_RJ", "ANALISE")
-RS_KG = deps.exigir_perfil("ESTOQUE", "ANALISE")
+VER_COP = deps.exigir_perfil("OPERACAO_RJ", "ESTOQUE", "ANALISE", "FINANCEIRO")
+VER_SA = deps.exigir_perfil("ESTOQUE", "OPERACAO_RJ", "ANALISE", "FINANCEIRO")
+RS_KG = deps.exigir_perfil("ESTOQUE", "ANALISE", "FINANCEIRO")
 # P36 [proposta] (spec v3.13 T14): a Amanda cadastra o SA no Mega e informa o código com usuário próprio, perfil
 # Análise; o Estoque Itu e o Admin continuam podendo
 INFORMA_SA = deps.exigir_perfil("ESTOQUE", "ANALISE")
@@ -207,7 +207,7 @@ class EdicaoSa(BaseModel):
 def editar_sa(sa_id: int, c: EdicaoSa, request: Request, db: Session = Depends(get_db),
               u: Usuario = Depends(RS_KG)) -> dict:
     dados = c.model_dump(exclude_unset=True)
-    if u.perfil == "ANALISE" and set(dados) - {"rs_kg"}:
+    if u.perfil in ("ANALISE", "FINANCEIRO") and set(dados) - {"rs_kg"}:      # só o R$/kg do precificador
         dados = {k: v for k, v in dados.items() if k == "rs_kg"}
     return sas.para_dict(db, sas.editar(db, sa_id, dados, usuario=u, ip=deps.ip_cliente(request)))
 

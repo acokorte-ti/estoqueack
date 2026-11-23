@@ -16,6 +16,7 @@ class Perfil(str, enum.Enum):
     ESTOQUE = "ESTOQUE"            # Fabiano / Matheus — movimentações em Itu
     OPERACAO_RJ = "OPERACAO_RJ"    # Marcelo — corte, peso real, COP, entrada por NF no RJ
     ANALISE = "ANALISE"            # Renato — consulta, destinações, notas
+    FINANCEIRO = "FINANCEIRO"      # Bruna — R$/kg do precificador no Cadastro de SA; consulta o resto
 
 
 class Usuario(Base):

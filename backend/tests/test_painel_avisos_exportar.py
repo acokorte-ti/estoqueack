@@ -56,7 +56,8 @@ def test_pendencias_por_perfil(amb):
     r = client.get("/api/painel/pendencias").json()
     assert set(r["grupos"]) == {"ANALISE"}
     entrar(client, u["admin"])
-    assert set(client.get("/api/painel/pendencias").json()["grupos"]) == {"ESTOQUE", "OPERACAO_RJ", "ANALISE"}
+    assert set(client.get("/api/painel/pendencias").json()["grupos"]) == {"ESTOQUE", "OPERACAO_RJ", "ANALISE",
+                                                                         "FINANCEIRO"}
 
 
 def test_conciliacao_minima(amb):

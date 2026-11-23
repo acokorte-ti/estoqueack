@@ -9,7 +9,7 @@ from tests.fluxo_util import criar_usuarios, entrar
 
 pytest.importorskip("fastapi")
 
-ITU, RJ, ANALISE, ADMIN = "itu", "rj", "analise", "admin"
+ITU, RJ, ANALISE, FIN, ADMIN = "itu", "rj", "analise", "financeiro", "admin"
 
 # (método, url, perfis com permissão, tela)
 MATRIZ = [
@@ -19,16 +19,20 @@ MATRIZ = [
     ("GET", "/api/fila-rj", {ITU, RJ}, "T09 fila RJ (Itu só consulta)"),
     ("POST", "/api/solicitacoes/999/material-insuficiente", {RJ}, "T09 material insuficiente"),
     ("POST", "/api/solicitacoes/999/corte/validar", {RJ}, "T10 registrar corte"),
-    ("GET", "/api/cops", {ITU, RJ, ANALISE}, "T11 COP (consulta)"),
+    ("GET", "/api/cops", {ITU, RJ, ANALISE, FIN}, "T11 COP (consulta)"),
     ("POST", "/api/cops", {RJ}, "T11 novo COP"),
     ("POST", "/api/cops/999/fechar", {RJ}, "T11 fechar COP"),
     ("POST", "/api/cops/999/nf", {RJ}, "T11 NF"),
     ("GET", "/api/recebimentos", {ITU, RJ}, "T12 receber (RJ consulta)"),
     ("POST", "/api/cops/999/receber/validar", {ITU}, "T12 receber"),
     ("POST", "/api/cortes-itu/validar", {ITU}, "T13 corte em Itu"),
-    ("GET", "/api/sas", {ITU, RJ, ANALISE}, "T14 SA (consulta)"),
+    ("GET", "/api/sas", {ITU, RJ, ANALISE, FIN}, "T14 SA (consulta)"),
     ("POST", "/api/sas/999/codigo/validar", {ITU, ANALISE}, "T14 informar código (P36: Amanda, perfil Análise)"),
-    ("PATCH", "/api/sas/999", {ITU, ANALISE}, "T14 editar (Análise: R$/kg)"),
+    ("PATCH", "/api/sas/999", {ITU, ANALISE, FIN}, "T14 editar (Análise e Financeiro: só o R$/kg)"),
+    ("POST", "/api/sas/preparar", {ITU}, "T14 marcar como preparado"),
+    ("POST", "/api/sas/verificar", {ITU}, "T14 verificar no Mega"),
+    ("GET", "/api/conciliacao", {ITU, ANALISE}, "T16 conferir com o Mega"),
+    ("GET", "/api/entradas-mega", {ITU, ANALISE}, "T15 entradas do Mega sem lote"),
     ("POST", "/api/entradas-nf/validar", {RJ}, "T06 entrada por NF"),
     ("POST", "/api/lotes/999/destinacoes", {ITU, ANALISE}, "T17 reservas e restrições"),
     ("POST", "/api/lotes/999/ajuste/validar", {ITU}, "T18 ajuste"),
@@ -44,7 +48,7 @@ def usuarios(client):
     return criar_usuarios(client)
 
 
-@pytest.mark.parametrize("perfil", [ITU, RJ, ANALISE, ADMIN])
+@pytest.mark.parametrize("perfil", [ITU, RJ, ANALISE, FIN, ADMIN])
 def test_matriz_perfil_tela(client, usuarios, perfil):
     h = entrar(client, usuarios[perfil])
     if perfil == ADMIN:

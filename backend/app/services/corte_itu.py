@@ -277,6 +277,7 @@ def registrar(db: Session, cfg: Config, e: CorteItuEntrada, *, usuario: Usuario,
         sas.criar_linha(db, origem="CORTE_ITU", lote=lote, op=e.op, item_codigo=dados.item_codigo,
                         item_descricao=dados.item_descricao, cliente=dados.cliente, pedido=dados.pedido,
                         quantidade=e.pecas, peso_kg=e.consumo_kg, corte_itu_id=c.id)
+        sas.avisar_financeiro(db, f"Corte em Itu da OP {e.op} (material RJ): falta o R$/kg do precificador.", "/sa")
     auditoria.registrar(db, "CORTE_ITU_REGISTRADO", usuario_id=usuario.id, entidade="corte_itu", entidade_id=c.id,
                         depois={"op": e.op, "lote": lote.codigo, "consumo_kg": e.consumo_kg, "sobra_kg": e.sobra_kg,
                                 "reto": reto, "sobra_destino": destino, "perda_kg": perda,

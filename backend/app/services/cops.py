@@ -132,6 +132,8 @@ def fechar(db: Session, cop_id: int, *, usuario: Usuario, ip: str | None) -> Cop
     notificar(db, perfis=ESTOQUE_ITU, tipo="COP_FECHADO",
               texto=f"COP {cop.numero} fechado pelo RJ com {len(cop.itens)} item(ns): SA a fazer.",
               link=f"/sa?cop={cop.numero}")
+    sas.avisar_financeiro(db, f"COP {cop.numero} fechado com {len(cop.itens)} item(ns): falta o R$/kg do precificador.",
+                          f"/sa?cop={cop.numero}")
     auditoria.registrar(db, "COP_FECHADO", usuario_id=usuario.id, entidade="cop", entidade_id=cop.id,
                         depois={"itens": len(cop.itens)}, ip=ip)
     db.commit()

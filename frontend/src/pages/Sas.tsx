@@ -208,7 +208,8 @@ export default function Sas() {
   // contrato §7.1 (R070): ferramenta só da homologação, só ADMIN
   const confirmaTeste = modoTeste && usuario?.perfil === "ADMIN";
   const altera = usuario?.perfil === "ESTOQUE" || usuario?.perfil === "ADMIN";
-  const editaRs = altera || usuario?.perfil === "ANALISE";
+  // spec v3.21: o Financeiro (Bruna) grava o R$/kg do precificador; o resto do SA fica só como texto para ela
+  const editaRs = altera || usuario?.perfil === "ANALISE" || usuario?.perfil === "FINANCEIRO";
   // spec v3.13 T14 / contrato §7 [P36]: a Amanda (perfil Análise) também informa o código do SA depois de cadastrar no Mega
   const informaCodigo = altera || usuario?.perfil === "ANALISE";
   // Eduardo, 2026-11-19 (pendências item 17): a NF do corte em Itu (B2) é emitida no RJ e informada pelo Marcelo

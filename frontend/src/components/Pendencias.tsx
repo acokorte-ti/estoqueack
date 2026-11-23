@@ -8,13 +8,14 @@ import Janela, { fecharJanela } from "./Janela";
 import Icone, { type NomeIcone } from "./Icone";
 import { JUSTIFICATIVA_MIN } from "./PainelValidacao";
 
-const NOME_GRUPO: Record<string, string> = { ESTOQUE: "Itu", OPERACAO_RJ: "Barra Mansa", ANALISE: "Análise" };
+const NOME_GRUPO: Record<string, string> = { ESTOQUE: "Itu", OPERACAO_RJ: "Barra Mansa", ANALISE: "Análise", FINANCEIRO: "Financeiro" };
 const s = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 
 /** Ícone e verbo do botão de cada tipo de pendência (layout A: a tarefa diz o que fazer). */
 const TIPO: Record<string, { icone: NomeIcone; verbo: string }> = {
   SA_SEGURANDO_COP: { icone: "sa", verbo: "Abrir Cadastro de SA" },
   SA_SEM_CONFIRMACAO: { icone: "relogio", verbo: "Abrir Cadastro de SA" },
+  SA_SEM_PRECIFICADOR: { icone: "sa", verbo: "Informar R$/kg" },
   COP_EM_TRANSITO: { icone: "receber", verbo: "Receber" },
   COP_ABERTO: { icone: "envio", verbo: "Abrir envios" },
   COP_AGUARDANDO_SA: { icone: "envio", verbo: "Abrir envios" },
@@ -39,6 +40,9 @@ function resumo(codigo: string, i: ItemPendencia): { texto: string; link?: strin
     case "COP_EM_TRANSITO": case "COP_ABERTO": case "COP_AGUARDANDO_SA": case "COP_AGUARDANDO_NF":
       return { texto: `COP ${s(i.numero)} · ${s(i.qtd_itens)} item(ns) · ${typeof i.peso_total_kg === "number" ? `${kg(i.peso_total_kg)} kg` : ""}`,
         link: codigo === "COP_EM_TRANSITO" ? `/recebimentos/${s(i.id)}` : `/cops/${s(i.id)}` };
+    case "SA_SEM_PRECIFICADOR": // spec v3.21 (Financeiro): no Mega = falta só o R$/kg para o SA fechar
+      return { texto: `OP ${s(i.op)}${i.cop ? ` · COP ${s(i.cop)}` : " · corte em Itu"}${i.material ? ` · ${s(i.material)} ${s(i.dimensao)}` : ""}${typeof i.peso_kg === "number" ? ` · ${kg(i.peso_kg)} kg` : ""}${i.sa_no_mega ? " · SA no Mega, falta só o R$/kg" : ""}`,
+        link: i.cop ? `/sa?cop=${s(i.cop)}` : "/sa" };
     case "SA_SEM_CONFIRMACAO":
       return { texto: `OP ${s(i.op)} · SA ${s(i.sa_codigo) || "sem código"} · desde ${data(s(i.criado_em))}`, link: "/sa" };
     case "CORTES_FORA_DE_COP":

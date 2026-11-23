@@ -2,7 +2,7 @@
 
 Sistema que substitui as planilhas de estoque de MP (ESTOQUE 2026, Estoque Geral, Cadastro de SA, Controle de Corte RJ). Duas plantas: **Itu** (matriz, filial 3 no Mega) e **Barra Mansa / RJ**. Controle por **lote** (contêiner + material + bitola), com lotes filhos (sobra/RETO) apontando para a origem; saldo = soma de movimentos imutáveis, em kg. O Mega (Oracle) é **só leitura**: o sistema nunca grava no ERP.
 
-Dono do projeto: **Eduardo Macedo** (TI). Usuários: Fabiano Camargo e Matheus Almeida (Estoque Itu), Marcelo Teixeira (Operação RJ), Renato Pinto (Análise/compras). Tudo em **português do Brasil**.
+Dono do projeto: **Eduardo Macedo** (TI). Usuários: Fabiano Camargo e Matheus Almeida (Estoque Itu), Marcelo Teixeira (Operação RJ), Renato Pinto (Análise/compras), Bruna (Financeiro: R$/kg do precificador no Cadastro de SA). Tudo em **português do Brasil**.
 
 ## Onde está cada coisa
 

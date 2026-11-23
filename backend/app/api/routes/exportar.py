@@ -20,7 +20,7 @@ from app.models import Usuario
 from app.services import estoque, sas, solicitacoes
 
 router = APIRouter(prefix="/exportar", tags=["exportações"])
-VER_SA = deps.exigir_perfil("ESTOQUE", "OPERACAO_RJ", "ANALISE")
+VER_SA = deps.exigir_perfil("ESTOQUE", "OPERACAO_RJ", "ANALISE", "FINANCEIRO")
 ESTOQUES = {"ESTOQUE_MEGA": "Estoque Mega", "RJ_NO_RIO": "RJ no Rio", "RJ_EM_ITU": "RJ em Itu"}
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 

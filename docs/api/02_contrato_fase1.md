@@ -203,7 +203,7 @@ Vale quando `sobra_kg > 0` e `sobra_na_bitola: false` (sobra na bitola continua 
 - `201` ganha: `lote_sobra: {id, codigo, bitola}|null`, `sobra_destino` (`RETO` | `LOTE_NOVO` | null), `sobra_espessura_mm`, `sobra_largura_mm`, `sobra_diametro_mm`.
 - Parâmetros novos da T23 (§10): `RETO_ESP_LIMITE` = 50, `RETO_LARG_MAX_ATE_LIMITE` = 200, `RETO_LARG_MAX_ACIMA` = 250 (mm; `PATCH /api/parametros/{chave}`, só Admin).
 
-## 7. T14 SA ✅ (Estoque Itu altera; Operação RJ e Análise consultam; Análise edita R$/kg)
+## 7. T14 SA ✅ (Estoque Itu altera; Operação RJ, Análise e Financeiro consultam; Análise e Financeiro editam o R$/kg)
 
 - `GET /api/sas?situacao=&origem=&op=&cop=&nao_exportados=`: sem filtro, traz os não confirmados. A resposta tem `cops_aguardando_sa[]` (para o topo da tela) e `itens[]`:
 
@@ -273,7 +273,7 @@ Ocorrências: `NF_DUPLICADA`, `SEM_ITENS`, `LIGA_DESCONHECIDA#n`, `BITOLA_INCOMP
 
 ## 11. T03 Painel com pendências ✅ (2026-11-04)
 
-`GET /api/painel/pendencias` (todos os perfis; o Admin recebe os três grupos). A barra de estoque continua em `GET /api/painel/resumo`.
+`GET /api/painel/pendencias` (todos os perfis; o Admin recebe todos os grupos). A barra de estoque continua em `GET /api/painel/resumo`.
 
 ```json
 { "perfil": "ESTOQUE",
@@ -287,6 +287,7 @@ Ocorrências: `NF_DUPLICADA`, `SEM_ITENS`, `LIGA_DESCONHECIDA#n`, `BITOLA_INCOMP
 - `nivel`: `ALERTA` (destacar) ou `NORMAL`; com `quantidade` 0 vem sempre `NORMAL`. `itens` traz no máximo 10 (o `link` abre a lista completa). A ordem dos grupos é a ordem de exibição.
 - **ESTOQUE** (Fabiano, Matheus): `SA_SEGURANDO_COP` (itens `{cop_id, cop, sas_pendentes, precificador_pendentes, itens, fechado_em}`; desde 2026-11-18 o COP fica aqui até ter SA confirmado **e** R$/kg em todos os itens, sempre no topo), `COP_EM_TRANSITO` (COPs no formato da lista do §4), `PECA_INTEIRA_AGUARDANDO_CORTE` e `MATERIAL_INSUFICIENTE` (solicitações `{id, numero, op, cliente, quantidade, prazo, situacao, atraso, dias_em_aberto, material, conteiner}`), `SA_SEM_CONFIRMACAO` (`{id, op, situacao, sa_codigo, criado_em}`, passou do prazo de 48 h).
 - **OPERACAO_RJ** (Marcelo): `FILA_CORTE` (por prazo), `FILA_CORTE_ATRASADA`, `CORTES_FORA_DE_COP` (formato de `cortes-prontos`), `COP_ABERTO`, `COP_AGUARDANDO_SA`, `COP_AGUARDANDO_NF`.
+- **FINANCEIRO** (Bruna, §16.6): `SA_SEM_PRECIFICADOR`.
 - **ANALISE** (Renato): `RESERVA_VENCENDO` (`{destinacao_id, lote_id, lote, tipo, descricao, kg, validade}`, próximos 7 dias), `DIVERGENCIA_MEGA` (itens da T16), `EXCECOES_SEMANA` (`{movimento_id, lote_id, tipo, kg, op, codigos, justificativa, usuario, criado_em}`).
 - `atrasos`: solicitações Enviadas, Parciais e com Material insuficiente por faixa (7 / 15 dias). `divergencias_mega.quantidade` vem `null` para a Operação RJ (não enxerga o Estoque Mega).
 - **Entradas Mega a classificar (T15)** ainda não existem (F1.1): o grupo não aparece.
@@ -466,6 +467,14 @@ Campos novos opcionais: `fornecedor`, `serie`, `ncm`, `packing_list`, `di_duimp`
 - **T13:** lote **redondo** com sobra fora da bitola → ERRO `SOBRA_REDONDO_NA_BITOLA` (a sobra fica no lote). `sobra_vai_para_reto` e `sobra_diametro_mm` deixam de ser usados.
 - **T14:** `POST /api/sas/nf` (NF só fiscal do B2) passa para a **Operação RJ** (e Admin); o Estoque Itu recebe 403. `GET /api/sas` da Operação RJ passa a trazer também as linhas `origem: CORTE_ITU`.
 - **Anexos (§16.4):** `tipo` aceita só `NF`, `PACKING_LIST`, `OUTRO` (o precificador não é anexo); arquivos só PDF, JPG e PNG. Anexo antigo `PRECIFICADOR` continua aparecendo. Sai `indicadores.precificador` e a coluna "Tem precificador" do Excel.
+
+## 16.6 Perfil Financeiro (2026-11-23, spec v3.21; migração 0014)
+
+- `perfil` aceita `FINANCEIRO` (`POST/PATCH /api/usuarios`; a 0014 alarga o `ck_usuario_perfil`). Nome na tela: "Financeiro".
+- **Grava:** só `PATCH /api/sas/{id}` com `rs_kg` (outros campos do corpo são ignorados, como na Análise). Informar código, preparar, verificar no Mega, NF do B2, COP, solicitação, reserva e ajuste: `403`.
+- **Consulta:** `GET /api/sas`, `/api/sas/{id}`, `/api/exportar/sas.xlsx`, `/api/cops`, `/api/cops/{id}`, e o que é de todos os perfis (lotes, solicitações, entradas por NF, calculadora). Não vê `/api/conciliacao`, `/api/entradas-mega` nem `/api/recebimentos`.
+- **Painel:** grupo `FINANCEIRO` com `SA_SEM_PRECIFICADOR` (o Admin também recebe): itens `{id, op, cliente, material, dimensao, peso_kg, sa_codigo, situacao, sa_no_mega, cop, origem, criado_em}` dos SAs sem R$/kg (fora os da carga), primeiro os `sa_no_mega` (só falta o R$/kg para fechar); `nivel` `ALERTA` se houver algum `sa_no_mega`; campo extra `no_mega` (quantos). `link` `/sa`.
+- **Sino:** `SA_AGUARDANDO_PRECIFICADOR` ao fechar o COP (`link` `/sa?cop=<número>`) e ao registrar corte em Itu de lote fiscal RJ que cria SA (`link` `/sa`).
 
 ## 17. Ainda não implementado
 

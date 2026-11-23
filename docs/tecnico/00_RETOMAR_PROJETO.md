@@ -50,7 +50,7 @@ No **PC do Eduardo**, dentro de `estoqueack\` e ignorados pelo Git:
 | Destino | Como |
 |---|---|
 | system-lab | `ssh system-lab` (alias no `~/.ssh/config` do Eduardo: `ubuntu@204.216.137.171`). Ubuntu 22.04 ARM64, 4 vCPU, 15 GB, Docker, nginx 1.18 |
-| Site | https://estoque.acokorte.com.br, só dos IPs liberados: Itu Agil 45.6.164.74, Itu Vivo 201.91.252.202 e Barra Mansa 200.165.15.190 |
+| Site | https://estoque.acokorte.com.br, só dos IPs liberados: Itu Agil 45.6.164.74, Itu Vivo 201.91.252.202 e Barra Mansa 200.165.13.229 (IP dinâmico: era 200.165.15.190; trocou em 2026-11-23 e deu 403 no RJ. Se voltar o 403, ver o IP recusado em `/var/log/nginx/error.log`, "access forbidden by rule", e trocar no `ips-estoqueack.conf` com sudo, numa sessão `ssh system-lab` interativa) |
 | Mega (Oracle) | a partir do system-lab ou de dentro do container `api`. **Exige criptografia nativa (NNE)**, então precisa do Instant Client 19 (modo thick). Usuário `estoqueack_ro`, só leitura |
 | GitHub | repositório `acokorte-ti/estoqueack` (**público**: avaliar se torna privado) |
 

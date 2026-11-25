@@ -61,6 +61,8 @@ const GRUPOS: Grupo[] = [
       { para: "/admin/usuarios", rotulo: "Usuários", icone: "pessoas", pronto: true },
       { para: "/admin/ligas", rotulo: "Ligas e densidades", icone: "camadas", pronto: true },
       { para: "/admin/parametros", rotulo: "Parâmetros do sistema", icone: "ajustes", pronto: true },
+      // spec v3.22 T27 (Eduardo, 2026-11-25): conferência física, todos os lotes fora do Estoque Mega
+      { para: "/admin/estoque", rotulo: "Corrigir estoque", icone: "editar", pronto: true },
     ],
   },
 ];

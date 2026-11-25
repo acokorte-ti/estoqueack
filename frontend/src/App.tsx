@@ -25,6 +25,7 @@ import Estoque from "./pages/Estoque";
 import LoteDetalhe from "./pages/LoteDetalhe";
 import EntradasNf from "./pages/EntradasNf";
 import Parametros from "./pages/Parametros";
+import CorrigirEstoque from "./pages/CorrigirEstoque";
 import Conciliacao from "./pages/Conciliacao";
 import EntradasMega from "./pages/EntradasMega";
 
@@ -62,6 +63,7 @@ export default function App() {
         <Route path="lotes/:id" element={<RedirecionaLote />} />
         <Route path="entradas-nf" element={<Protegido perfis={ACESSO.entradaNf}><EntradasNf /></Protegido>} />
         <Route path="admin/parametros" element={<Protegido admin><Parametros /></Protegido>} />
+        <Route path="admin/estoque" element={<Protegido admin><CorrigirEstoque /></Protegido>} />
         <Route path="solicitacoes" element={<Protegido perfis={ACESSO.solicitacoes}><Solicitacoes /></Protegido>} />
         <Route path="solicitacoes/nova" element={<Protegido perfis={ACESSO.novaSolicitacao}><NovaSolicitacao /></Protegido>} />
         <Route path="solicitacoes/:id" element={<Protegido perfis={ACESSO.solicitacoes}><SolicitacaoDetalhe /></Protegido>} />

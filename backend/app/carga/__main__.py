@@ -21,7 +21,7 @@ from sqlalchemy import func, select
 from app.core.config import get_config
 from app.core.db import SessionLocal
 from app.integrations.mega import fabrica
-from app.models import Liga, MegaSaldo, Usuario
+from app.models import Auditoria, Liga, Lote, MegaSaldo, Usuario
 from app.services import estoque
 
 from . import gravar, planilhas, plano, relatorio
@@ -71,6 +71,16 @@ def _kardex():
     return consultar
 
 
+def correcoes_manuais(db) -> int:
+    """T27 (spec v3.22): correções manuais de lote (auditoria LOTE_CORRIGIDO) feitas depois da última carga, que a
+    recarga apaga (Eduardo, 2026-11-25: "recarga apaga as correções")."""
+    desde = db.scalar(select(func.min(Lote.criado_em)))
+    if desde is None:
+        return 0
+    return db.scalar(select(func.count(Auditoria.id)).where(Auditoria.acao == "LOTE_CORRIGIDO",
+                                                            Auditoria.quando >= desde)) or 0
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     ap = argparse.ArgumentParser(prog="python -m app.carga", description="Carga inicial das planilhas (T25)")
@@ -111,6 +121,10 @@ def main(argv: list[str] | None = None) -> int:
     with SessionLocal() as db:
         pl = plano.montar(contexto(db, not a.sem_conferir_ops, correcoes), est, hist, geral, corte, sas)
         log.info("plano: %s", pl.contagens)
+        n_corr = correcoes_manuais(db)
+        if n_corr:
+            log.warning("ATENÇÃO: %d correção(ões) manual(is) de lote feitas na T27 (Admin) desde a última carga "
+                        "serão APAGADAS pela recarga (spec v3.22 T27).", n_corr)
         if not a.importar:
             p = relatorio.gerar(pl, a.saida / f"carga_previa_{carimbo}.xlsx", titulo=f"PRÉVIA {carimbo} (nada gravado)")
             log.info("prévia: %s", p)

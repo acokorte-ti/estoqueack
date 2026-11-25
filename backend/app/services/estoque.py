@@ -126,6 +126,8 @@ def consulta_lotes(db: Session, f: dict[str, Any]):
     if f.get("estoque"):
         pf, lf = BALDE_INV[f["estoque"]]
         q = q.where(Lote.planta_fiscal == pf, Lote.local_fisico == lf)
+    if f.get("planta_fiscal"):              # T27 (spec v3.22): tudo o que não é Estoque Mega = planta fiscal RJ
+        q = q.where(Lote.planta_fiscal == f["planta_fiscal"])
     if _termo_liga(f.get("liga")):
         q = q.where(filtro_liga(Liga.codigo, f["liga"]))
     if f.get("formato"):

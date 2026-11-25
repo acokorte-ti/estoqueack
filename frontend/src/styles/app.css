@@ -716,3 +716,8 @@ label.secundario:focus-within { outline: 2px solid var(--aco-preto); outline-off
 .linha-detalhe td { background: #f7f8f9; }
 @media (max-width: 900px) { .lado-a-lado { grid-template-columns: 1fr; } }
 .texto-bloqueio { color: var(--bloqueio); }
+
+/* T27 Corrigir estoque (spec v3.22) */
+.campo-sa > legend { padding: 0 4px; font-size: var(--t-pequeno); font-weight: 700; color: var(--aco-preto); }
+.aviso-busca { color: var(--ciencia); font-weight: 600; }
+.aviso-busca svg, .dica svg { width: 1em; height: 1em; vertical-align: -0.15em; }

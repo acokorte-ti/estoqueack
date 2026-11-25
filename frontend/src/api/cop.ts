@@ -21,6 +21,8 @@ export interface CopItem {
 export interface Cop {
   id: number; numero: number; situacao: SituacaoCop; data: string; fechado_em: string | null; enviado_em: string | null;
   qtd_itens: number; peso_total_kg: number; nfs: string[]; observacao: string | null; itens?: CopItem[];
+  /** spec v3.23: quem abriu o COP (pode excluir; o Admin também). Campos novos, opcionais; null no COP da carga. */
+  criado_por_id?: number | null; criado_por?: string | null;
 }
 
 export interface CortePronto { liberacao_id: number; solicitacao_id: number; op: number; cliente: string | null; material: string;

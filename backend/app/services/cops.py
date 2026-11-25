@@ -162,6 +162,49 @@ def reabrir(db: Session, cop_id: int, justificativa: str, *, usuario: Usuario, i
     return cop
 
 
+def pode_excluir(cop: Cop, usuario: Usuario) -> bool:
+    """Spec v3.23 T11 (Eduardo, 2026-11-25): quem abriu o COP ou o Admin (COP da carga, sem autor: só o Admin)."""
+    return usuario.perfil == "ADMIN" or (cop.criado_por_id is not None and cop.criado_por_id == usuario.id)
+
+
+def excluir(db: Session, cop_id: int, motivo: str | None, *, usuario: Usuario, ip: str | None) -> None:
+    """Excluir COP (spec v3.23 T11): aberto, ou fechado e não enviado sem SA confirmado (a trava do Reabrir). Os
+    cortes voltam para "cortes prontos", as linhas de SA não confirmadas saem e as solicitações são recalculadas.
+    Não mexe em saldo (o COP só move material ao ser enviado)."""
+    cop = obter(db, cop_id, travar=True)
+    if cop.situacao not in ("ABERTO", "FECHADO"):
+        raise ErroNegocio("COP enviado ou recebido não pode ser excluído: o material já saiu do RJ.")
+    linhas = [s for i in cop.itens if (s := _sa_do_item(db, i)) is not None]
+    if any(s.situacao == "CONFIRMADO" for s in linhas):
+        raise ErroNegocio("Há SA confirmado neste COP: não é possível excluir.")
+    if any(i.nf_id is not None for i in cop.itens):
+        raise ErroNegocio("Este COP já tem NF de transferência: não é possível excluir.")
+    fechado, numero = cop.situacao == "FECHADO", cop.numero
+    sols = {i.liberacao.solicitacao_id for i in cop.itens}
+    snapshot = {"numero": numero, "situacao": cop.situacao, "criado_por_id": cop.criado_por_id,
+                "itens": [{"liberacao_id": i.liberacao_id, "op": i.liberacao.solicitacao.op,
+                           "pecas": i.liberacao.pecas, "peso_kg": i.liberacao.peso_real_kg} for i in cop.itens],
+                "sas_removidos": len(linhas)}
+    for s in linhas:
+        db.delete(s)
+    db.flush()
+    for i in list(cop.itens):
+        db.delete(i)
+    db.flush()
+    db.expire(cop, ["itens"])
+    db.delete(cop)
+    db.flush()
+    for sol_id in sols:
+        recalcular_solicitacao(db, db.get(SolicitacaoCorte, sol_id))
+    motivo = " ".join((motivo or "").split())[:500] or None
+    if fechado:
+        notificar(db, perfis=ESTOQUE_ITU, tipo="COP_EXCLUIDO", link="/sa",
+                  texto=f"COP {numero} excluído pelo RJ{f': {motivo}' if motivo else ''}. Os SAs dele saíram da fila.")
+    auditoria.registrar(db, "COP_EXCLUIDO", usuario_id=usuario.id, entidade="cop", entidade_id=cop_id,
+                        antes=snapshot, depois={"motivo": motivo}, ip=ip)
+    db.commit()
+
+
 def informar_nf(db: Session, cop_id: int, numero: str, emitente: str, data, item_ids: list[int] | None, *,
                 usuario: Usuario, ip: str | None) -> Cop:
     """NF digitada uma vez no COP e copiada para os itens (ou só para os selecionados) e suas linhas de SA."""
@@ -357,7 +400,11 @@ def cop_dict(db: Session, cop: Cop, *, com_itens: bool = True) -> dict[str, Any]
          "enviado_em": cop.enviado_em.isoformat() if cop.enviado_em else None,
          "qtd_itens": len(cop.itens),
          "peso_total_kg": round(sum(float(i.liberacao.peso_real_kg) for i in cop.itens), 3),
-         "nfs": nfs, "observacao": cop.observacao}
+         "nfs": nfs, "observacao": cop.observacao,
+         # spec v3.23: quem abriu o COP (pode excluir; o Admin também)
+         "criado_por_id": cop.criado_por_id,
+         "criado_por": db.scalar(select(Usuario.nome).where(Usuario.id == cop.criado_por_id))
+         if cop.criado_por_id else None}
     if com_itens:
         d["itens"] = [item_dict(db, i) for i in cop.itens]
     return d

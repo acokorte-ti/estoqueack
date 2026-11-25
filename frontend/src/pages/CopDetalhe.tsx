@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, data, kg, reais, rsKg, validacaoDoErro, type Ocorrencia } from "../api/cliente";
 import { useSessao } from "../api/sessao";
 import { EMITENTES_LANCAMENTO, faltasNf, nfTexto, nomeEmitente, SA_ITEM, SITUACAO_COP, temPrecificador, type Cop, type CortePronto } from "../api/cop";
@@ -25,7 +25,8 @@ export default function CopDetalhe() {
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
   const [sel, setSel] = useState<number[]>([]);
-  const [janela, setJanela] = useState<null | "adicionar" | "fechar" | "nf" | "reabrir" | "enviar">(null);
+  const [janela, setJanela] = useState<null | "adicionar" | "fechar" | "nf" | "reabrir" | "enviar" | "excluir">(null);
+  const nav = useNavigate();
 
   const carregar = useCallback(() => api.get<Cop>(`/cops/${id}`).then(setC).catch((e: Error) => setErro(e.message)), [id]);
   useEffect(() => {
@@ -56,6 +57,9 @@ export default function CopDetalhe() {
   const nfLiberada = !faltam.sa && !faltam.rs;
   const motivoNf = nfLiberada ? "" : `Falta ${[faltam.sa ? `SA confirmado em ${faltam.sa} item(ns)` : "", faltam.rs ? `R$/kg do precificador em ${faltam.rs} item(ns)` : ""].filter(Boolean).join(" e ")} (Cadastro de SA, em Itu).`;
   const e = etapa(c);
+  // spec v3.23 T11: "Excluir COP" para quem abriu o COP e para o Admin, antes do envio e sem SA confirmado
+  const autor = !!usuario && c.criado_por_id !== null && c.criado_por_id !== undefined && c.criado_por_id === usuario.id;
+  const podeExcluir = (autor || usuario?.perfil === "ADMIN") && (c.situacao === "ABERTO" || c.situacao === "FECHADO") && saOk === 0 && comNf === 0;
 
   return (
     <>
@@ -67,6 +71,7 @@ export default function CopDetalhe() {
             <span className={`etiqueta ${SITUACAO_COP[c.situacao]?.classe ?? ""}`}>{SITUACAO_COP[c.situacao]?.nome ?? c.situacao}</span>{" "}
             {c.qtd_itens} item(ns) · {kg(c.peso_total_kg)} kg
             {c.enviado_em && ` · enviado em ${data(c.enviado_em)}`}
+            {c.criado_por && ` · aberto por ${c.criado_por}`}
           </p>
         </div>
         {monta && aberto && <button className="primario" disabled={!itens.length} onClick={() => setJanela("fechar")}>Fechar COP</button>}
@@ -104,7 +109,11 @@ export default function CopDetalhe() {
           )}
           {fechado && !nfLiberada && <span className="desc">NF bloqueada: {motivoNf}</span>}
           {fechado && <button className="perigo" onClick={() => setJanela("reabrir")}>Reabrir COP</button>}
+          {podeExcluir && <button className="perigo" onClick={() => setJanela("excluir")}>Excluir COP</button>}
         </div>
+      )}
+      {!monta && podeExcluir && (
+        <div className="barra-acoes"><button className="perigo" onClick={() => setJanela("excluir")}>Excluir COP</button></div>
       )}
 
       {!itens.length ? (
@@ -160,6 +169,7 @@ export default function CopDetalhe() {
       {janela === "fechar" && <JanelaFechar cop={c} aoFechar={() => setJanela(null)} aoGravar={() => feito("COP fechado. Itu foi avisado para fazer os SAs.")} />}
       {janela === "nf" && <JanelaNf cop={c} itemIds={sel} aoFechar={() => setJanela(null)} aoGravar={(n) => feito(`NF ${n} informada.`)} />}
       {janela === "reabrir" && <JanelaReabrir cop={c} aoFechar={() => setJanela(null)} aoGravar={() => feito("COP reaberto. As linhas de SA ainda não confirmadas foram apagadas.")} />}
+      {janela === "excluir" && <JanelaExcluir cop={c} aoFechar={() => setJanela(null)} aoGravar={() => nav("/cops")} />}
       {janela === "enviar" && <JanelaEnviar cop={c} aoFechar={() => setJanela(null)} aoGravar={() => feito("COP enviado. Itu foi avisado do material em trânsito.")} />}
     </>
   );
@@ -299,6 +309,37 @@ function JanelaReabrir({ cop, aoFechar, aoGravar }: { cop: Cop; aoFechar: () => 
       {erro && <p className="erro" role="alert">{erro}</p>}
       <div className="botoes">
         <button className="perigo" disabled={falta > 0} onClick={() => void ok()}>Reabrir COP</button>
+        <button className="secundario" onClick={(e) => fecharJanela(e.currentTarget)}>Voltar</button>
+      </div>
+    </Janela>
+  );
+}
+
+function JanelaExcluir({ cop, aoFechar, aoGravar }: { cop: Cop; aoFechar: () => void; aoGravar: () => void }) {
+  const [motivo, setMotivo] = useState("");
+  const [erro, setErro] = useState("");
+  const [gravando, setGravando] = useState(false);
+  const fechado = cop.situacao !== "ABERTO";
+  async function ok() {
+    setGravando(true);
+    try {
+      await api.post(`/cops/${cop.id}/excluir`, motivo.trim() ? { motivo: motivo.trim() } : {});
+      aoGravar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível excluir.");
+      setGravando(false);
+    }
+  }
+  return (
+    <Janela titulo={`Excluir COP ${cop.numero}`} aoFechar={aoFechar}>
+      <p className="desc">
+        O COP nº {cop.numero} deixa de existir. Os {cop.qtd_itens} corte(s) dele voltam para "cortes prontos" e podem entrar em outro COP
+        {fechado ? "; as linhas de SA ainda não confirmadas são apagadas e Itu é avisado" : ""}. O saldo não muda. Não dá para desfazer.
+      </p>
+      <label>Motivo (opcional)<textarea autoFocus rows={2} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ex.: COP aberto em duplicidade" /></label>
+      {erro && <p className="erro" role="alert">{erro}</p>}
+      <div className="botoes">
+        <button className="perigo" disabled={gravando} onClick={() => void ok()}>Excluir COP</button>
         <button className="secundario" onClick={(e) => fecharJanela(e.currentTarget)}>Voltar</button>
       </div>
     </Janela>

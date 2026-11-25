@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -90,6 +90,19 @@ class Justificativa(BaseModel):
 def reabrir(cop_id: int, c: Justificativa, request: Request, db: Session = Depends(get_db),
             u: Usuario = Depends(RJ)) -> dict:
     return cops.cop_dict(db, cops.reabrir(db, cop_id, c.justificativa, usuario=u, ip=deps.ip_cliente(request)))
+
+
+class Motivo(BaseModel):
+    motivo: str | None = Field(None, max_length=500)
+
+
+@router.post("/cops/{cop_id}/excluir", status_code=204)
+def excluir(cop_id: int, request: Request, c: Motivo | None = None, db: Session = Depends(get_db),
+            u: Usuario = Depends(deps.usuario_liberado)):
+    """Spec v3.23 T11: só quem abriu o COP ou o Admin."""
+    if not cops.pode_excluir(cops.obter(db, cop_id), u):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Só quem abriu o COP (ou o Admin) pode excluí-lo.")
+    cops.excluir(db, cop_id, c.motivo if c else None, usuario=u, ip=deps.ip_cliente(request))
 
 
 class NfCorpo(BaseModel):

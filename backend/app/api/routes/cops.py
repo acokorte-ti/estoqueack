@@ -77,6 +77,32 @@ def remover(cop_id: int, item_id: int, request: Request, db: Session = Depends(g
     return cops.cop_dict(db, cops.remover_item(db, cop_id, item_id, usuario=u, ip=deps.ip_cliente(request)))
 
 
+class EdicaoItem(BaseModel):
+    """Spec v3.24 T11 "Editar" no item do COP aberto. Campo ausente ou null = não muda."""
+    op: int | None = Field(None, gt=0)
+    pecas: int | None = Field(None, gt=0, lt=100_000)
+    peso_kg: float | None = Field(None, gt=0, lt=1_000_000)
+    motivo: str | None = Field(None, max_length=400)
+    confirmacoes: dict[str, str] = Field(default_factory=dict)
+
+    def entrada(self) -> cops.EdicaoItem:
+        return cops.EdicaoItem(op=self.op, pecas=self.pecas, peso_kg=self.peso_kg, motivo=self.motivo,
+                               confirmacoes=self.confirmacoes)
+
+
+@router.post("/cops/{cop_id}/itens/{item_id}/validar")
+def validar_edicao(cop_id: int, item_id: int, c: EdicaoItem, db: Session = Depends(get_db),
+                   cfg: Config = Depends(deps.config), _: Usuario = Depends(RJ)) -> dict:
+    return cops.validar_edicao(db, cfg, cop_id, item_id, c.entrada()).como_dict()
+
+
+@router.patch("/cops/{cop_id}/itens/{item_id}")
+def editar_item(cop_id: int, item_id: int, c: EdicaoItem, request: Request, db: Session = Depends(get_db),
+                cfg: Config = Depends(deps.config), u: Usuario = Depends(RJ)) -> dict:
+    return cops.cop_dict(db, cops.editar_item(db, cfg, cop_id, item_id, c.entrada(), usuario=u,
+                                              ip=deps.ip_cliente(request)))
+
+
 @router.post("/cops/{cop_id}/fechar")
 def fechar(cop_id: int, request: Request, db: Session = Depends(get_db), u: Usuario = Depends(RJ)) -> dict:
     return cops.cop_dict(db, cops.fechar(db, cop_id, usuario=u, ip=deps.ip_cliente(request)))

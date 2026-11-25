@@ -526,24 +526,30 @@ def trocar_op(db: Session, sol_id: int, nova_op: int, justificativa: str, *, usu
     r = _validar_op(db, dados, ignorar_solicitacao=sol.id)
     if r.erros:
         raise ErroNegocio(r.erros[0].mensagem)
-    avisos = []
     antes = {"op": sol.op, "item_codigo": sol.item_codigo, "cliente": sol.cliente}
-    sol.op, sol.item_codigo, sol.item_descricao = nova_op, dados.item_codigo, dados.item_descricao
-    sol.cliente, sol.pedido, sol.op_confirmada_mega = dados.cliente, dados.pedido, dados.confirmada_mega
-    sas = db.scalars(select(CadastroSa).where(CadastroSa.solicitacao_id == sol.id)).all()
-    for sa in sas:
-        if sa.situacao == "CONFIRMADO":
-            avisos.append(f"O SA {sa.sa_codigo} já foi confirmado no Mega: ajuste o SA no Mega.")
-        sa.op, sa.item_codigo, sa.item_descricao, sa.cliente = nova_op, dados.item_codigo, dados.item_descricao, \
-            dados.cliente
-        sa.pedido = dados.pedido or sa.pedido
-        if sa.exportado_renato_em:
-            sa.alterado_apos_exportar = True
+    avisos = aplicar_op(db, sol, dados)
     auditoria.registrar(db, "SOLICITACAO_OP_TROCADA", usuario_id=usuario.id, entidade="solicitacao",
                         entidade_id=sol.id, antes=antes, depois={"op": nova_op, "justificativa": j, "avisos": avisos},
                         ip=ip)
     db.commit()
     return sol, avisos
+
+
+def aplicar_op(db: Session, sol: SolicitacaoCorte, dados: ops.DadosOp) -> list[str]:
+    """Troca OP, item e cliente na solicitação e nas linhas de SA dela (R007; também "Editar" no COP, spec v3.24).
+    SA já confirmado também é atualizado aqui, mas volta um aviso para ajustar no Mega."""
+    avisos = []
+    sol.op, sol.item_codigo, sol.item_descricao = dados.numero, dados.item_codigo, dados.item_descricao
+    sol.cliente, sol.pedido, sol.op_confirmada_mega = dados.cliente, dados.pedido, dados.confirmada_mega
+    for sa in db.scalars(select(CadastroSa).where(CadastroSa.solicitacao_id == sol.id)).all():
+        if sa.situacao == "CONFIRMADO":
+            avisos.append(f"O SA {sa.sa_codigo} já foi confirmado no Mega: ajuste o SA no Mega.")
+        sa.op, sa.item_codigo, sa.item_descricao, sa.cliente = dados.numero, dados.item_codigo, \
+            dados.item_descricao, dados.cliente
+        sa.pedido = dados.pedido or sa.pedido
+        if sa.exportado_renato_em:
+            sa.alterado_apos_exportar = True
+    return avisos
 
 
 def duplicar(db: Session, sol_id: int, *, usuario: Usuario, ip: str | None) -> SolicitacaoCorte:

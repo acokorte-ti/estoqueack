@@ -302,6 +302,9 @@ def estornar(db: Session, mov_id: int, justificativa: str, *, usuario: Usuario, 
         raise ErroNegocio("Este movimento já foi estornado.")
     if so_rj_no_rio(usuario) and m.usuario_id != usuario.id:
         raise ErroNegocio("O RJ só pode estornar os próprios lançamentos.")
+    if m.tipo == "AJUSTE_INVENTARIO" and m.liberacao_id:
+        # spec v3.24 T11: ajuste da correção de um corte no COP; desfazer = editar o item do COP de novo
+        raise ErroNegocio("Este ajuste é a correção de um corte no COP: para desfazer, edite o item no COP.")
     lib = db.get(LiberacaoCorte, m.liberacao_id) if m.liberacao_id and m.tipo == "SAIDA_CORTE_RJ" else None
     if lib is not None:
         item = db.scalar(select(CopItem).where(CopItem.liberacao_id == lib.id))

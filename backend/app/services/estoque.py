@@ -376,7 +376,8 @@ def movimentos(db: Session, lote_id: int) -> list[dict]:
         saldo = round(saldo + m.kg, 3)
         estornavel = (m.tipo != "ESTORNO" and m.estorno_de_id is None and m.id not in estornados
                       and m.origem_ref is None                       # movimento da carga: corrigir por ajuste (T18)
-                      and not (m.tipo == "SAIDA_CORTE_RJ" and m.liberacao_id in em_cop))
+                      and not (m.tipo == "SAIDA_CORTE_RJ" and m.liberacao_id in em_cop)
+                      and not (m.tipo == "AJUSTE_INVENTARIO" and m.liberacao_id))   # correção do corte no COP
         out.append({"id": m.id, "data": (m.data_referencia or m.criado_em.date()).isoformat(), "tipo": m.tipo,
                     "tipo_descricao": TIPO_MOV_DESCRICAO.get(m.tipo, m.tipo), "kg": round(m.kg, 3),
                     "saldo_apos_kg": saldo, "op": m.op, "cop": m.cop_numero, "sa": m.sa_codigo,

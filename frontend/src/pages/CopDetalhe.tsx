@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api, data, kg, reais, rsKg, validacaoDoErro, type Ocorrencia } from "../api/cliente";
+import { api, data, kg, num, reais, rsKg, validacaoDoErro, type Ocorrencia, type Validacao } from "../api/cliente";
 import { useSessao } from "../api/sessao";
-import { EMITENTES_LANCAMENTO, faltasNf, nfTexto, nomeEmitente, SA_ITEM, SITUACAO_COP, temPrecificador, type Cop, type CortePronto } from "../api/cop";
+import { EMITENTES_LANCAMENTO, faltasNf, nfTexto, nomeEmitente, SA_ITEM, SITUACAO_COP, temPrecificador, type Cop, type CopItem, type CortePronto } from "../api/cop";
 import { MODO_NOME } from "../api/solicitacao";
 import Janela, { fecharJanela } from "../components/Janela";
-import PainelValidacao, { JUSTIFICATIVA_MIN } from "../components/PainelValidacao";
+import PainelValidacao, { confirmacoesValidas, JUSTIFICATIVA_MIN, podeGravar, type Confirmacoes } from "../components/PainelValidacao";
 
 const ETAPAS = ["Montar", "Fechar", "SA e precificador em Itu", "NF", "Enviar", "Recebido"];
 function etapa(c: Cop): number {
@@ -26,6 +26,7 @@ export default function CopDetalhe() {
   const [aviso, setAviso] = useState("");
   const [sel, setSel] = useState<number[]>([]);
   const [janela, setJanela] = useState<null | "adicionar" | "fechar" | "nf" | "reabrir" | "enviar" | "excluir">(null);
+  const [editando, setEditando] = useState<CopItem | null>(null);
   const nav = useNavigate();
 
   const carregar = useCallback(() => api.get<Cop>(`/cops/${id}`).then(setC).catch((e: Error) => setErro(e.message)), [id]);
@@ -154,7 +155,12 @@ export default function CopDetalhe() {
                         {i.divergencias.length > 0 && <><br /><span className="etiqueta ruim">{i.divergencias.length} divergência(s)</span></>}
                       </td>
                     )}
-                    {monta && aberto && <td className="acoes"><button className="link" onClick={() => void remover(i.id)}>Remover</button></td>}
+                    {monta && aberto && (
+                      <td className="acoes">
+                        <button className="link" onClick={() => setEditando(i)}>Editar</button>
+                        <button className="link" onClick={() => void remover(i.id)}>Remover</button>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -165,6 +171,8 @@ export default function CopDetalhe() {
       {c.nfs.length > 0 && <p className="desc" style={{ marginTop: 8 }}>NF(s): {c.nfs.map(nfTexto).join(", ")}</p>}
       {c.observacao && <p className="desc">Observação: {c.observacao}</p>}
 
+      {editando && <JanelaEditarItem cop={c} item={editando} aoFechar={() => setEditando(null)}
+        aoGravar={(novo) => { setEditando(null); setC(novo); setAviso(`Item da OP ${editando.op} corrigido.`); }} />}
       {janela === "adicionar" && <JanelaAdicionar cop={c} aoFechar={() => setJanela(null)} aoGravar={(n) => feito(`${n} corte(s) incluído(s) no COP.`)} />}
       {janela === "fechar" && <JanelaFechar cop={c} aoFechar={() => setJanela(null)} aoGravar={() => feito("COP fechado. Itu foi avisado para fazer os SAs.")} />}
       {janela === "nf" && <JanelaNf cop={c} itemIds={sel} aoFechar={() => setJanela(null)} aoGravar={(n) => feito(`NF ${n} informada.`)} />}
@@ -216,6 +224,75 @@ function JanelaAdicionar({ cop, aoFechar, aoGravar }: { cop: Cop; aoFechar: () =
       {erro && <p className="erro" role="alert">{erro}</p>}
       <div className="botoes">
         <button className="primario" disabled={!sel.length} onClick={() => void ok()}>Incluir {sel.length} corte(s)</button>
+        <button className="secundario" onClick={(e) => fecharJanela(e.currentTarget)}>Voltar</button>
+      </div>
+    </Janela>
+  );
+}
+
+type PreviaEdicao = Validacao<{ frase?: string }>;
+const textoNum = (v: number) => String(v).replace(".", ",");
+
+/** Spec v3.24 T11: "Editar" no item do COP aberto. OP, peças e peso real do corte; o peso ajusta o saldo do lote. */
+function JanelaEditarItem({ cop, item, aoFechar, aoGravar }: { cop: Cop; item: CopItem; aoFechar: () => void; aoGravar: (c: Cop) => void }) {
+  const [op, setOp] = useState(String(item.op));
+  const [pecas, setPecas] = useState(String(item.pecas));
+  const [peso, setPeso] = useState(textoNum(item.peso_kg));
+  const [motivo, setMotivo] = useState("");
+  const [v, setV] = useState<PreviaEdicao | null>(null);
+  const [conf, setConf] = useState<Confirmacoes>({});
+  const [erro, setErro] = useState("");
+  const [gravando, setGravando] = useState(false);
+  const mudar = (f: (x: string) => void) => (x: string) => { f(x); setV(null); setErro(""); };
+
+  /** Só os campos que mudaram (campo ausente = não muda; contrato §4). */
+  function corpo(c: Confirmacoes) {
+    const b: Record<string, unknown> = { confirmacoes: c };
+    const nOp = Number(op.trim()), nPecas = Number(pecas.trim()), nPeso = num(peso);
+    if (op.trim() && nOp !== item.op) b.op = nOp;
+    if (pecas.trim() && nPecas !== item.pecas) b.pecas = nPecas;
+    if (nPeso !== undefined && nPeso !== null && Math.abs(nPeso - item.peso_kg) > 0.0005) b.peso_kg = nPeso;
+    if (motivo.trim()) b.motivo = motivo.trim();
+    return b;
+  }
+  const invalido = !/^\d+$/.test(op.trim()) || !/^\d+$/.test(pecas.trim()) || Number(pecas) <= 0 || !((num(peso) ?? 0) > 0);
+  const algoMudou = Object.keys(corpo({})).some((k) => k !== "confirmacoes" && k !== "motivo");
+  const url = `/cops/${cop.id}/itens/${item.id}`;
+
+  async function conferir() {
+    setErro("");
+    try { setV(await api.post<PreviaEdicao>(`${url}/validar`, corpo({}))); }
+    catch (e) { setErro(e instanceof Error ? e.message : "Não foi possível conferir."); }
+  }
+  async function gravar() {
+    if (!v) return;
+    setGravando(true);
+    try {
+      aoGravar(await api.patch<Cop>(url, corpo(confirmacoesValidas(v.ocorrencias, conf))));
+    } catch (e) {
+      const x = validacaoDoErro<{ frase?: string }>(e);
+      if (x) setV(x); else setErro(e instanceof Error ? e.message : "Não foi possível gravar.");
+    } finally {
+      setGravando(false);
+    }
+  }
+  return (
+    <Janela titulo={`Editar item · OP ${item.op}`} aoFechar={aoFechar}>
+      <p className="desc">{item.material} · {item.conteiner ?? "sem contêiner"} · {MODO_NOME[item.modo]}. Mudando o peso, o saldo do lote {item.lote} é ajustado pela diferença.</p>
+      <div className="barra-filtros">
+        <label>OP<input inputMode="numeric" value={op} onChange={(e) => mudar(setOp)(e.target.value.replace(/\D/g, ""))} /></label>
+        <label>Peças<input inputMode="numeric" value={pecas} onChange={(e) => mudar(setPecas)(e.target.value.replace(/\D/g, ""))} /></label>
+        <label>Peso real (kg)<input inputMode="decimal" value={peso} onChange={(e) => mudar(setPeso)(e.target.value)} /></label>
+      </div>
+      <p className="desc">Trocando a OP, o cliente vem do Mega e a troca vale para a solicitação inteira.</p>
+      <label>Motivo (opcional)<textarea rows={2} value={motivo} onChange={(e) => { setMotivo(e.target.value); setV(null); }} placeholder="Ex.: peso digitado errado" /></label>
+
+      {v?.resultado?.frase && <p className="frase-resultado">{v.resultado.frase}</p>}
+      {v && <PainelValidacao ocorrencias={v.ocorrencias} confirmacoes={conf} aoMudar={setConf} semOcorrencias="Pode gravar." />}
+      {erro && <p className="erro" role="alert">{erro}</p>}
+      <div className="botoes">
+        {!v ? <button className="primario" disabled={invalido || !algoMudou} onClick={() => void conferir()}>Ver o que muda</button>
+          : <button className="primario" disabled={gravando || !podeGravar(v.ocorrencias, conf)} onClick={() => void gravar()}>Gravar</button>}
         <button className="secundario" onClick={(e) => fecharJanela(e.currentTarget)}>Voltar</button>
       </div>
     </Janela>

@@ -8,11 +8,14 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import Config
+from app.domain import regras
 from app.domain.formato import kg_br, pct_br
 from app.domain.validacao import Nivel
 from app.models import CadastroSa, Cop, CopItem, DivergenciaRecebimento, LiberacaoCorte, SolicitacaoCorte, Usuario
 
-from . import auditoria, movimentos, sas
+from . import auditoria, movimentos, ops, sas
+from . import solicitacoes as sol_svc
 from .base import ErroNegocio, NaoEncontrado, Previa, agora, exigir_sem_pendencias, notificar, parametro
 from .estoque import bitola
 from .fluxo import material_texto, recalcular_solicitacao
@@ -106,6 +109,132 @@ def remover_item(db: Session, cop_id: int, item_id: int, *, usuario: Usuario, ip
     db.refresh(cop, ["itens"])
     auditoria.registrar(db, "COP_ITEM_REMOVIDO", usuario_id=usuario.id, entidade="cop", entidade_id=cop.id,
                         depois={"item": item_id}, ip=ip)
+    db.commit()
+    return cop
+
+
+@dataclass
+class EdicaoItem:
+    """Spec v3.24 T11 "Editar" no item do COP aberto: OP, peças e peso real do corte (o que vier None não muda)."""
+    op: int | None = None
+    pecas: int | None = None
+    peso_kg: float | None = None
+    motivo: str | None = None
+    confirmacoes: dict[str, str] = field(default_factory=dict)
+
+
+def _item_do_cop(db: Session, cop: Cop, item_id: int) -> CopItem:
+    item = db.get(CopItem, item_id)
+    if item is None or item.cop_id != cop.id:
+        raise NaoEncontrado("Item não encontrado neste COP.")
+    return item
+
+
+def _preparar_edicao(db: Session, cfg: Config | None, cop: Cop, item: CopItem,
+                     e: EdicaoItem) -> tuple[Previa, ops.DadosOp | None, int, float]:
+    previa = Previa()
+    r = previa.resultado
+    lib, sol = item.liberacao, item.liberacao.solicitacao
+    if cop.situacao != "ABERTO":
+        r.adicionar("COP_FECHADO", Nivel.ERRO, "Só dá para editar item de COP aberto. Com o COP fechado, use "
+                                               "\"Reabrir COP\".")
+    pecas = lib.pecas if e.pecas is None else e.pecas
+    peso = float(lib.peso_real_kg) if e.peso_kg is None else round(float(e.peso_kg), 3)
+    antigo = float(lib.peso_real_kg)
+    muda_corte = pecas != lib.pecas or abs(peso - antigo) > 1e-6
+    dados = None
+    if e.op is not None and e.op != sol.op:
+        dados = ops.consultar(db, e.op)
+        r.juntar(sol_svc._validar_op(db, dados, ignorar_solicitacao=sol.id))
+        if dados.encontrada:
+            outros = [x for x in sol.liberacoes if not x.estornada and x.id != lib.id]
+            r.adicionar("OP_TROCADA", Nivel.ALERTA,
+                        f"A OP passa de {sol.op} ({sol.cliente or 'sem cliente'}) para {dados.numero} "
+                        f"({dados.cliente or 'sem cliente'}). Muda na solicitação S-{sol.id:06d} inteira"
+                        + (f", inclusive nos outros {len(outros)} corte(s) dela." if outros else "."))
+            for sa in db.scalars(select(CadastroSa).where(CadastroSa.solicitacao_id == sol.id,
+                                                          CadastroSa.situacao == "CONFIRMADO")):
+                r.adicionar("SA_CONFIRMADO", Nivel.ALERTA,
+                            f"O SA {sa.sa_codigo} desta solicitação já foi confirmado no Mega: ajuste o SA no Mega.")
+    if not muda_corte and dados is None:
+        r.adicionar("SEM_MUDANCA", Nivel.ERRO, "Nada foi alterado.")
+    if muda_corte:
+        lote = lib.lote
+        saldo = float(lote.saldo_kg)
+        if peso - antigo > saldo + 1e-6:
+            r.adicionar("SALDO_INSUFICIENTE", Nivel.ERRO,
+                        f"Faltam {kg_br(peso - antigo - saldo)} no lote {lote.codigo} (saldo {kg_br(saldo)}) para "
+                        f"aumentar o corte para {kg_br(peso)}.")
+        else:
+            r.adicionar("AJUSTE_SALDO", Nivel.ALERTA,
+                        f"O corte passa de {lib.pecas} pç / {kg_br(antigo)} para {pecas} pç / {kg_br(peso)}. "
+                        f"O saldo do lote {lote.codigo} vai de {kg_br(saldo)} para {kg_br(saldo + antigo - peso)}.")
+            previa.efeitos.append({"lote": lote.codigo, "lote_id": lote.id, "antes_kg": round(saldo, 3),
+                                   "depois_kg": round(saldo + antigo - peso, 3), "pecas": pecas,
+                                   "peso_real_kg": peso})
+        outras = movimentos.pecas_cortadas(sol) - lib.pecas
+        if outras + pecas > sol.quantidade:
+            r.adicionar("PECAS_ACIMA_SOLICITADO", Nivel.ALERTA,
+                        f"Peças cortadas ({outras + pecas}) acima do pedido ({sol.quantidade}).")
+        elif outras + pecas < sol.quantidade <= outras + lib.pecas:
+            r.adicionar("SOLICITACAO_PARCIAL", Nivel.ALERTA,
+                        f"Faltam {sol.quantidade - outras - pecas} peça(s) da OP: a solicitação volta a ficar parcial "
+                        f"e volta para a fila do RJ.")
+        if sol.quantidade and sol.peso_previsto_kg:
+            previsto = round(float(sol.peso_previsto_kg) * pecas / sol.quantidade, 3)
+            if sol.modo == "CORTAR_RJ":
+                r.juntar(regras.validar_peso_real(previsto, peso, parametro(db, "TOLERANCIA_EXCESSO_PCT", cfg),
+                                                  parametro(db, "TOLERANCIA_FALTA_PCT", cfg)))
+            elif sol.modo == "TRAZER_INTEIRA":
+                r.juntar(regras.validar_barra_inteira(previsto, peso))
+    op = dados.numero if dados is not None else sol.op
+    previa.frase = (f"Item da OP {op} no COP {cop.numero}: {pecas} pç, {kg_br(peso)}."
+                    + (" O saldo do lote é ajustado pela diferença." if muda_corte else ""))
+    return previa, dados, pecas, peso
+
+
+def validar_edicao(db: Session, cfg: Config | None, cop_id: int, item_id: int, e: EdicaoItem) -> Previa:
+    cop = obter(db, cop_id)
+    return _preparar_edicao(db, cfg, cop, _item_do_cop(db, cop, item_id), e)[0]
+
+
+def editar_item(db: Session, cfg: Config | None, cop_id: int, item_id: int, e: EdicaoItem, *, usuario: Usuario,
+                ip: str | None) -> Cop:
+    """Spec v3.24 T11: corrige OP, peças e peso real de um corte no COP aberto. A OP muda na solicitação (como o
+    "Trocar OP" de Itu); o peso muda o saldo do lote por um ajuste ligado ao corte, que não se estorna à parte."""
+    cop = obter(db, cop_id, travar=True)
+    if cop.situacao != "ABERTO":
+        raise ErroNegocio("Só dá para editar item de COP aberto. Com o COP fechado, use \"Reabrir COP\".")
+    item = _item_do_cop(db, cop, item_id)
+    lib = item.liberacao
+    sol = sol_svc.obter(db, lib.solicitacao_id, travar=True)
+    lote = movimentos.lote_ou_404(db, lib.lote_id, travar=True)
+    previa, dados, pecas, peso = _preparar_edicao(db, cfg, cop, item, e)
+    conf = exigir_sem_pendencias(previa, e.confirmacoes)
+    motivo = (e.motivo or "").strip()
+    antes = {"op": sol.op, "cliente": sol.cliente, "pecas": lib.pecas, "peso_kg": float(lib.peso_real_kg)}
+    avisos = sol_svc.aplicar_op(db, sol, dados) if dados is not None else []
+    antigo = float(lib.peso_real_kg)
+    mov_id = None
+    if pecas != lib.pecas or abs(peso - antigo) > 1e-6:
+        texto = (f"Correção do corte da OP {sol.op} no COP {cop.numero}: {lib.pecas} pç / {kg_br(antigo)} → "
+                 f"{pecas} pç / {kg_br(peso)}" + (f". {motivo}" if motivo else ""))
+        if abs(peso - antigo) > 1e-6:
+            mov_id = movimentos.lancar(db, lote, "AJUSTE_INVENTARIO", antigo - peso, usuario_id=usuario.id,
+                                       op=sol.op, cop_numero=cop.numero, solicitacao_id=sol.id,
+                                       liberacao_id=lib.id, justificativa=texto,
+                                       confirmacoes=conf or None).id
+        lib.pecas, lib.peso_real_kg = pecas, peso
+        db.flush()
+        recalcular_solicitacao(db, sol)
+    notificar(db, perfis=ESTOQUE_ITU, tipo="CORTE_CORRIGIDO",
+              texto=f"COP {cop.numero}: o RJ corrigiu o corte da OP {sol.op} ({pecas} pç, {kg_br(peso)})"
+                    + (f"; a OP era {antes['op']}" if dados is not None else "") + ".",
+              link=f"/solicitacoes/{sol.id}")
+    auditoria.registrar(db, "COP_ITEM_EDITADO", usuario_id=usuario.id, entidade="cop", entidade_id=cop.id,
+                        antes=antes, depois={"item": item.id, "op": sol.op, "cliente": sol.cliente, "pecas": pecas,
+                                             "peso_kg": peso, "movimento_id": mov_id, "motivo": motivo or None,
+                                             "confirmacoes": conf, "avisos": avisos}, ip=ip)
     db.commit()
     return cop
 

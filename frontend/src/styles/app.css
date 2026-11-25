@@ -437,6 +437,10 @@ tr.linha-aviso .validacao { margin: 0 0 var(--esp-2); font-size: var(--t-pequeno
 .cartao-espera { color: var(--aco-medio); font-weight: 600; }
 .cartao-linha-etiquetas { display: inline-flex; flex-wrap: wrap; gap: var(--esp-2); margin-left: auto; }
 .cartao-linha-seta { color: var(--aco-medio); font-size: 1.25rem; }
+/* T09: linha do cartão + "Imprimir OP" ao lado (spec v3.25) */
+.cartao-faixa { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--esp-3); }
+.cartao-faixa .cartao-linha { flex: 1 1 0; width: auto; min-width: 0; }
+.cartao-faixa > .secundario { flex: none; }
 .secao { margin-top: var(--esp-6); }
 .secao > h2 { margin-bottom: var(--esp-3); }
 .saldos { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: var(--esp-4); margin-bottom: var(--esp-4); }

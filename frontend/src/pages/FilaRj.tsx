@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, data, kg } from "../api/cliente";
 import { useSessao } from "../api/sessao";
 import { MODO_NOME, material, type SolicItem } from "../api/solicitacao";
 import { EtiquetaAtraso, EtiquetaSituacao } from "../components/Etiquetas";
+import Icone from "../components/Icone";
 import Janela, { fecharJanela } from "../components/Janela";
 import { JUSTIFICATIVA_MIN } from "../components/PainelValidacao";
 
@@ -29,6 +31,10 @@ const inicioEspera = (s: SolicItem) => {
 };
 type Ordem = "ESPERA" | "PRAZO";
 const ORDEM_NOME: Record<Ordem, string> = { ESPERA: "há mais tempo esperando", PRAZO: "prazo" };
+/** "PRAZO" = ordem da API; "ESPERA" = há mais tempo esperando no topo (sort estável: empate fica na ordem de prazo). */
+const ordenar = (lista: SolicItem[], ordem: Ordem) => (ordem === "PRAZO" ? lista : [...lista].sort((a, b) => inicioEspera(a) - inicioEspera(b)));
+/** O que vai para o papel (spec v3.25 T09): a lista inteira, uma OP (todas as partes dela) ou, no Ctrl+P, o que está na tela. */
+type Impressao = null | "TODAS" | number;
 
 /** T09 Fila RJ: o que o Marcelo tem para cortar, por prazo. Cartões grandes para tablet/celular. */
 export default function FilaRj() {
@@ -50,11 +56,21 @@ export default function FilaRj() {
     const termo = normalizar(busca.trim());
     const achados = !fila ? [] : !termo ? fila
       : fila.filter((s) => normalizar([s.op, s.cliente, s.lote.liga, s.lote.bitola, s.lote.conteiner, s.lote.codigo, material(s.lote)].filter(Boolean).join(" ")).includes(termo));
-    if (ordem === "PRAZO") return achados;
-    // sort estável: empate no envio fica na ordem de prazo da API
-    return [...achados].sort((a, b) => inicioEspera(a) - inicioEspera(b));
+    return ordenar(achados, ordem);
   }, [fila, busca, ordem]);
   const totalEstimado = useMemo(() => visiveis.reduce((t, s) => t + (estimado(s) ?? 0), 0), [visiveis]);
+
+  const [impressao, setImpressao] = useState<Impressao>(null);
+  useEffect(() => {
+    const fim = () => setImpressao(null);
+    window.addEventListener("afterprint", fim);
+    return () => window.removeEventListener("afterprint", fim);
+  }, []);
+  /** Monta a folha antes de abrir a impressão (o navegador imprime o que estiver na tela naquele instante). */
+  const imprimir = (alvo: "TODAS" | number) => { flushSync(() => setImpressao(alvo)); window.print(); };
+  const impressas = useMemo(() => (!fila ? [] : impressao === "TODAS" ? ordenar(fila, ordem)
+    : impressao !== null ? ordenar(fila.filter((s) => s.op === impressao), ordem) : visiveis), [fila, impressao, ordem, visiveis]);
+  const totalImpresso = useMemo(() => impressas.reduce((t, s) => t + (estimado(s) ?? 0), 0), [impressas]);
 
   const carregar = useCallback(async () => {
     try {
@@ -75,7 +91,6 @@ export default function FilaRj() {
           <h1>Cortes a fazer no RJ</h1>
           <p>Solicitações enviadas e parciais, {ordem === "ESPERA" ? "da que está há mais tempo esperando para a mais nova" : "da mais urgente (prazo) para a menos urgente"}.</p>
         </div>
-        {!!visiveis.length && <button className="secundario" onClick={() => window.print()}>Imprimir lista de corte</button>}
       </header>
 
       {/* Versão impressa (A4 deitada, sem menu nem cabeçalho/rodapé do navegador): só aparece no papel.
@@ -91,8 +106,8 @@ export default function FilaRj() {
             <thead>
               <tr className="lista-corte-titulo">
                 <th colSpan={10}>
-                  <strong>Lista de corte · RJ</strong> · {new Date().toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                  {" "}· {visiveis.length} item(ns) · {kg(totalEstimado)} kg estimados · por {ORDEM_NOME[ordem]}{busca.trim() ? ` · pesquisa “${busca.trim()}”` : ""}
+                  <strong>Lista de corte · RJ{typeof impressao === "number" ? ` · OP ${impressao}` : ""}</strong> · {new Date().toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  {" "}· {impressas.length} item(ns) · {kg(totalImpresso)} kg estimados · por {ORDEM_NOME[ordem]}{impressao === null && busca.trim() ? ` · pesquisa “${busca.trim()}”` : ""}
                 </th>
               </tr>
               <tr className="lista-corte-colunas">
@@ -101,7 +116,7 @@ export default function FilaRj() {
               </tr>
             </thead>
             <tbody>
-              {visiveis.map((s) => {
+              {impressas.map((s) => {
                 const est = estimado(s);
                 return (
                   <tr key={s.id}>
@@ -118,8 +133,8 @@ export default function FilaRj() {
                 );
               })}
               <tr className="lista-corte-total">
-                <td colSpan={4}>Total estimado · {visiveis.length} item(ns)</td>
-                <td className="num sem-quebra">{kg(totalEstimado)}</td>
+                <td colSpan={4}>Total estimado · {impressas.length} item(ns)</td>
+                <td className="num sem-quebra">{kg(totalImpresso)}</td>
                 <td colSpan={3} /><td className="em-branco" /><td className="em-branco" />
               </tr>
             </tbody>
@@ -148,6 +163,12 @@ export default function FilaRj() {
           <span className="desc">{busca.trim() ? `${visiveis.length} de ${fila.length}` : `${fila.length}`} corte(s) · {kg(totalEstimado)} kg estimados</span>
         </div>
       )}
+      {!!fila?.length && (
+        <div className="barra-acoes nao-imprimir">
+          <button className="secundario" onClick={() => imprimir("TODAS")}><Icone nome="imprimir" /> Imprimir lista completa</button>
+          {busca.trim() && <span className="desc">Imprime os {fila.length} cortes, sem a pesquisa.</span>}
+        </div>
+      )}
       {fila && !!fila.length && !visiveis.length && (
         <div className="estado-vazio nao-imprimir"><strong>Nada encontrado</strong>Nenhum corte com “{busca.trim()}”.</div>
       )}
@@ -161,19 +182,24 @@ export default function FilaRj() {
           const espera = diasEsperando(s);
           return (
             <li key={s.id} className={["cartao", "cartao-compacto", s.atraso === "ATRASADO" ? "atrasado" : "", destaque === s.id ? "destaque" : ""].join(" ")}>
-              <button type="button" className="cartao-linha" aria-expanded={aberto} onClick={() => alternar(s.id)}>
-                <span className="cartao-op">OP {s.op}</span>
-                <span className="cartao-linha-material">{material(s.lote)}</span>
-                {espera !== null && <span className="cartao-espera">há {espera} dia{espera === 1 ? "" : "s"}</span>}
-                <span>{pecas} peça(s)</span>
-                {est !== null && <span>≈ {kg(est)} kg</span>}
-                <span>prazo {data(s.prazo)}</span>
-                <span className="cartao-linha-etiquetas">
-                  <EtiquetaAtraso a={s.atraso} />
-                  {s.situacao !== "ENVIADA" && <EtiquetaSituacao s={s.situacao} />}
-                </span>
-                <span className="cartao-linha-seta" aria-hidden="true">{aberto ? "▴" : "▾"}</span>
-              </button>
+              <div className="cartao-faixa">
+                <button type="button" className="cartao-linha" aria-expanded={aberto} onClick={() => alternar(s.id)}>
+                  <span className="cartao-op">OP {s.op}</span>
+                  <span className="cartao-linha-material">{material(s.lote)}</span>
+                  {espera !== null && <span className="cartao-espera">há {espera} dia{espera === 1 ? "" : "s"}</span>}
+                  <span>{pecas} peça(s)</span>
+                  {est !== null && <span>≈ {kg(est)} kg</span>}
+                  <span>prazo {data(s.prazo)}</span>
+                  <span className="cartao-linha-etiquetas">
+                    <EtiquetaAtraso a={s.atraso} />
+                    {s.situacao !== "ENVIADA" && <EtiquetaSituacao s={s.situacao} />}
+                  </span>
+                  <span className="cartao-linha-seta" aria-hidden="true">{aberto ? "▴" : "▾"}</span>
+                </button>
+                <button type="button" className="secundario pequeno" onClick={() => imprimir(s.op)} aria-label={`Imprimir a OP ${s.op}`}>
+                  <Icone nome="imprimir" /> Imprimir OP
+                </button>
+              </div>
               {aberto && (
                 <>
                   <p className="cartao-instrucao">{s.instrucao ?? `${s.quantidade} peça(s)`}</p>

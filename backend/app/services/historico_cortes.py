@@ -17,8 +17,8 @@ from app.models import Auditoria, CopItem, ItemMP, LiberacaoCorte, Lote, Movimen
 from .base import NaoEncontrado
 from .estoque import TIPO_MOV_DESCRICAO, bitola
 
-SITUACAO_NOME = {"CORTE_PRONTO": "Corte pronto (fora de COP)", "EM_COP": "No COP", "EM_TRANSITO": "Enviado a Itu",
-                 "RECEBIDO": "Recebido em Itu", "ESTORNADO": "Estornado"}
+SITUACAO_NOME = {"CORTE_PRONTO": "Corte pronto (fora de COP)", "SEM_COP": "Sem COP (concluído)", "EM_COP": "No COP",
+                 "EM_TRANSITO": "Enviado a Itu", "RECEBIDO": "Recebido em Itu", "ESTORNADO": "Estornado"}
 ORIGEM_NOME = {"SISTEMA": "Sistema", "PLANILHA": "Planilha (Controle de Corte)"}
 
 
@@ -30,7 +30,10 @@ def _situacao(lib: LiberacaoCorte) -> str:
     if lib.estornada:
         return "ESTORNADO"
     if lib.cop_item is None:
-        return "CORTE_PRONTO"
+        # mesma regra dos "cortes prontos" do COP: corte histórico da carga liberado sem número de COP, com a
+        # solicitação já concluída ou em trânsito, não espera COP
+        prontas = ("CORTADA", "CORTADA_PARCIAL", "MATERIAL_INSUFICIENTE")
+        return "CORTE_PRONTO" if lib.solicitacao.situacao in prontas else "SEM_COP"
     return lib.cop_item.situacao
 
 

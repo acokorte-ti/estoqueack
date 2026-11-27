@@ -6,7 +6,7 @@ import Janela, { fecharJanela } from "../components/Janela";
 import Icone from "../components/Icone";
 
 /** T28 Histórico de cortes do RJ (spec v3.26, contrato §16.8): só Admin, só leitura. */
-type Situacao = "CORTE_PRONTO" | "EM_COP" | "EM_TRANSITO" | "RECEBIDO" | "ESTORNADO";
+type Situacao = "CORTE_PRONTO" | "SEM_COP" | "EM_COP" | "EM_TRANSITO" | "RECEBIDO" | "ESTORNADO";
 interface Corte {
   id: number; data_corte: string; registrado_em: string; registrado_por: string | null;
   origem: "SISTEMA" | "PLANILHA"; origem_nome: string; origem_ref: { arquivo?: string; aba?: string; linha?: number } | null;
@@ -29,10 +29,11 @@ interface Detalhe extends Corte {
 }
 
 const SITUACOES: { valor: Situacao | ""; nome: string }[] = [
-  { valor: "", nome: "Todas" }, { valor: "CORTE_PRONTO", nome: "Corte pronto (fora de COP)" }, { valor: "EM_COP", nome: "No COP" },
+  { valor: "", nome: "Todas" }, { valor: "CORTE_PRONTO", nome: "Corte pronto (fora de COP)" }, { valor: "SEM_COP", nome: "Sem COP (concluído)" },
+  { valor: "EM_COP", nome: "No COP" },
   { valor: "EM_TRANSITO", nome: "Enviado a Itu" }, { valor: "RECEBIDO", nome: "Recebido em Itu" }, { valor: "ESTORNADO", nome: "Estornado" },
 ];
-const CLASSE: Record<Situacao, string> = { CORTE_PRONTO: "atencao", EM_COP: "info", EM_TRANSITO: "info", RECEBIDO: "ok", ESTORNADO: "ruim" };
+const CLASSE: Record<Situacao, string> = { CORTE_PRONTO: "atencao", SEM_COP: "", EM_COP: "info", EM_TRANSITO: "info", RECEBIDO: "ok", ESTORNADO: "ruim" };
 const POR_PAGINA = 100;
 
 const dataHora = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });

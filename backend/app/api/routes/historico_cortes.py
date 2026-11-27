@@ -16,7 +16,7 @@ from app.services import historico_cortes as svc
 
 router = APIRouter(prefix="/admin", tags=["T28 histórico de cortes do RJ"])
 ADMIN = deps.exigir_perfil()          # só ADMIN
-Situacao = Literal["CORTE_PRONTO", "EM_COP", "EM_TRANSITO", "RECEBIDO", "ESTORNADO"]
+Situacao = Literal["CORTE_PRONTO", "SEM_COP", "EM_COP", "EM_TRANSITO", "RECEBIDO", "ESTORNADO"]
 
 
 def filtros(de: date | None = None, ate: date | None = None, op: int | None = Query(None, gt=0),

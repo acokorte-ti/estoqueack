@@ -63,6 +63,8 @@ const GRUPOS: Grupo[] = [
       { para: "/admin/parametros", rotulo: "Parâmetros do sistema", icone: "ajustes", pronto: true },
       // spec v3.22 T27 (Eduardo, 2026-11-25): conferência física, todos os lotes fora do Estoque Mega
       { para: "/admin/estoque", rotulo: "Corrigir estoque", icone: "editar", pronto: true },
+      // spec v3.26 T28 (Eduardo, 2026-11-27): todos os cortes do RJ, do sistema e da planilha, com o log de cada um
+      { para: "/admin/cortes-rj", rotulo: "Histórico de cortes RJ", icone: "relogio", pronto: true },
     ],
   },
 ];

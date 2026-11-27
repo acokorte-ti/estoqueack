@@ -486,6 +486,12 @@ Campos novos opcionais: `fornecedor`, `serie`, `ncm`, `packing_list`, `di_duimp`
 - Grava `AJUSTE_INVENTARIO` (observação ou "Correção manual do estoque (Admin)" no movimento), troca o item do lote por um item sem código Mega com os dados novos (reusa o igual), auditoria `LOTE_CORRIGIDO` e nota no lote.
 - A carga (`python -m app.carga`) avisa no log quantas `LOTE_CORRIGIDO` desde a última carga a recarga vai apagar.
 
+## 16.8 T28 Histórico de cortes do RJ, só Admin (2026-11-27, spec v3.26; sem migração)
+
+- `GET /api/admin/cortes-rj?de=&ate=&op=&busca=&origem=SISTEMA|PLANILHA&situacao=…&estornados=true&pagina=1&por_pagina=100` (só Admin; os demais `403`): `{ itens, total, pagina, por_pagina, totais: {cortes, pecas, peso_real_kg, estornados, sistema, planilha}, periodo: {de, ate} | null }`. Cada item: `id` (liberação), `data_corte`, `registrado_em`, `registrado_por`, `origem` + `origem_nome` + `origem_ref` (aba/linha da planilha), `solicitacao_id`, `solicitacao`, `op`, `cliente`, `item_descricao`, `modo`, `lote_id`, `lote`, `liga`, `bitola`, `conteiner`, `lote_trocado`, `pecas`, `peso_real_kg`, `previsto_kg`, `diferenca_pct`, `comprimento_barra_mm`, `observacao`, `cop`, `cop_id`, `situacao` (`CORTE_PRONTO`, `EM_COP`, `EM_TRANSITO`, `RECEBIDO`, `ESTORNADO`) + `situacao_nome`, `estornado`, `corrigido`. Ordem: data do corte, mais recente primeiro. Totais sem os estornados.
+- `GET /api/admin/cortes-rj.xlsx` com os mesmos filtros: planilha com a lista inteira.
+- `GET /api/admin/cortes-rj/{id}`: o item + `confirmacoes` do lançamento, `movimentos` (todos os movimentos com `liberacao_id` = o corte: `tipo`, `tipo_descricao`, `kg`, `lote`, `data`, `registrado_em`, `usuario`, `justificativa`, `da_carga`) e `correcoes` (auditorias `COP_ITEM_EDITADO` do item do COP: `quando`, `usuario`, `antes`/`depois` com `op`, `cliente`, `pecas`, `peso_kg`, `motivo`). `404` se não existe.
+
 ## 17. Ainda não implementado
 
 📋 F1.1: tratamento da T16 (ver movimentos, ajustar, marcar como explicada), T19 Relatórios, T26, exportação para o Renato com marca, PDFs (romaneio do COP, ficha do lote). A **impressão da Fila RJ (T09)** usa `GET /api/fila-rj`; se faltar campo, o FUNCIONAL indica e eu acrescento.
